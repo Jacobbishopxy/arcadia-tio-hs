@@ -1,0 +1,10 @@
+-- Optional local settings for tests that run against a private native library.
+-- Copy to cabal.project.local if you want Cabal to pass loader paths via an
+-- environment wrapper or custom per-machine settings. Do not commit the copy.
+--
+-- Typical shell setup instead:
+--
+--   export ARCADIA_TIO_CAPI_LIB=/path/to/libarcadia_tio_capi.so
+--   export LD_LIBRARY_PATH="$(dirname "$ARCADIA_TIO_CAPI_LIB")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+--   cabal build all
+--   cabal test all

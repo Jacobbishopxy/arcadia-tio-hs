@@ -1,0 +1,65 @@
+cabal-version: 3.0
+name:          arcadia-tio-hs
+version:       0.2.0.0
+synopsis:      Haskell wrapper over the Arcadia TIO C ABI
+description:
+    Source-visible Haskell wrapper over the Arcadia TIO C ABI. The package
+    dynamically loads libarcadia_tio_capi.so at runtime and exposes a small safe
+    dense TensorFile API. It does not implement the .tio or .ocb binary formats
+    itself.
+category:      Data
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Arcadia TIO contributors
+maintainer:    Jacobbishopxy
+build-type:    Simple
+extra-source-files:
+    README.md
+    cabal.project.local.example
+    docs/parity.md
+
+common warnings
+  ghc-options: -Wall
+
+library
+  import: warnings
+  exposed-modules:
+      Arcadia.Tio
+      Arcadia.Tio.Error
+      Arcadia.Tio.Types
+      Arcadia.Tio.Tensor
+      Arcadia.Tio.TensorFile
+      Arcadia.Tio.Ocb
+      Arcadia.Tio.Internal.CApi
+  hs-source-dirs: src
+  build-depends:
+      base >=4.18 && <5
+    , filepath >=1.4 && <1.6
+    , unix >=2.8 && <2.9
+    , vector >=0.13 && <0.14
+  default-language: GHC2021
+
+executable arcadia-tio-hs-roundtrip
+  import: warnings
+  main-is: Roundtrip.hs
+  hs-source-dirs: examples
+  build-depends:
+      arcadia-tio-hs
+    , base >=4.18 && <5
+    , directory >=1.3 && <1.4
+    , filepath >=1.4 && <1.6
+    , vector >=0.13 && <0.14
+  default-language: GHC2021
+
+test-suite arcadia-tio-hs-test
+  import: warnings
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs: test
+  build-depends:
+      arcadia-tio-hs
+    , base >=4.18 && <5
+    , directory >=1.3 && <1.4
+    , filepath >=1.4 && <1.6
+    , vector >=0.13 && <0.14
+  default-language: GHC2021

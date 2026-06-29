@@ -1,4 +1,16 @@
 dist
+.tmp/
+tmp/
+.test-output/
+*.tio
+*.ocb
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.tar.gz
+*.zip
 dist-*
 cabal-dev
 *.o
