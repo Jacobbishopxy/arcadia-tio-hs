@@ -35,6 +35,7 @@ not-applicable ABI conveniences, deferred blockers, and unknown/unmapped items.
 A passing default run means there are no unknown/unmapped C ABI items; deferred
 blockers remain visible and can be promoted to a hard failure with
 `--fail-on-deferred` when later parity slices are ready for that stricter gate.
+The checked-in generated item list is [parity-inventory.generated.md](parity-inventory.generated.md).
 
 Current local header snapshot used while adding this gate:
 
@@ -43,7 +44,7 @@ Current local header snapshot used while adding this gate:
 - deferred blockers: 74
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, or deployment statement.
+These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 74 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
 
 Legend:
 
@@ -96,7 +97,7 @@ Legend:
 
 ## Recommended next slices
 
-Before closing a later parity slice, run the machine inventory with
+Before closing a later parity slice, regenerate `docs/parity-inventory.generated.md`, then run the machine inventory with
 `--fail-on-deferred` against the same C ABI headers and resolve any remaining
 deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.

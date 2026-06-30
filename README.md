@@ -16,7 +16,7 @@ API-parity claim.
 
 ## Rust / Haskell parity
 
-See [docs/parity.md](docs/parity.md) for the current parity map against the original Arcadia TIO Rust surface and recommended next slices.
+See [docs/parity.md](docs/parity.md) for the current parity map against the original Arcadia TIO Rust surface and recommended next slices. The generated C ABI item inventory is checked in at [docs/parity-inventory.generated.md](docs/parity-inventory.generated.md).
 
 A static inventory gate can compare the Haskell wrapper surface with the native
 C ABI headers without loading a native shared library:
@@ -34,8 +34,16 @@ ARCADIA_TIO_CAPI_INCLUDE_ROOT=/path/to/arcadia-tio/crates/arcadia-tio-capi/inclu
   cabal test arcadia-tio-hs-parity-inventory --test-show-details=direct
 ```
 
+Regenerate the checked-in inventory after changing wrapper coverage or when auditing a new header snapshot:
+
+```sh
+python3 scripts/parity_inventory.py \
+  --include-root /path/to/arcadia-tio/crates/arcadia-tio-capi/include \
+  --markdown > docs/parity-inventory.generated.md
+```
+
 The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices.
+deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 310 wrapped items, 20 intentionally not-applicable items, 74 deferred blockers, and 0 unknown/unmapped items; those deferred blockers prevent any broad 100% parity claim.
 
 ## Current scope
 

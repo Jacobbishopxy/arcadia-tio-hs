@@ -17,6 +17,7 @@ extra-source-files:
     README.md
     cabal.project.local.example
     docs/parity.md
+    docs/parity-inventory.generated.md
     scripts/parity_inventory.py
 
 common warnings
