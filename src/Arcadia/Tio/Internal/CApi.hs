@@ -129,6 +129,15 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioOcbDictionaryValues(..)
   , CArcadiaTioOcbPrimitiveValues(..)
   , CArcadiaTioOcbValidityBitmap(..)
+  , CArcadiaTioOcbWriteOptions(..)
+  , CArcadiaTioOcbWriteColumn(..)
+  , CArcadiaTioOcbDictionaryEntry(..)
+  , CArcadiaTioOcbWriteDictionary(..)
+  , CArcadiaTioOcbWriteColumnChunk(..)
+  , CArcadiaTioOcbWriteRowGroup(..)
+  , CArcadiaTioOcbWriteOrderingKey(..)
+  , CArcadiaTioOcbWriteSpec(..)
+  , CArcadiaTioOcbCleanupResult(..)
   , CArcadiaTioOcbPredicateValue(..)
   , CArcadiaTioOcbRowGroupPredicate(..)
   , CArcadiaTioOcbReadRequest(..)
@@ -147,6 +156,15 @@ module Arcadia.Tio.Internal.CApi
   , emptyCArcadiaTioOcbDictionaryValues
   , emptyCArcadiaTioOcbPrimitiveValues
   , emptyCArcadiaTioOcbValidityBitmap
+  , emptyCArcadiaTioOcbWriteOptions
+  , emptyCArcadiaTioOcbWriteColumn
+  , emptyCArcadiaTioOcbDictionaryEntry
+  , emptyCArcadiaTioOcbWriteDictionary
+  , emptyCArcadiaTioOcbWriteColumnChunk
+  , emptyCArcadiaTioOcbWriteRowGroup
+  , emptyCArcadiaTioOcbWriteOrderingKey
+  , emptyCArcadiaTioOcbWriteSpec
+  , emptyCArcadiaTioOcbCleanupResult
   , emptyCArcadiaTioOcbPredicateValue
   , emptyCArcadiaTioOcbRowGroupPredicate
   , emptyCArcadiaTioOcbReadRequest
@@ -296,6 +314,24 @@ module Arcadia.Tio.Internal.CApi
   , capiOcbMetadataFree
   , capiOcbDictionaryValues
   , capiOcbDictionaryValuesFree
+  , capiOcbPrimitiveValuesInit
+  , capiOcbValidityBitmapInit
+  , capiOcbWriteOptionsInit
+  , capiOcbWriteColumnInit
+  , capiOcbDictionaryEntryInit
+  , capiOcbWriteDictionaryInit
+  , capiOcbWriteColumnChunkInit
+  , capiOcbWriteRowGroupInit
+  , capiOcbWriteOrderingKeyInit
+  , capiOcbWriteSpecInit
+  , capiOcbCleanupResultInit
+  , capiOcbWriteColumnSetFixedBinaryWidth
+  , capiOcbWriteColumnFixedBinaryWidth
+  , capiOcbCreate
+  , capiOcbCreateWithOptions
+  , capiOcbAppend
+  , capiOcbAppendWithOptions
+  , capiOcbCleanupOrphanTail
   , capiOcbReadRequestInit
   , capiOcbReadReportInit
   , capiOcbReadAttributionInit
@@ -2866,6 +2902,250 @@ instance Storable CArcadiaTioOcbValidityBitmap where
 emptyCArcadiaTioOcbValidityBitmap :: CArcadiaTioOcbValidityBitmap
 emptyCArcadiaTioOcbValidityBitmap = CArcadiaTioOcbValidityBitmap 1 64 nullPtr 0 0
 
+
+-- | Raw OCB write options matching @ArcadiaTioOcbWriteOptions@.
+data CArcadiaTioOcbWriteOptions = CArcadiaTioOcbWriteOptions
+  { cOcbWriteOptionsVersion :: Word32
+  , cOcbWriteOptionsStructSize :: CSize
+  , cOcbWriteOptionsWriteThreads :: CSize
+  , cOcbWriteOptionsChunkCodec :: CInt
+  , cOcbWriteOptionsZstdLevel :: Int32
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteOptions where
+  sizeOf _ = 64
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28
+  poke ptr CArcadiaTioOcbWriteOptions{cOcbWriteOptionsVersion, cOcbWriteOptionsStructSize, cOcbWriteOptionsWriteThreads, cOcbWriteOptionsChunkCodec, cOcbWriteOptionsZstdLevel} = do
+    fillBytes ptr 0 64
+    pokeByteOff ptr 0 cOcbWriteOptionsVersion
+    pokeByteOff ptr 8 cOcbWriteOptionsStructSize
+    pokeByteOff ptr 16 cOcbWriteOptionsWriteThreads
+    pokeByteOff ptr 24 cOcbWriteOptionsChunkCodec
+    pokeByteOff ptr 28 cOcbWriteOptionsZstdLevel
+
+emptyCArcadiaTioOcbWriteOptions :: CArcadiaTioOcbWriteOptions
+emptyCArcadiaTioOcbWriteOptions = CArcadiaTioOcbWriteOptions 1 64 1 1 3
+
+-- | Raw OCB write column matching @ArcadiaTioOcbWriteColumn@.
+data CArcadiaTioOcbWriteColumn = CArcadiaTioOcbWriteColumn
+  { cOcbWriteColumnVersion :: Word32
+  , cOcbWriteColumnStructSize :: CSize
+  , cOcbWriteColumnName :: CString
+  , cOcbWriteColumnPhysicalType :: CInt
+  , cOcbWriteColumnLogicalKind :: CInt
+  , cOcbWriteColumnHasDictionaryId :: Word8
+  , cOcbWriteColumnDictionaryId :: Word32
+  , cOcbWriteColumnScale :: Int32
+  , cOcbWriteColumnNullable :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteColumn where
+  sizeOf _ = 72
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteColumn <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44
+  poke ptr CArcadiaTioOcbWriteColumn{cOcbWriteColumnVersion, cOcbWriteColumnStructSize, cOcbWriteColumnName, cOcbWriteColumnPhysicalType, cOcbWriteColumnLogicalKind, cOcbWriteColumnHasDictionaryId, cOcbWriteColumnDictionaryId, cOcbWriteColumnScale, cOcbWriteColumnNullable} = do
+    fillBytes ptr 0 72
+    pokeByteOff ptr 0 cOcbWriteColumnVersion
+    pokeByteOff ptr 8 cOcbWriteColumnStructSize
+    pokeByteOff ptr 16 cOcbWriteColumnName
+    pokeByteOff ptr 24 cOcbWriteColumnPhysicalType
+    pokeByteOff ptr 28 cOcbWriteColumnLogicalKind
+    pokeByteOff ptr 32 cOcbWriteColumnHasDictionaryId
+    pokeByteOff ptr 36 cOcbWriteColumnDictionaryId
+    pokeByteOff ptr 40 cOcbWriteColumnScale
+    pokeByteOff ptr 44 cOcbWriteColumnNullable
+
+emptyCArcadiaTioOcbWriteColumn :: CArcadiaTioOcbWriteColumn
+emptyCArcadiaTioOcbWriteColumn = CArcadiaTioOcbWriteColumn 1 72 nullPtr 0 0 0 0 0 0
+
+-- | Raw OCB dictionary entry matching @ArcadiaTioOcbDictionaryEntry@.
+data CArcadiaTioOcbDictionaryEntry = CArcadiaTioOcbDictionaryEntry
+  { cOcbDictionaryEntryVersion :: Word32
+  , cOcbDictionaryEntryStructSize :: CSize
+  , cOcbDictionaryEntryData :: Ptr Word8
+  , cOcbDictionaryEntryLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbDictionaryEntry where
+  sizeOf _ = 56
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbDictionaryEntry <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioOcbDictionaryEntry{cOcbDictionaryEntryVersion, cOcbDictionaryEntryStructSize, cOcbDictionaryEntryData, cOcbDictionaryEntryLen} = do
+    fillBytes ptr 0 56
+    pokeByteOff ptr 0 cOcbDictionaryEntryVersion
+    pokeByteOff ptr 8 cOcbDictionaryEntryStructSize
+    pokeByteOff ptr 16 cOcbDictionaryEntryData
+    pokeByteOff ptr 24 cOcbDictionaryEntryLen
+
+emptyCArcadiaTioOcbDictionaryEntry :: CArcadiaTioOcbDictionaryEntry
+emptyCArcadiaTioOcbDictionaryEntry = CArcadiaTioOcbDictionaryEntry 1 56 nullPtr 0
+
+-- | Raw OCB write dictionary matching @ArcadiaTioOcbWriteDictionary@.
+data CArcadiaTioOcbWriteDictionary = CArcadiaTioOcbWriteDictionary
+  { cOcbWriteDictionaryVersion :: Word32
+  , cOcbWriteDictionaryStructSize :: CSize
+  , cOcbWriteDictionaryId :: Word32
+  , cOcbWriteDictionaryName :: CString
+  , cOcbWriteDictionaryCodePhysicalType :: CInt
+  , cOcbWriteDictionaryValueKind :: CInt
+  , cOcbWriteDictionaryFixedWidth :: Word32
+  , cOcbWriteDictionaryEntries :: Ptr CArcadiaTioOcbDictionaryEntry
+  , cOcbWriteDictionaryEntriesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteDictionary where
+  sizeOf _ = 88
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteDictionary <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56
+  poke ptr CArcadiaTioOcbWriteDictionary{cOcbWriteDictionaryVersion, cOcbWriteDictionaryStructSize, cOcbWriteDictionaryId, cOcbWriteDictionaryName, cOcbWriteDictionaryCodePhysicalType, cOcbWriteDictionaryValueKind, cOcbWriteDictionaryFixedWidth, cOcbWriteDictionaryEntries, cOcbWriteDictionaryEntriesLen} = do
+    fillBytes ptr 0 88
+    pokeByteOff ptr 0 cOcbWriteDictionaryVersion
+    pokeByteOff ptr 8 cOcbWriteDictionaryStructSize
+    pokeByteOff ptr 16 cOcbWriteDictionaryId
+    pokeByteOff ptr 24 cOcbWriteDictionaryName
+    pokeByteOff ptr 32 cOcbWriteDictionaryCodePhysicalType
+    pokeByteOff ptr 36 cOcbWriteDictionaryValueKind
+    pokeByteOff ptr 40 cOcbWriteDictionaryFixedWidth
+    pokeByteOff ptr 48 cOcbWriteDictionaryEntries
+    pokeByteOff ptr 56 cOcbWriteDictionaryEntriesLen
+
+emptyCArcadiaTioOcbWriteDictionary :: CArcadiaTioOcbWriteDictionary
+emptyCArcadiaTioOcbWriteDictionary = CArcadiaTioOcbWriteDictionary 1 88 0 nullPtr 0 0 0 nullPtr 0
+
+-- | Raw OCB write column chunk matching @ArcadiaTioOcbWriteColumnChunk@.
+data CArcadiaTioOcbWriteColumnChunk = CArcadiaTioOcbWriteColumnChunk
+  { cOcbWriteColumnChunkVersion :: Word32
+  , cOcbWriteColumnChunkStructSize :: CSize
+  , cOcbWriteColumnChunkColumnId :: Word32
+  , cOcbWriteColumnChunkValues :: CArcadiaTioOcbPrimitiveValues
+  , cOcbWriteColumnChunkValidity :: Ptr CArcadiaTioOcbValidityBitmap
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteColumnChunk where
+  sizeOf _ = 120
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteColumnChunk <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 88
+  poke ptr CArcadiaTioOcbWriteColumnChunk{cOcbWriteColumnChunkVersion, cOcbWriteColumnChunkStructSize, cOcbWriteColumnChunkColumnId, cOcbWriteColumnChunkValues, cOcbWriteColumnChunkValidity} = do
+    fillBytes ptr 0 120
+    pokeByteOff ptr 0 cOcbWriteColumnChunkVersion
+    pokeByteOff ptr 8 cOcbWriteColumnChunkStructSize
+    pokeByteOff ptr 16 cOcbWriteColumnChunkColumnId
+    pokeByteOff ptr 24 cOcbWriteColumnChunkValues
+    pokeByteOff ptr 88 cOcbWriteColumnChunkValidity
+
+emptyCArcadiaTioOcbWriteColumnChunk :: CArcadiaTioOcbWriteColumnChunk
+emptyCArcadiaTioOcbWriteColumnChunk = CArcadiaTioOcbWriteColumnChunk 1 120 0 emptyCArcadiaTioOcbPrimitiveValues nullPtr
+
+-- | Raw OCB write row group matching @ArcadiaTioOcbWriteRowGroup@.
+data CArcadiaTioOcbWriteRowGroup = CArcadiaTioOcbWriteRowGroup
+  { cOcbWriteRowGroupVersion :: Word32
+  , cOcbWriteRowGroupStructSize :: CSize
+  , cOcbWriteRowGroupColumns :: Ptr CArcadiaTioOcbWriteColumnChunk
+  , cOcbWriteRowGroupColumnsLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteRowGroup where
+  sizeOf _ = 56
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteRowGroup <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioOcbWriteRowGroup{cOcbWriteRowGroupVersion, cOcbWriteRowGroupStructSize, cOcbWriteRowGroupColumns, cOcbWriteRowGroupColumnsLen} = do
+    fillBytes ptr 0 56
+    pokeByteOff ptr 0 cOcbWriteRowGroupVersion
+    pokeByteOff ptr 8 cOcbWriteRowGroupStructSize
+    pokeByteOff ptr 16 cOcbWriteRowGroupColumns
+    pokeByteOff ptr 24 cOcbWriteRowGroupColumnsLen
+
+emptyCArcadiaTioOcbWriteRowGroup :: CArcadiaTioOcbWriteRowGroup
+emptyCArcadiaTioOcbWriteRowGroup = CArcadiaTioOcbWriteRowGroup 1 56 nullPtr 0
+
+-- | Raw OCB write ordering key matching @ArcadiaTioOcbWriteOrderingKey@.
+data CArcadiaTioOcbWriteOrderingKey = CArcadiaTioOcbWriteOrderingKey
+  { cOcbWriteOrderingKeyVersion :: Word32
+  , cOcbWriteOrderingKeyStructSize :: CSize
+  , cOcbWriteOrderingKeyColumnId :: Word32
+  , cOcbWriteOrderingKeyDirection :: CInt
+  , cOcbWriteOrderingKeyNullOrder :: CInt
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteOrderingKey where
+  sizeOf _ = 56
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteOrderingKey <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioOcbWriteOrderingKey{cOcbWriteOrderingKeyVersion, cOcbWriteOrderingKeyStructSize, cOcbWriteOrderingKeyColumnId, cOcbWriteOrderingKeyDirection, cOcbWriteOrderingKeyNullOrder} = do
+    fillBytes ptr 0 56
+    pokeByteOff ptr 0 cOcbWriteOrderingKeyVersion
+    pokeByteOff ptr 8 cOcbWriteOrderingKeyStructSize
+    pokeByteOff ptr 16 cOcbWriteOrderingKeyColumnId
+    pokeByteOff ptr 20 cOcbWriteOrderingKeyDirection
+    pokeByteOff ptr 24 cOcbWriteOrderingKeyNullOrder
+
+emptyCArcadiaTioOcbWriteOrderingKey :: CArcadiaTioOcbWriteOrderingKey
+emptyCArcadiaTioOcbWriteOrderingKey = CArcadiaTioOcbWriteOrderingKey 1 56 0 0 0
+
+-- | Raw OCB write spec matching @ArcadiaTioOcbWriteSpec@.
+data CArcadiaTioOcbWriteSpec = CArcadiaTioOcbWriteSpec
+  { cOcbWriteSpecVersion :: Word32
+  , cOcbWriteSpecStructSize :: CSize
+  , cOcbWriteSpecColumns :: Ptr CArcadiaTioOcbWriteColumn
+  , cOcbWriteSpecColumnsLen :: CSize
+  , cOcbWriteSpecDictionaries :: Ptr CArcadiaTioOcbWriteDictionary
+  , cOcbWriteSpecDictionariesLen :: CSize
+  , cOcbWriteSpecRowGroups :: Ptr CArcadiaTioOcbWriteRowGroup
+  , cOcbWriteSpecRowGroupsLen :: CSize
+  , cOcbWriteSpecOrderingKeys :: Ptr CArcadiaTioOcbWriteOrderingKey
+  , cOcbWriteSpecOrderingKeysLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbWriteSpec where
+  sizeOf _ = 112
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbWriteSpec <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72
+  poke ptr CArcadiaTioOcbWriteSpec{cOcbWriteSpecVersion, cOcbWriteSpecStructSize, cOcbWriteSpecColumns, cOcbWriteSpecColumnsLen, cOcbWriteSpecDictionaries, cOcbWriteSpecDictionariesLen, cOcbWriteSpecRowGroups, cOcbWriteSpecRowGroupsLen, cOcbWriteSpecOrderingKeys, cOcbWriteSpecOrderingKeysLen} = do
+    fillBytes ptr 0 112
+    pokeByteOff ptr 0 cOcbWriteSpecVersion
+    pokeByteOff ptr 8 cOcbWriteSpecStructSize
+    pokeByteOff ptr 16 cOcbWriteSpecColumns
+    pokeByteOff ptr 24 cOcbWriteSpecColumnsLen
+    pokeByteOff ptr 32 cOcbWriteSpecDictionaries
+    pokeByteOff ptr 40 cOcbWriteSpecDictionariesLen
+    pokeByteOff ptr 48 cOcbWriteSpecRowGroups
+    pokeByteOff ptr 56 cOcbWriteSpecRowGroupsLen
+    pokeByteOff ptr 64 cOcbWriteSpecOrderingKeys
+    pokeByteOff ptr 72 cOcbWriteSpecOrderingKeysLen
+
+emptyCArcadiaTioOcbWriteSpec :: CArcadiaTioOcbWriteSpec
+emptyCArcadiaTioOcbWriteSpec = CArcadiaTioOcbWriteSpec 1 112 nullPtr 0 nullPtr 0 nullPtr 0 nullPtr 0
+
+-- | Raw OCB cleanup result matching @ArcadiaTioOcbCleanupResult@.
+data CArcadiaTioOcbCleanupResult = CArcadiaTioOcbCleanupResult
+  { cOcbCleanupResultVersion :: Word32
+  , cOcbCleanupResultStructSize :: CSize
+  , cOcbCleanupResultTruncated :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbCleanupResult where
+  sizeOf _ = 48
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbCleanupResult <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16
+  poke ptr CArcadiaTioOcbCleanupResult{cOcbCleanupResultVersion, cOcbCleanupResultStructSize, cOcbCleanupResultTruncated} = do
+    fillBytes ptr 0 48
+    pokeByteOff ptr 0 cOcbCleanupResultVersion
+    pokeByteOff ptr 8 cOcbCleanupResultStructSize
+    pokeByteOff ptr 16 cOcbCleanupResultTruncated
+
+emptyCArcadiaTioOcbCleanupResult :: CArcadiaTioOcbCleanupResult
+emptyCArcadiaTioOcbCleanupResult = CArcadiaTioOcbCleanupResult 1 48 0
+
 -- | Raw OCB predicate value matching @ArcadiaTioOcbPredicateValue@.
 data CArcadiaTioOcbPredicateValue = CArcadiaTioOcbPredicateValue
   { cOcbPredicateValueVersion :: Word32
@@ -3435,6 +3715,24 @@ type OcbMetadataFn = Ptr COcbFile -> Ptr CArcadiaTioOcbMetadata -> IO CInt
 type OcbMetadataFreeFn = Ptr CArcadiaTioOcbMetadata -> IO ()
 type OcbDictionaryValuesFn = Ptr COcbFile -> Word32 -> Ptr CArcadiaTioOcbDictionaryValues -> IO CInt
 type OcbDictionaryValuesFreeFn = Ptr CArcadiaTioOcbDictionaryValues -> IO ()
+type OcbPrimitiveValuesInitFn = Ptr CArcadiaTioOcbPrimitiveValues -> IO ()
+type OcbValidityBitmapInitFn = Ptr CArcadiaTioOcbValidityBitmap -> IO ()
+type OcbWriteOptionsInitFn = Ptr CArcadiaTioOcbWriteOptions -> IO ()
+type OcbWriteColumnInitFn = Ptr CArcadiaTioOcbWriteColumn -> IO ()
+type OcbDictionaryEntryInitFn = Ptr CArcadiaTioOcbDictionaryEntry -> IO ()
+type OcbWriteDictionaryInitFn = Ptr CArcadiaTioOcbWriteDictionary -> IO ()
+type OcbWriteColumnChunkInitFn = Ptr CArcadiaTioOcbWriteColumnChunk -> IO ()
+type OcbWriteRowGroupInitFn = Ptr CArcadiaTioOcbWriteRowGroup -> IO ()
+type OcbWriteOrderingKeyInitFn = Ptr CArcadiaTioOcbWriteOrderingKey -> IO ()
+type OcbWriteSpecInitFn = Ptr CArcadiaTioOcbWriteSpec -> IO ()
+type OcbCleanupResultInitFn = Ptr CArcadiaTioOcbCleanupResult -> IO ()
+type OcbWriteColumnSetFixedBinaryWidthFn = Ptr CArcadiaTioOcbWriteColumn -> Word32 -> IO ()
+type OcbWriteColumnFixedBinaryWidthFn = Ptr CArcadiaTioOcbWriteColumn -> IO Word32
+type OcbCreateFn = CString -> Ptr CArcadiaTioOcbWriteSpec -> IO CInt
+type OcbCreateWithOptionsFn = CString -> Ptr CArcadiaTioOcbWriteSpec -> Ptr CArcadiaTioOcbWriteOptions -> IO CInt
+type OcbAppendFn = CString -> Ptr CArcadiaTioOcbWriteSpec -> IO CInt
+type OcbAppendWithOptionsFn = CString -> Ptr CArcadiaTioOcbWriteSpec -> Ptr CArcadiaTioOcbWriteOptions -> IO CInt
+type OcbCleanupOrphanTailFn = CString -> Ptr CArcadiaTioOcbCleanupResult -> IO CInt
 type OcbReadRequestInitFn = Ptr CArcadiaTioOcbReadRequest -> IO ()
 type OcbReadReportInitFn = Ptr CArcadiaTioOcbReadReport -> IO ()
 type OcbReadAttributionInitFn = Ptr CArcadiaTioOcbReadAttribution -> IO ()
@@ -3601,6 +3899,24 @@ foreign import ccall safe "dynamic" mkOcbMetadata :: FunPtr OcbMetadataFn -> Ocb
 foreign import ccall safe "dynamic" mkOcbMetadataFree :: FunPtr OcbMetadataFreeFn -> OcbMetadataFreeFn
 foreign import ccall safe "dynamic" mkOcbDictionaryValues :: FunPtr OcbDictionaryValuesFn -> OcbDictionaryValuesFn
 foreign import ccall safe "dynamic" mkOcbDictionaryValuesFree :: FunPtr OcbDictionaryValuesFreeFn -> OcbDictionaryValuesFreeFn
+foreign import ccall safe "dynamic" mkOcbPrimitiveValuesInit :: FunPtr OcbPrimitiveValuesInitFn -> OcbPrimitiveValuesInitFn
+foreign import ccall safe "dynamic" mkOcbValidityBitmapInit :: FunPtr OcbValidityBitmapInitFn -> OcbValidityBitmapInitFn
+foreign import ccall safe "dynamic" mkOcbWriteOptionsInit :: FunPtr OcbWriteOptionsInitFn -> OcbWriteOptionsInitFn
+foreign import ccall safe "dynamic" mkOcbWriteColumnInit :: FunPtr OcbWriteColumnInitFn -> OcbWriteColumnInitFn
+foreign import ccall safe "dynamic" mkOcbDictionaryEntryInit :: FunPtr OcbDictionaryEntryInitFn -> OcbDictionaryEntryInitFn
+foreign import ccall safe "dynamic" mkOcbWriteDictionaryInit :: FunPtr OcbWriteDictionaryInitFn -> OcbWriteDictionaryInitFn
+foreign import ccall safe "dynamic" mkOcbWriteColumnChunkInit :: FunPtr OcbWriteColumnChunkInitFn -> OcbWriteColumnChunkInitFn
+foreign import ccall safe "dynamic" mkOcbWriteRowGroupInit :: FunPtr OcbWriteRowGroupInitFn -> OcbWriteRowGroupInitFn
+foreign import ccall safe "dynamic" mkOcbWriteOrderingKeyInit :: FunPtr OcbWriteOrderingKeyInitFn -> OcbWriteOrderingKeyInitFn
+foreign import ccall safe "dynamic" mkOcbWriteSpecInit :: FunPtr OcbWriteSpecInitFn -> OcbWriteSpecInitFn
+foreign import ccall safe "dynamic" mkOcbCleanupResultInit :: FunPtr OcbCleanupResultInitFn -> OcbCleanupResultInitFn
+foreign import ccall safe "dynamic" mkOcbWriteColumnSetFixedBinaryWidth :: FunPtr OcbWriteColumnSetFixedBinaryWidthFn -> OcbWriteColumnSetFixedBinaryWidthFn
+foreign import ccall safe "dynamic" mkOcbWriteColumnFixedBinaryWidth :: FunPtr OcbWriteColumnFixedBinaryWidthFn -> OcbWriteColumnFixedBinaryWidthFn
+foreign import ccall safe "dynamic" mkOcbCreate :: FunPtr OcbCreateFn -> OcbCreateFn
+foreign import ccall safe "dynamic" mkOcbCreateWithOptions :: FunPtr OcbCreateWithOptionsFn -> OcbCreateWithOptionsFn
+foreign import ccall safe "dynamic" mkOcbAppend :: FunPtr OcbAppendFn -> OcbAppendFn
+foreign import ccall safe "dynamic" mkOcbAppendWithOptions :: FunPtr OcbAppendWithOptionsFn -> OcbAppendWithOptionsFn
+foreign import ccall safe "dynamic" mkOcbCleanupOrphanTail :: FunPtr OcbCleanupOrphanTailFn -> OcbCleanupOrphanTailFn
 foreign import ccall safe "dynamic" mkOcbReadRequestInit :: FunPtr OcbReadRequestInitFn -> OcbReadRequestInitFn
 foreign import ccall safe "dynamic" mkOcbReadReportInit :: FunPtr OcbReadReportInitFn -> OcbReadReportInitFn
 foreign import ccall safe "dynamic" mkOcbReadAttributionInit :: FunPtr OcbReadAttributionInitFn -> OcbReadAttributionInitFn
@@ -3774,6 +4090,24 @@ data NativeLibrary = NativeLibrary
   , nativeOcbMetadataFree :: OcbMetadataFreeFn
   , nativeOcbDictionaryValues :: OcbDictionaryValuesFn
   , nativeOcbDictionaryValuesFree :: OcbDictionaryValuesFreeFn
+  , nativeOcbPrimitiveValuesInit :: OcbPrimitiveValuesInitFn
+  , nativeOcbValidityBitmapInit :: OcbValidityBitmapInitFn
+  , nativeOcbWriteOptionsInit :: OcbWriteOptionsInitFn
+  , nativeOcbWriteColumnInit :: OcbWriteColumnInitFn
+  , nativeOcbDictionaryEntryInit :: OcbDictionaryEntryInitFn
+  , nativeOcbWriteDictionaryInit :: OcbWriteDictionaryInitFn
+  , nativeOcbWriteColumnChunkInit :: OcbWriteColumnChunkInitFn
+  , nativeOcbWriteRowGroupInit :: OcbWriteRowGroupInitFn
+  , nativeOcbWriteOrderingKeyInit :: OcbWriteOrderingKeyInitFn
+  , nativeOcbWriteSpecInit :: OcbWriteSpecInitFn
+  , nativeOcbCleanupResultInit :: OcbCleanupResultInitFn
+  , nativeOcbWriteColumnSetFixedBinaryWidth :: OcbWriteColumnSetFixedBinaryWidthFn
+  , nativeOcbWriteColumnFixedBinaryWidth :: OcbWriteColumnFixedBinaryWidthFn
+  , nativeOcbCreate :: OcbCreateFn
+  , nativeOcbCreateWithOptions :: OcbCreateWithOptionsFn
+  , nativeOcbAppend :: OcbAppendFn
+  , nativeOcbAppendWithOptions :: OcbAppendWithOptionsFn
+  , nativeOcbCleanupOrphanTail :: OcbCleanupOrphanTailFn
   , nativeOcbReadRequestInit :: OcbReadRequestInitFn
   , nativeOcbReadReportInit :: OcbReadReportInitFn
   , nativeOcbReadAttributionInit :: OcbReadAttributionInitFn
@@ -4002,6 +4336,24 @@ loadUnchecked path = do
   nativeOcbMetadataFree <- mkOcbMetadataFree <$> dlsym dl "arcadia_tio_ocb_metadata_free"
   nativeOcbDictionaryValues <- mkOcbDictionaryValues <$> dlsym dl "arcadia_tio_ocb_dictionary_values"
   nativeOcbDictionaryValuesFree <- mkOcbDictionaryValuesFree <$> dlsym dl "arcadia_tio_ocb_dictionary_values_free"
+  nativeOcbPrimitiveValuesInit <- mkOcbPrimitiveValuesInit <$> dlsym dl "arcadia_tio_ocb_primitive_values_init"
+  nativeOcbValidityBitmapInit <- mkOcbValidityBitmapInit <$> dlsym dl "arcadia_tio_ocb_validity_bitmap_init"
+  nativeOcbWriteOptionsInit <- mkOcbWriteOptionsInit <$> dlsym dl "arcadia_tio_ocb_write_options_init"
+  nativeOcbWriteColumnInit <- mkOcbWriteColumnInit <$> dlsym dl "arcadia_tio_ocb_write_column_init"
+  nativeOcbDictionaryEntryInit <- mkOcbDictionaryEntryInit <$> dlsym dl "arcadia_tio_ocb_dictionary_entry_init"
+  nativeOcbWriteDictionaryInit <- mkOcbWriteDictionaryInit <$> dlsym dl "arcadia_tio_ocb_write_dictionary_init"
+  nativeOcbWriteColumnChunkInit <- mkOcbWriteColumnChunkInit <$> dlsym dl "arcadia_tio_ocb_write_column_chunk_init"
+  nativeOcbWriteRowGroupInit <- mkOcbWriteRowGroupInit <$> dlsym dl "arcadia_tio_ocb_write_row_group_init"
+  nativeOcbWriteOrderingKeyInit <- mkOcbWriteOrderingKeyInit <$> dlsym dl "arcadia_tio_ocb_write_ordering_key_init"
+  nativeOcbWriteSpecInit <- mkOcbWriteSpecInit <$> dlsym dl "arcadia_tio_ocb_write_spec_init"
+  nativeOcbCleanupResultInit <- mkOcbCleanupResultInit <$> dlsym dl "arcadia_tio_ocb_cleanup_result_init"
+  nativeOcbWriteColumnSetFixedBinaryWidth <- mkOcbWriteColumnSetFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_write_column_set_fixed_binary_width"
+  nativeOcbWriteColumnFixedBinaryWidth <- mkOcbWriteColumnFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_write_column_fixed_binary_width"
+  nativeOcbCreate <- mkOcbCreate <$> dlsym dl "arcadia_tio_ocb_create"
+  nativeOcbCreateWithOptions <- mkOcbCreateWithOptions <$> dlsym dl "arcadia_tio_ocb_create_with_options"
+  nativeOcbAppend <- mkOcbAppend <$> dlsym dl "arcadia_tio_ocb_append"
+  nativeOcbAppendWithOptions <- mkOcbAppendWithOptions <$> dlsym dl "arcadia_tio_ocb_append_with_options"
+  nativeOcbCleanupOrphanTail <- mkOcbCleanupOrphanTail <$> dlsym dl "arcadia_tio_ocb_cleanup_orphan_tail"
   nativeOcbReadRequestInit <- mkOcbReadRequestInit <$> dlsym dl "arcadia_tio_ocb_read_request_init"
   nativeOcbReadReportInit <- mkOcbReadReportInit <$> dlsym dl "arcadia_tio_ocb_read_report_init"
   nativeOcbReadAttributionInit <- mkOcbReadAttributionInit <$> dlsym dl "arcadia_tio_ocb_read_attribution_init"
@@ -4174,6 +4526,24 @@ loadUnchecked path = do
       , nativeOcbMetadataFree
       , nativeOcbDictionaryValues
       , nativeOcbDictionaryValuesFree
+      , nativeOcbPrimitiveValuesInit
+      , nativeOcbValidityBitmapInit
+      , nativeOcbWriteOptionsInit
+      , nativeOcbWriteColumnInit
+      , nativeOcbDictionaryEntryInit
+      , nativeOcbWriteDictionaryInit
+      , nativeOcbWriteColumnChunkInit
+      , nativeOcbWriteRowGroupInit
+      , nativeOcbWriteOrderingKeyInit
+      , nativeOcbWriteSpecInit
+      , nativeOcbCleanupResultInit
+      , nativeOcbWriteColumnSetFixedBinaryWidth
+      , nativeOcbWriteColumnFixedBinaryWidth
+      , nativeOcbCreate
+      , nativeOcbCreateWithOptions
+      , nativeOcbAppend
+      , nativeOcbAppendWithOptions
+      , nativeOcbCleanupOrphanTail
       , nativeOcbReadRequestInit
       , nativeOcbReadReportInit
       , nativeOcbReadAttributionInit
@@ -4650,6 +5020,61 @@ capiOcbDictionaryValues NativeLibrary{nativeOcbDictionaryValues} = nativeOcbDict
 
 capiOcbDictionaryValuesFree :: NativeLibrary -> OcbDictionaryValuesFreeFn
 capiOcbDictionaryValuesFree NativeLibrary{nativeOcbDictionaryValuesFree} = nativeOcbDictionaryValuesFree
+
+
+capiOcbPrimitiveValuesInit :: NativeLibrary -> OcbPrimitiveValuesInitFn
+capiOcbPrimitiveValuesInit NativeLibrary{nativeOcbPrimitiveValuesInit} = nativeOcbPrimitiveValuesInit
+
+capiOcbValidityBitmapInit :: NativeLibrary -> OcbValidityBitmapInitFn
+capiOcbValidityBitmapInit NativeLibrary{nativeOcbValidityBitmapInit} = nativeOcbValidityBitmapInit
+
+capiOcbWriteOptionsInit :: NativeLibrary -> OcbWriteOptionsInitFn
+capiOcbWriteOptionsInit NativeLibrary{nativeOcbWriteOptionsInit} = nativeOcbWriteOptionsInit
+
+capiOcbWriteColumnInit :: NativeLibrary -> OcbWriteColumnInitFn
+capiOcbWriteColumnInit NativeLibrary{nativeOcbWriteColumnInit} = nativeOcbWriteColumnInit
+
+capiOcbDictionaryEntryInit :: NativeLibrary -> OcbDictionaryEntryInitFn
+capiOcbDictionaryEntryInit NativeLibrary{nativeOcbDictionaryEntryInit} = nativeOcbDictionaryEntryInit
+
+capiOcbWriteDictionaryInit :: NativeLibrary -> OcbWriteDictionaryInitFn
+capiOcbWriteDictionaryInit NativeLibrary{nativeOcbWriteDictionaryInit} = nativeOcbWriteDictionaryInit
+
+capiOcbWriteColumnChunkInit :: NativeLibrary -> OcbWriteColumnChunkInitFn
+capiOcbWriteColumnChunkInit NativeLibrary{nativeOcbWriteColumnChunkInit} = nativeOcbWriteColumnChunkInit
+
+capiOcbWriteRowGroupInit :: NativeLibrary -> OcbWriteRowGroupInitFn
+capiOcbWriteRowGroupInit NativeLibrary{nativeOcbWriteRowGroupInit} = nativeOcbWriteRowGroupInit
+
+capiOcbWriteOrderingKeyInit :: NativeLibrary -> OcbWriteOrderingKeyInitFn
+capiOcbWriteOrderingKeyInit NativeLibrary{nativeOcbWriteOrderingKeyInit} = nativeOcbWriteOrderingKeyInit
+
+capiOcbWriteSpecInit :: NativeLibrary -> OcbWriteSpecInitFn
+capiOcbWriteSpecInit NativeLibrary{nativeOcbWriteSpecInit} = nativeOcbWriteSpecInit
+
+capiOcbCleanupResultInit :: NativeLibrary -> OcbCleanupResultInitFn
+capiOcbCleanupResultInit NativeLibrary{nativeOcbCleanupResultInit} = nativeOcbCleanupResultInit
+
+capiOcbWriteColumnSetFixedBinaryWidth :: NativeLibrary -> OcbWriteColumnSetFixedBinaryWidthFn
+capiOcbWriteColumnSetFixedBinaryWidth NativeLibrary{nativeOcbWriteColumnSetFixedBinaryWidth} = nativeOcbWriteColumnSetFixedBinaryWidth
+
+capiOcbWriteColumnFixedBinaryWidth :: NativeLibrary -> OcbWriteColumnFixedBinaryWidthFn
+capiOcbWriteColumnFixedBinaryWidth NativeLibrary{nativeOcbWriteColumnFixedBinaryWidth} = nativeOcbWriteColumnFixedBinaryWidth
+
+capiOcbCreate :: NativeLibrary -> OcbCreateFn
+capiOcbCreate NativeLibrary{nativeOcbCreate} = nativeOcbCreate
+
+capiOcbCreateWithOptions :: NativeLibrary -> OcbCreateWithOptionsFn
+capiOcbCreateWithOptions NativeLibrary{nativeOcbCreateWithOptions} = nativeOcbCreateWithOptions
+
+capiOcbAppend :: NativeLibrary -> OcbAppendFn
+capiOcbAppend NativeLibrary{nativeOcbAppend} = nativeOcbAppend
+
+capiOcbAppendWithOptions :: NativeLibrary -> OcbAppendWithOptionsFn
+capiOcbAppendWithOptions NativeLibrary{nativeOcbAppendWithOptions} = nativeOcbAppendWithOptions
+
+capiOcbCleanupOrphanTail :: NativeLibrary -> OcbCleanupOrphanTailFn
+capiOcbCleanupOrphanTail NativeLibrary{nativeOcbCleanupOrphanTail} = nativeOcbCleanupOrphanTail
 
 capiOcbReadRequestInit :: NativeLibrary -> OcbReadRequestInitFn
 capiOcbReadRequestInit NativeLibrary{nativeOcbReadRequestInit} = nativeOcbReadRequestInit

@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Exception (finally)
 import Control.Monad (unless)
 import Data.Int (Int32, Int64)
 import Data.Bits ((.|.), shiftL)
@@ -13,6 +14,7 @@ import System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDire
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>), takeDirectory)
+import System.IO (IOMode(..), hPutStr, withBinaryFile)
 
 import Arcadia.Tio
 import qualified Arcadia.Tio.Internal.CApi as C
@@ -20,6 +22,7 @@ import qualified Arcadia.Tio.Ocb as Ocb
 
 main :: IO ()
 main = do
+  testOcbWriteValidationPure
   configured <- nativeLibraryConfigured
   unless configured $ do
     putStrLn "SKIP: ARCADIA_TIO_CAPI_LIB or ARCADIA_TIO_CAPI_LIB_DIR is not set"
@@ -46,8 +49,63 @@ main = do
   testAppendAxisCoordinateBatches native
   testUniverseAuthoringAndReads native
   testOcbReadBatchesAndAttribution native
+  testOcbCreateAppendSmoke native
 
   putStrLn "PASS: dense .tio lifecycle/read parity smoke through libarcadia_tio_capi.so"
+
+
+testOcbWriteValidationPure :: IO ()
+testOcbWriteValidationPure = do
+  assertInvalid "OCB write empty schema" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = []})
+  assertInvalid "OCB write empty row groups" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = []})
+  assertInvalid "OCB write empty column name" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnName = ""}]})
+  assertInvalid "OCB write NUL column" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnName = "bad\0name"}]})
+  assertInvalid "OCB write duplicate column names" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn, baseColumn]})
+  assertInvalid "OCB write missing dictionary" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnDictionaryId = Just 7}]})
+  assertInvalid "OCB write empty chunks" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup []]})
+  assertInvalid "OCB write zero primitive rows" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [baseChunk{Ocb.ocbWriteChunkValues = Ocb.OcbValuesI32 []}]]})
+  assertInvalid "OCB write zero fixed rows" (Ocb.validateWriteSpec fixedSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [fixedChunk{Ocb.ocbWriteChunkValues = Ocb.OcbValuesFixedBinary 2 []}]]})
+  assertInvalid "OCB write duplicate chunks" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [baseChunk, baseChunk]]})
+  assertInvalid "OCB write validity on non-null" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [baseChunk{Ocb.ocbWriteChunkValidity = Just (Ocb.OcbValidityBitmap [0x1] 1)}]]})
+  assertInvalid "OCB write validity exact length" (Ocb.validateWriteSpec nullableSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [baseChunk{Ocb.ocbWriteChunkValidity = Just (Ocb.OcbValidityBitmap [0xff, 0x00] 3)}]]})
+  assertInvalid "OCB write fixed width mismatch" (Ocb.validateWriteSpec fixedSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [fixedChunk{Ocb.ocbWriteChunkValues = Ocb.OcbValuesFixedBinary 3 [1,2,3,4]}]]})
+  assertInvalid "OCB write fixed ordering key" (Ocb.validateWriteSpec fixedSpec{Ocb.ocbWriteOrderingKeys = [Ocb.OcbWriteOrderingKey 0 Ocb.OcbOrderingAscending Ocb.OcbNoNulls]})
+  assertInvalid "OCB write duplicate ordering key" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteOrderingKeys = [baseOrdering, baseOrdering]})
+  assertInvalid "OCB write unknown physical" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalUnknown 99}]})
+  assertInvalid "OCB write unknown logical" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalUnknown 99}]})
+  assertInvalid "OCB write unknown values" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [baseChunk{Ocb.ocbWriteChunkValues = Ocb.OcbValuesUnknown (Ocb.OcbPhysicalUnknown 99) 3}]]})
+  assertInvalid "OCB write unknown ordering direction" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteOrderingKeys = [baseOrdering{Ocb.ocbWriteOrderingDirection = Ocb.OcbOrderingDirectionUnknown 99}]})
+  assertInvalid "OCB write unknown null order" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteOrderingKeys = [baseOrdering{Ocb.ocbWriteOrderingNullOrder = Ocb.OcbNullOrderUnknown 99}]})
+  assertInvalid "OCB write empty dictionary name" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteDictionaries = [fixedDictionary{Ocb.ocbWriteDictionaryName = ""}]})
+  assertInvalid "OCB write fixed dictionary entry width" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteDictionaries = [fixedDictionary{Ocb.ocbWriteDictionaryEntries = [Ocb.OcbDictionaryEntryBytes [1]]}]})
+  assertInvalid "OCB write utf8 dictionary shape" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteDictionaries = [utf8Dictionary{Ocb.ocbWriteDictionaryEntries = [Ocb.OcbDictionaryEntryBytes [1,2]]}]})
+  assertInvalid "OCB write unknown dictionary code" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteDictionaries = [utf8Dictionary{Ocb.ocbWriteDictionaryCodePhysicalType = Ocb.OcbPhysicalUnknown 99}]})
+  assertInvalid "OCB write unknown dictionary value kind" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteDictionaries = [utf8Dictionary{Ocb.ocbWriteDictionaryValueKind = Ocb.OcbDictionaryValueUnknown 99}]})
+  assertInvalid "OCB write threads range" (Ocb.validateWriteOptions Ocb.defaultOcbWriteOptions{Ocb.ocbWriteThreads = 0})
+  assertInvalid "OCB write zstd range" (Ocb.validateWriteOptions Ocb.defaultOcbWriteOptions{Ocb.ocbWriteZstdLevel = 23})
+  assertInvalid "OCB write unknown codec" (Ocb.validateWriteOptions Ocb.defaultOcbWriteOptions{Ocb.ocbWriteChunkCodec = Ocb.OcbWriteChunkCodecUnknown 99})
+  assertEqual "OCB write valid spec" Nothing (Ocb.validateWriteSpec validWriteSpec)
+  assertEqual "OCB write valid options" Nothing (Ocb.validateWriteOptions Ocb.defaultOcbWriteOptions)
+ where
+  baseColumn =
+    Ocb.OcbWriteColumn
+      { Ocb.ocbWriteColumnName = "value"
+      , Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalI32
+      , Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalPlain
+      , Ocb.ocbWriteColumnDictionaryId = Nothing
+      , Ocb.ocbWriteColumnScale = 0
+      , Ocb.ocbWriteColumnNullable = False
+      , Ocb.ocbWriteColumnFixedBinaryWidth = Nothing
+      }
+  baseChunk = Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 [1, 2, 3]) Nothing
+  baseOrdering = Ocb.OcbWriteOrderingKey 0 Ocb.OcbOrderingAscending Ocb.OcbNoNulls
+  validWriteSpec = Ocb.OcbWriteSpec [baseColumn] [] [Ocb.OcbWriteRowGroup [baseChunk]] [baseOrdering]
+  nullableSpec = validWriteSpec{Ocb.ocbWriteColumns = [baseColumn{Ocb.ocbWriteColumnNullable = True}]}
+  fixedColumn = baseColumn{Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalFixedBinary, Ocb.ocbWriteColumnFixedBinaryWidth = Just 2}
+  fixedChunk = Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesFixedBinary 2 [1,2,3,4]) Nothing
+  fixedSpec = validWriteSpec{Ocb.ocbWriteColumns = [fixedColumn], Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [fixedChunk]], Ocb.ocbWriteOrderingKeys = []}
+  fixedDictionary = Ocb.OcbWriteDictionary 1 "fixed" Ocb.OcbPhysicalI32 Ocb.OcbDictionaryFixedBytes 2 [Ocb.OcbDictionaryEntryBytes [1,2]]
+  utf8Dictionary = Ocb.OcbWriteDictionary 2 "labels" Ocb.OcbPhysicalI32 Ocb.OcbDictionaryUtf8 0 [Ocb.OcbDictionaryEntryUtf8 "a"]
 
 testStreamingF64MetadataSelectorsDense :: NativeLibrary -> IO ()
 testStreamingF64MetadataSelectorsDense native = do
@@ -802,6 +860,116 @@ testOcbReadBatchesAndAttribution native = do
       Ocb.closeReadPlan plan
       Ocb.close file
 
+
+testOcbCreateAppendSmoke :: NativeLibrary -> IO ()
+testOcbCreateAppendSmoke native = do
+  let plainPath = ".test-output" </> "ocb-create-append-smoke.ocb"
+      optionsPath = ".test-output" </> "ocb-create-options-smoke.ocb"
+      dictionaryPath = ".test-output" </> "ocb-dictionary-smoke.ocb"
+      cleanupBoth = cleanup plainPath >> cleanup optionsPath >> cleanup dictionaryPath
+  cleanupBoth
+  (`finally` cleanupBoth) $ do
+
+    unwrap "OCB create" =<< Ocb.create native plainPath (i32WriteSpec [1, 2, 3])
+    plainFile <- unwrap "OCB open created" =<< Ocb.open native plainPath
+    plainMeta <- unwrap "OCB metadata created" =<< Ocb.metadata plainFile
+    assertEqual "OCB created row count" 3 (Ocb.ocbRowCount plainMeta)
+    assertOcbReadI32 "OCB created read" [1, 2, 3] plainFile
+    Ocb.close plainFile
+
+    unwrap "OCB appendWithOptions" =<< Ocb.appendWithOptions native plainPath (i32WriteSpec [4, 5]) Ocb.defaultOcbWriteOptions{Ocb.ocbWriteChunkCodec = Ocb.OcbWriteChunkCodecNone}
+    appendedFile <- unwrap "OCB open appended" =<< Ocb.open native plainPath
+    appendedMeta <- unwrap "OCB metadata appended" =<< Ocb.metadata appendedFile
+    assertEqual "OCB appended row count" 5 (Ocb.ocbRowCount appendedMeta)
+    assertEqual "OCB appended previous generation" True (maybe False (const True) (Ocb.ocbPreviousRootGeneration appendedMeta))
+    assertOcbReadI32 "OCB appended read" [1, 2, 3, 4, 5] appendedFile
+    Ocb.close appendedFile
+
+    unwrap "OCB createWithOptions" =<< Ocb.createWithOptions native optionsPath (i32WriteSpec [10, 11]) Ocb.defaultOcbWriteOptions{Ocb.ocbWriteThreads = 1}
+    unwrap "OCB append" =<< Ocb.append native optionsPath (i32WriteSpec [12])
+    optionsFile <- unwrap "OCB open options appended" =<< Ocb.open native optionsPath
+    assertOcbReadI32 "OCB createWithOptions/append read" [10, 11, 12] optionsFile
+    Ocb.close optionsFile
+
+    unwrap "OCB dictionary create" =<< Ocb.create native dictionaryPath dictionaryWriteSpec
+    dictionaryFile <- unwrap "OCB open dictionary" =<< Ocb.open native dictionaryPath
+    dictionaryMeta <- unwrap "OCB dictionary metadata" =<< Ocb.metadata dictionaryFile
+    assertEqual "OCB dictionary descriptor count" 1 (length (Ocb.ocbDictionaries dictionaryMeta))
+    values <- unwrap "OCB dictionary values" =<< Ocb.dictionaryValues dictionaryFile 1
+    assertEqual "OCB dictionary value entries" ["low", "high"] (Ocb.ocbDictionaryStringValues values)
+    assertOcbReadI32 "OCB dictionary code read" [0, 0, 1] dictionaryFile
+    summaries <- unwrap "OCB dictionary summaries" =<< Ocb.rowGroupSummaries dictionaryFile
+    assertEqual "OCB dictionary summary count" 1 (length (Ocb.ocbRowGroupSummaries summaries))
+    assertEqual "OCB dictionary summary chunks" True (not (null (concatMap Ocb.ocbSummaryChunks (Ocb.ocbRowGroupSummaries summaries))))
+    Ocb.close dictionaryFile
+
+    withBinaryFile plainPath AppendMode $ \handle -> hPutStr handle "deterministic orphan tail"
+    truncated <- unwrap "OCB cleanup orphan tail" =<< Ocb.cleanupOrphanTail native plainPath
+    assertEqual "OCB cleanup truncated" True (Ocb.ocbCleanupTruncated truncated)
+    cleanedFile <- unwrap "OCB open cleaned" =<< Ocb.open native plainPath
+    assertOcbReadI32 "OCB cleaned read" [1, 2, 3, 4, 5] cleanedFile
+    Ocb.close cleanedFile
+    cleanNoop <- unwrap "OCB cleanup clean no-op" =<< Ocb.cleanupOrphanTail native plainPath
+    assertEqual "OCB cleanup no-op" False (Ocb.ocbCleanupTruncated cleanNoop)
+
+dictionaryWriteSpec :: Ocb.OcbWriteSpec
+dictionaryWriteSpec =
+  Ocb.OcbWriteSpec
+    { Ocb.ocbWriteColumns =
+        [ Ocb.OcbWriteColumn
+            { Ocb.ocbWriteColumnName = "value"
+            , Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalI32
+            , Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalDictionaryCode
+            , Ocb.ocbWriteColumnDictionaryId = Just 1
+            , Ocb.ocbWriteColumnScale = 0
+            , Ocb.ocbWriteColumnNullable = False
+            , Ocb.ocbWriteColumnFixedBinaryWidth = Nothing
+            }
+        ]
+    , Ocb.ocbWriteDictionaries =
+        [ Ocb.OcbWriteDictionary
+            { Ocb.ocbWriteDictionaryId = 1
+            , Ocb.ocbWriteDictionaryName = "kind"
+            , Ocb.ocbWriteDictionaryCodePhysicalType = Ocb.OcbPhysicalI32
+            , Ocb.ocbWriteDictionaryValueKind = Ocb.OcbDictionaryUtf8
+            , Ocb.ocbWriteDictionaryFixedWidth = 0
+            , Ocb.ocbWriteDictionaryEntries = [Ocb.OcbDictionaryEntryUtf8 "low", Ocb.OcbDictionaryEntryUtf8 "high"]
+            }
+        ]
+    , Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 [0, 0, 1]) Nothing]]
+    , Ocb.ocbWriteOrderingKeys = [Ocb.OcbWriteOrderingKey 0 Ocb.OcbOrderingAscending Ocb.OcbNoNulls]
+    }
+
+i32WriteSpec :: [Int32] -> Ocb.OcbWriteSpec
+i32WriteSpec values =
+  Ocb.OcbWriteSpec
+    { Ocb.ocbWriteColumns =
+        [ Ocb.OcbWriteColumn
+            { Ocb.ocbWriteColumnName = "value"
+            , Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalI32
+            , Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalPlain
+            , Ocb.ocbWriteColumnDictionaryId = Nothing
+            , Ocb.ocbWriteColumnScale = 0
+            , Ocb.ocbWriteColumnNullable = False
+            , Ocb.ocbWriteColumnFixedBinaryWidth = Nothing
+            }
+        ]
+    , Ocb.ocbWriteDictionaries = []
+    , Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 values) Nothing]]
+    , Ocb.ocbWriteOrderingKeys = [Ocb.OcbWriteOrderingKey 0 Ocb.OcbOrderingAscending Ocb.OcbNoNulls]
+    }
+
+assertOcbReadI32 :: String -> [Int32] -> Ocb.OcbFile -> IO ()
+assertOcbReadI32 label expected file = do
+  outcome <- unwrap label =<< Ocb.readBatches file Ocb.defaultOcbReadRequest{Ocb.ocbReadProjection = Ocb.OcbProjectionNames ["value"]}
+  let actual = concatMap batchValues (Ocb.ocbOutcomeBatches outcome)
+  assertEqual label expected actual
+ where
+  batchValues batch = concatMap columnValues (Ocb.ocbBatchColumns batch)
+  columnValues column = case Ocb.ocbArrayValues column of
+    Ocb.OcbValuesI32 values -> values
+    other -> error (label <> ": expected i32 values, got " <> show other)
+
 assertOcbProjectionPredicateOutcome :: String -> Ocb.OcbReadOutcome -> IO ()
 assertOcbProjectionPredicateOutcome label outcome = do
   let report = Ocb.ocbOutcomeReport outcome
@@ -914,6 +1082,11 @@ assertEqualResult :: (Eq a, Show a) => String -> a -> Result a -> IO ()
 assertEqualResult label expected result = do
   actual <- unwrap label result
   assertEqual label expected actual
+
+assertInvalid :: String -> Maybe TioError -> IO ()
+assertInvalid label result = case result of
+  Just err -> assertEqual label ErrorInvalidArgument (tioErrorCode err)
+  Nothing -> failTest (label <> ": expected validation failure")
 
 assertErrorCode :: String -> ErrorCode -> Result a -> IO ()
 assertErrorCode label expected result = case result of

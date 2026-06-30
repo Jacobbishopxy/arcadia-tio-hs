@@ -18,6 +18,24 @@ module Arcadia.Tio.Ocb
   , OcbOrderingKey(..)
   , OcbMetadata(..)
   , OcbDictionaryValues(..)
+  , OcbWriteChunkCodec(..)
+  , OcbWriteOptions(..)
+  , defaultOcbWriteOptions
+  , OcbDictionaryEntry(..)
+  , OcbWriteColumn(..)
+  , OcbWriteDictionary(..)
+  , OcbWriteColumnChunk(..)
+  , OcbWriteRowGroup(..)
+  , OcbWriteOrderingKey(..)
+  , OcbWriteSpec(..)
+  , OcbCleanupResult(..)
+  , validateWriteOptions
+  , validateWriteSpec
+  , create
+  , createWithOptions
+  , append
+  , appendWithOptions
+  , cleanupOrphanTail
   , OcbProjection(..)
   , OcbPredicateValue(..)
   , OcbRowGroupPredicate(..)
@@ -63,14 +81,14 @@ module Arcadia.Tio.Ocb
 import Control.Exception (finally)
 import Data.Int (Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
-import Foreign.C.String (CString, peekCString, withCString)
+import Foreign.C.String (CString, peekCString, withCString, withCStringLen)
 import Foreign.C.Types (CFloat(..), CInt(..), CSize(..))
 import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, withForeignPtr)
 import qualified Foreign.Concurrent as FC
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Marshal.Array (allocaArray, peekArray, withArray)
-import Foreign.Ptr (Ptr, castPtr, nullPtr)
-import Foreign.Storable (Storable, peek, poke)
+import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
+import Foreign.Storable (Storable, peek, poke, sizeOf)
 
 import Arcadia.Tio.Error (Result, TioError, invalidArgument)
 import Arcadia.Tio.Internal.CApi
@@ -96,6 +114,15 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioOcbRowGroupSummaries(..)
   , CArcadiaTioOcbRowGroupPredicate(..)
   , CArcadiaTioOcbValidityBitmap(..)
+  , CArcadiaTioOcbWriteColumn(..)
+  , CArcadiaTioOcbDictionaryEntry(..)
+  , CArcadiaTioOcbWriteDictionary(..)
+  , CArcadiaTioOcbWriteColumnChunk(..)
+  , CArcadiaTioOcbWriteOptions(..)
+  , CArcadiaTioOcbWriteOrderingKey(..)
+  , CArcadiaTioOcbWriteRowGroup(..)
+  , CArcadiaTioOcbWriteSpec(..)
+  , CArcadiaTioOcbCleanupResult(..)
   , COcbFile
   , COcbReadPlan
   , NativeLibrary
@@ -129,12 +156,32 @@ import Arcadia.Tio.Internal.CApi
   , capiOcbRowGroupSummaries
   , capiOcbRowGroupSummariesFree
   , capiOcbRowGroupSummariesInit
+  , capiOcbWriteColumnSetFixedBinaryWidth
+  , capiOcbWriteOptionsInit
+  , capiOcbWriteSpecInit
+  , capiOcbCreate
+  , capiOcbCreateWithOptions
+  , capiOcbAppend
+  , capiOcbAppendWithOptions
+  , capiOcbCleanupResultInit
+  , capiOcbCleanupOrphanTail
   , emptyCArcadiaTioOcbDictionaryValues
   , emptyCArcadiaTioOcbMetadata
   , emptyCArcadiaTioOcbOpenOptions
   , emptyCArcadiaTioOcbPredicateValue
+  , emptyCArcadiaTioOcbPrimitiveValues
+  , emptyCArcadiaTioOcbValidityBitmap
   , emptyCArcadiaTioOcbReadRequest
   , emptyCArcadiaTioOcbRowGroupPredicate
+  , emptyCArcadiaTioOcbWriteColumn
+  , emptyCArcadiaTioOcbDictionaryEntry
+  , emptyCArcadiaTioOcbWriteDictionary
+  , emptyCArcadiaTioOcbWriteColumnChunk
+  , emptyCArcadiaTioOcbWriteOptions
+  , emptyCArcadiaTioOcbWriteOrderingKey
+  , emptyCArcadiaTioOcbWriteRowGroup
+  , emptyCArcadiaTioOcbWriteSpec
+  , emptyCArcadiaTioOcbCleanupResult
   , lastError
   , okStatus
   )
@@ -277,6 +324,83 @@ data OcbDictionaryValues = OcbDictionaryValues
   }
   deriving (Eq, Show)
 
+
+data OcbWriteChunkCodec
+  = OcbWriteChunkCodecNone
+  | OcbWriteChunkCodecZstd
+  | OcbWriteChunkCodecUnknown Int
+  deriving (Eq, Show)
+
+-- | Write options borrowed by one native create/append call.
+data OcbWriteOptions = OcbWriteOptions
+  { ocbWriteThreads :: Int
+  , ocbWriteChunkCodec :: OcbWriteChunkCodec
+  , ocbWriteZstdLevel :: Int32
+  }
+  deriving (Eq, Show)
+
+defaultOcbWriteOptions :: OcbWriteOptions
+defaultOcbWriteOptions = OcbWriteOptions{ocbWriteThreads = 1, ocbWriteChunkCodec = OcbWriteChunkCodecZstd, ocbWriteZstdLevel = 3}
+
+data OcbDictionaryEntry
+  = OcbDictionaryEntryUtf8 String
+  | OcbDictionaryEntryBytes [Word8]
+  deriving (Eq, Show)
+
+-- | High-level write schema column; fixed-binary width is carried by the native helper.
+data OcbWriteColumn = OcbWriteColumn
+  { ocbWriteColumnName :: String
+  , ocbWriteColumnPhysicalType :: OcbPhysicalType
+  , ocbWriteColumnLogicalKind :: OcbLogicalKind
+  , ocbWriteColumnDictionaryId :: Maybe Word32
+  , ocbWriteColumnScale :: Int32
+  , ocbWriteColumnNullable :: Bool
+  , ocbWriteColumnFixedBinaryWidth :: Maybe Word32
+  }
+  deriving (Eq, Show)
+
+-- | Dictionary declaration and borrowed entries for a write spec.
+data OcbWriteDictionary = OcbWriteDictionary
+  { ocbWriteDictionaryId :: Word32
+  , ocbWriteDictionaryName :: String
+  , ocbWriteDictionaryCodePhysicalType :: OcbPhysicalType
+  , ocbWriteDictionaryValueKind :: OcbDictionaryValueKind
+  , ocbWriteDictionaryFixedWidth :: Word32
+  , ocbWriteDictionaryEntries :: [OcbDictionaryEntry]
+  }
+  deriving (Eq, Show)
+
+data OcbWriteColumnChunk = OcbWriteColumnChunk
+  { ocbWriteChunkColumnId :: Word32
+  , ocbWriteChunkValues :: OcbPrimitiveValues
+  , ocbWriteChunkValidity :: Maybe OcbValidityBitmap
+  }
+  deriving (Eq, Show)
+
+newtype OcbWriteRowGroup = OcbWriteRowGroup
+  { ocbWriteRowGroupColumns :: [OcbWriteColumnChunk]
+  }
+  deriving (Eq, Show)
+
+data OcbWriteOrderingKey = OcbWriteOrderingKey
+  { ocbWriteOrderingColumnId :: Word32
+  , ocbWriteOrderingDirection :: OcbOrderingDirection
+  , ocbWriteOrderingNullOrder :: OcbNullOrder
+  }
+  deriving (Eq, Show)
+
+data OcbWriteSpec = OcbWriteSpec
+  { ocbWriteColumns :: [OcbWriteColumn]
+  , ocbWriteDictionaries :: [OcbWriteDictionary]
+  , ocbWriteRowGroups :: [OcbWriteRowGroup]
+  , ocbWriteOrderingKeys :: [OcbWriteOrderingKey]
+  }
+  deriving (Eq, Show)
+
+data OcbCleanupResult = OcbCleanupResult
+  { ocbCleanupTruncated :: Bool
+  }
+  deriving (Eq, Show)
 
 data OcbProjection
   = OcbProjectionAll
@@ -483,6 +607,69 @@ newtype OcbRowGroupSummaries = OcbRowGroupSummaries
   { ocbRowGroupSummaries :: [OcbRowGroupSummary]
   }
   deriving (Eq, Show)
+
+-- | Create an appendable OCB file and publish its first committed root.
+create :: NativeLibrary -> FilePath -> OcbWriteSpec -> IO (Result ())
+create native path spec =
+  runOcbWrite native path spec (\pathPtr specPtr -> capiOcbCreate native pathPtr specPtr)
+
+-- | Create an appendable OCB file with explicit write options.
+createWithOptions :: NativeLibrary -> FilePath -> OcbWriteSpec -> OcbWriteOptions -> IO (Result ())
+createWithOptions native path spec options =
+  runOcbWriteWithOptions native path spec options (\pathPtr specPtr optionsPtr -> capiOcbCreateWithOptions native pathPtr specPtr optionsPtr)
+
+-- | Append one sorted suffix commit to an existing appendable OCB file.
+append :: NativeLibrary -> FilePath -> OcbWriteSpec -> IO (Result ())
+append native path spec =
+  runOcbWrite native path spec (\pathPtr specPtr -> capiOcbAppend native pathPtr specPtr)
+
+-- | Append one sorted suffix commit with explicit write options.
+appendWithOptions :: NativeLibrary -> FilePath -> OcbWriteSpec -> OcbWriteOptions -> IO (Result ())
+appendWithOptions native path spec options =
+  runOcbWriteWithOptions native path spec options (\pathPtr specPtr optionsPtr -> capiOcbAppendWithOptions native pathPtr specPtr optionsPtr)
+
+runOcbWrite :: NativeLibrary -> FilePath -> OcbWriteSpec -> (CString -> Ptr CArcadiaTioOcbWriteSpec -> IO CInt) -> IO (Result ())
+runOcbWrite native path spec call
+  | hasNul path = pure (Left (invalidArgument "OCB path must not contain NUL bytes"))
+  | otherwise =
+      withCString path $ \pathPtr -> do
+        specResult <- withOcbWriteSpec native spec $ \specPtr -> call pathPtr specPtr
+        flattenWriteStatus native specResult
+
+runOcbWriteWithOptions :: NativeLibrary -> FilePath -> OcbWriteSpec -> OcbWriteOptions -> (CString -> Ptr CArcadiaTioOcbWriteSpec -> Ptr CArcadiaTioOcbWriteOptions -> IO CInt) -> IO (Result ())
+runOcbWriteWithOptions native path spec options call
+  | hasNul path = pure (Left (invalidArgument "OCB path must not contain NUL bytes"))
+  | otherwise =
+      withCString path $ \pathPtr -> do
+        specResult <- withOcbWriteSpec native spec $ \specPtr ->
+          withOcbWriteOptions native options $ \optionsPtr -> call pathPtr specPtr optionsPtr
+        case specResult of
+          Left err -> pure (Left err)
+          Right (Left err) -> pure (Left err)
+          Right (Right status) -> flattenWriteStatus native (Right status)
+
+flattenWriteStatus :: NativeLibrary -> Result CInt -> IO (Result ())
+flattenWriteStatus native result = case result of
+  Left err -> pure (Left err)
+  Right status ->
+    if status == okStatus
+      then pure (Right ())
+      else Left <$> lastError native
+
+
+-- | Truncate orphan tail bytes after the latest valid appendable OCB root.
+cleanupOrphanTail :: NativeLibrary -> FilePath -> IO (Result OcbCleanupResult)
+cleanupOrphanTail native path
+  | hasNul path = pure (Left (invalidArgument "OCB path must not contain NUL bytes"))
+  | otherwise =
+      withCString path $ \pathPtr ->
+        alloca $ \resultPtr -> do
+          capiOcbCleanupResultInit native resultPtr
+          poke resultPtr emptyCArcadiaTioOcbCleanupResult
+          status <- capiOcbCleanupOrphanTail native pathPtr resultPtr
+          if status == okStatus
+            then Right <$> (peek resultPtr >>= copyOcbCleanupResult)
+            else Left <$> lastError native
 
 -- | Open an OCB selected-snapshot handle through the C ABI.
 open :: NativeLibrary -> FilePath -> IO (Result OcbFile)
@@ -773,6 +960,371 @@ toCPredicateValue value = case value of
   OcbPredicateF64 v -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = 3, cOcbPredicateValueF64 = v}
   OcbPredicateUnknown physical -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = toOcbPhysicalType physical}
 
+
+
+copyOcbCleanupResult :: CArcadiaTioOcbCleanupResult -> IO OcbCleanupResult
+copyOcbCleanupResult raw = pure OcbCleanupResult{ocbCleanupTruncated = cOcbCleanupResultTruncated raw /= 0}
+
+validateWriteOptions :: OcbWriteOptions -> Maybe TioError
+validateWriteOptions options
+  | ocbWriteThreads options < 1 || ocbWriteThreads options > 64 = Just (invalidArgument "OCB write_threads must be between 1 and 64")
+  | not (knownWriteChunkCodec (ocbWriteChunkCodec options)) = Just (invalidArgument "OCB write chunk codec must be known")
+  | ocbWriteChunkCodec options == OcbWriteChunkCodecZstd && (ocbWriteZstdLevel options < 1 || ocbWriteZstdLevel options > 22) = Just (invalidArgument "OCB zstd level must be between 1 and 22")
+  | otherwise = Nothing
+
+validateWriteSpec :: OcbWriteSpec -> Maybe TioError
+validateWriteSpec spec
+  | null (ocbWriteColumns spec) = Just (invalidArgument "OCB write spec must contain at least one schema column")
+  | null (ocbWriteRowGroups spec) = Just (invalidArgument "OCB write spec must contain at least one row group")
+  | otherwise = firstJust (schemaChecks <> dictionaryChecks <> orderingChecks <> concatMap rowGroupChecks (zip [0 :: Int ..] (ocbWriteRowGroups spec)))
+ where
+  columns = zip [0 :: Word32 ..] (ocbWriteColumns spec)
+  columnIds = map fst columns
+  columnNames = map (ocbWriteColumnName . snd) columns
+  dictionaries = ocbWriteDictionaries spec
+  dictionaryIds = map ocbWriteDictionaryId dictionaries
+  orderingIds = map ocbWriteOrderingColumnId (ocbWriteOrderingKeys spec)
+  schemaChecks =
+    [ require (all (not . null) columnNames) "OCB column names must not be empty"
+    , require (not (any hasNul columnNames)) "OCB column names must not contain NUL bytes"
+    , require (allUnique columnNames) "OCB column names must be unique"
+    , require (allUnique dictionaryIds) "OCB dictionary ids must be unique"
+    ]
+      <> map validateColumn columns
+  dictionaryChecks = concatMap validateDictionary dictionaries
+  orderingChecks =
+    [ require (allUnique orderingIds) "OCB ordering keys must not contain duplicate column ids" ]
+      <> map validateOrderingKey (ocbWriteOrderingKeys spec)
+
+  validateColumn (columnId, column) =
+    firstJust
+      [ require (columnId `elem` columnIds) "OCB column id out of range"
+      , require (not (hasNul (ocbWriteColumnName column))) "OCB column names must not contain NUL bytes"
+      , require (maybe True (`elem` dictionaryIds) (ocbWriteColumnDictionaryId column)) "OCB column dictionary id must refer to a declared dictionary"
+      , require (knownPhysicalType (ocbWriteColumnPhysicalType column)) "OCB schema physical type must be known"
+      , require (knownLogicalKind (ocbWriteColumnLogicalKind column)) "OCB schema logical kind must be known"
+      , case ocbWriteColumnPhysicalType column of
+          OcbPhysicalFixedBinary -> require (maybe False (> 0) (ocbWriteColumnFixedBinaryWidth column)) "OCB fixed-binary columns require a positive fixed width"
+          _ -> require (ocbWriteColumnFixedBinaryWidth column == Nothing) "OCB fixed width is only valid for fixed-binary columns"
+      ]
+
+  validateDictionary dictionary =
+    [ require (not (null (ocbWriteDictionaryName dictionary))) "OCB dictionary names must not be empty"
+    , require (not (hasNul (ocbWriteDictionaryName dictionary))) "OCB dictionary names must not contain NUL bytes"
+    , require (knownPhysicalType (ocbWriteDictionaryCodePhysicalType dictionary)) "OCB dictionary code physical type must be known"
+    , require (not (null (ocbWriteDictionaryEntries dictionary))) "OCB dictionaries must contain at least one entry"
+    , case ocbWriteDictionaryValueKind dictionary of
+        OcbDictionaryUtf8 -> require (all isUtf8Entry (ocbWriteDictionaryEntries dictionary)) "OCB UTF-8 dictionaries require UTF-8 entries"
+        OcbDictionaryEnumLabels -> require (all isUtf8Entry (ocbWriteDictionaryEntries dictionary)) "OCB enum dictionaries require UTF-8 entries"
+        OcbDictionaryBytes -> require (all isBytesEntry (ocbWriteDictionaryEntries dictionary)) "OCB byte dictionaries require byte entries"
+        OcbDictionaryFixedBytes -> require (ocbWriteDictionaryFixedWidth dictionary > 0 && all (fixedEntryLen (ocbWriteDictionaryFixedWidth dictionary)) (ocbWriteDictionaryEntries dictionary)) "OCB fixed-byte dictionaries require entries with the declared fixed width"
+        OcbDictionaryValueUnknown _ -> Just (invalidArgument "OCB dictionary value kind is unknown")
+    ]
+      <> map validateDictionaryEntry (ocbWriteDictionaryEntries dictionary)
+
+  validateDictionaryEntry entry = case entry of
+    OcbDictionaryEntryUtf8 value -> require (not (hasNul value)) "OCB dictionary UTF-8 entries must not contain NUL bytes"
+    OcbDictionaryEntryBytes _ -> Nothing
+
+  validateOrderingKey key =
+    let column = lookup (ocbWriteOrderingColumnId key) columns
+    in firstJust
+        [ require (ocbWriteOrderingColumnId key `elem` columnIds) "OCB ordering key must refer to a schema column"
+        , require (knownOrderingDirection (ocbWriteOrderingDirection key)) "OCB ordering direction must be known"
+        , require (knownNullOrder (ocbWriteOrderingNullOrder key)) "OCB null order must be known"
+        , case column of
+            Just c -> require (ocbWriteColumnPhysicalType c /= OcbPhysicalFixedBinary) "OCB fixed-binary columns cannot be ordering keys"
+            Nothing -> Nothing
+        ]
+
+  rowGroupChecks (rowGroupIndex, OcbWriteRowGroup chunks) =
+    case chunks of
+      [] -> [Just (invalidArgument "OCB row groups must contain at least one chunk")]
+      _ ->
+        [ require (allUnique (map ocbWriteChunkColumnId chunks)) "OCB row group chunks must not contain duplicate column ids"
+        , require (map ocbWriteChunkColumnId chunks == columnIds) "OCB row group chunks must be in schema column order"
+        , require (allSame (map chunkRowCount chunks)) "OCB row group chunks must have matching row counts"
+        ]
+          <> map (validateChunk rowGroupIndex) chunks
+
+  validateChunk _rowGroupIndex chunk =
+    let column = lookup (ocbWriteChunkColumnId chunk) columns
+        rows = chunkRowCount chunk
+    in firstJust
+        [ require (rows > 0) "OCB chunks must contain at least one row"
+        , require (ocbWriteChunkColumnId chunk `elem` columnIds) "OCB chunk column id must refer to a schema column"
+        , require (knownPrimitiveValues (ocbWriteChunkValues chunk)) "OCB write chunk values must use a known physical type"
+        , case column of
+            Nothing -> Nothing
+            Just c -> require (valuePhysicalType (ocbWriteChunkValues chunk) == ocbWriteColumnPhysicalType c) "OCB chunk values must match the schema physical type"
+        , case (column, ocbWriteChunkValues chunk) of
+            (Just c, OcbValuesFixedBinary width bytes) -> require (Just width == ocbWriteColumnFixedBinaryWidth c && fixedBytesLenMatches width rows bytes) "OCB fixed-binary chunk byte length must match row count and fixed width"
+            _ -> Nothing
+        , case (column, ocbWriteChunkValidity chunk) of
+            (Just c, Just _) -> require (ocbWriteColumnNullable c) "OCB validity is only valid for nullable columns"
+            _ -> Nothing
+        , case ocbWriteChunkValidity chunk of
+            Nothing -> Nothing
+            Just validity -> require (ocbValidityRowCount validity == rows && fromIntegral (length (ocbValidityBytes validity)) == exactValidityBytes rows) "OCB validity bitmap length must exactly match row count"
+        ]
+
+-- All arrays, strings, primitive buffers, dictionary entries, and validity bitmaps
+-- are borrowed only inside the continuation passed to the native create/append call.
+withOcbWriteSpec :: NativeLibrary -> OcbWriteSpec -> (Ptr CArcadiaTioOcbWriteSpec -> IO a) -> IO (Result a)
+withOcbWriteSpec native spec action =
+  case validateWriteSpec spec of
+    Just err -> pure (Left err)
+    Nothing ->
+      withWriteColumns native (ocbWriteColumns spec) $ \columnsPtr columnsLen ->
+        withWriteDictionaries (ocbWriteDictionaries spec) $ \dictionariesPtr dictionariesLen ->
+          withWriteRowGroups (ocbWriteRowGroups spec) $ \rowGroupsPtr rowGroupsLen ->
+            withWriteOrderingKeys (ocbWriteOrderingKeys spec) $ \orderingKeysPtr orderingKeysLen ->
+              alloca $ \specPtr -> do
+                capiOcbWriteSpecInit native specPtr
+                poke specPtr
+                  emptyCArcadiaTioOcbWriteSpec
+                    { cOcbWriteSpecColumns = columnsPtr
+                    , cOcbWriteSpecColumnsLen = columnsLen
+                    , cOcbWriteSpecDictionaries = dictionariesPtr
+                    , cOcbWriteSpecDictionariesLen = dictionariesLen
+                    , cOcbWriteSpecRowGroups = rowGroupsPtr
+                    , cOcbWriteSpecRowGroupsLen = rowGroupsLen
+                    , cOcbWriteSpecOrderingKeys = orderingKeysPtr
+                    , cOcbWriteSpecOrderingKeysLen = orderingKeysLen
+                    }
+                Right <$> action specPtr
+
+withOcbWriteOptions :: NativeLibrary -> OcbWriteOptions -> (Ptr CArcadiaTioOcbWriteOptions -> IO a) -> IO (Result a)
+withOcbWriteOptions native options action =
+  case validateWriteOptions options of
+    Just err -> pure (Left err)
+    Nothing -> alloca $ \optionsPtr -> do
+      capiOcbWriteOptionsInit native optionsPtr
+      poke optionsPtr (toCWriteOptions options)
+      Right <$> action optionsPtr
+
+withWriteColumns :: NativeLibrary -> [OcbWriteColumn] -> (Ptr CArcadiaTioOcbWriteColumn -> CSize -> IO a) -> IO a
+withWriteColumns _ [] action = action nullPtr 0
+withWriteColumns native columns action = go columns []
+ where
+  go [] acc =
+    withArray (reverse acc) $ \ptr -> do
+      setWidths ptr 0 columns
+      action ptr (fromIntegral (length acc))
+  go (column:rest) acc =
+    withCString (ocbWriteColumnName column) $ \namePtr ->
+      go rest (toCWriteColumn namePtr column : acc)
+  setWidths _ _ [] = pure ()
+  setWidths ptr index (column:rest) = do
+    let columnPtr = ptr `plusPtr` (index * sizeOf (undefined :: CArcadiaTioOcbWriteColumn))
+    case ocbWriteColumnFixedBinaryWidth column of
+      Just width -> capiOcbWriteColumnSetFixedBinaryWidth native columnPtr width
+      Nothing -> pure ()
+    setWidths ptr (index + 1) rest
+
+withWriteDictionaries :: [OcbWriteDictionary] -> (Ptr CArcadiaTioOcbWriteDictionary -> CSize -> IO a) -> IO a
+withWriteDictionaries [] action = action nullPtr 0
+withWriteDictionaries dictionaries action = go dictionaries []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
+  go (dictionary:rest) acc =
+    withCString (ocbWriteDictionaryName dictionary) $ \namePtr ->
+      withDictionaryEntries (ocbWriteDictionaryEntries dictionary) $ \entriesPtr entriesLen ->
+        go rest (toCWriteDictionary namePtr entriesPtr entriesLen dictionary : acc)
+
+withDictionaryEntries :: [OcbDictionaryEntry] -> (Ptr CArcadiaTioOcbDictionaryEntry -> CSize -> IO a) -> IO a
+withDictionaryEntries [] action = action nullPtr 0
+withDictionaryEntries entries action = go entries []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
+  go (entry:rest) acc =
+    withDictionaryEntry entry $ \cEntry -> go rest (cEntry : acc)
+
+withDictionaryEntry :: OcbDictionaryEntry -> (CArcadiaTioOcbDictionaryEntry -> IO a) -> IO a
+withDictionaryEntry entry action = case entry of
+  OcbDictionaryEntryUtf8 value ->
+    withCStringLen value $ \(ptr, len) -> action emptyCArcadiaTioOcbDictionaryEntry{cOcbDictionaryEntryData = castPtr ptr, cOcbDictionaryEntryLen = fromIntegral len}
+  OcbDictionaryEntryBytes bytes ->
+    withWord8Array bytes $ \ptr len -> action emptyCArcadiaTioOcbDictionaryEntry{cOcbDictionaryEntryData = ptr, cOcbDictionaryEntryLen = len}
+
+withWriteRowGroups :: [OcbWriteRowGroup] -> (Ptr CArcadiaTioOcbWriteRowGroup -> CSize -> IO a) -> IO a
+withWriteRowGroups [] action = action nullPtr 0
+withWriteRowGroups rowGroups action = go rowGroups []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
+  go (OcbWriteRowGroup chunks:rest) acc =
+    withWriteChunks chunks $ \chunksPtr chunksLen ->
+      go rest (emptyCArcadiaTioOcbWriteRowGroup{cOcbWriteRowGroupColumns = chunksPtr, cOcbWriteRowGroupColumnsLen = chunksLen} : acc)
+
+withWriteChunks :: [OcbWriteColumnChunk] -> (Ptr CArcadiaTioOcbWriteColumnChunk -> CSize -> IO a) -> IO a
+withWriteChunks [] action = action nullPtr 0
+withWriteChunks chunks action = go chunks []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
+  go (chunk:rest) acc =
+    withPrimitiveValuesForWrite (ocbWriteChunkValues chunk) $ \values ->
+      withMaybeValidity (ocbWriteChunkValidity chunk) $ \validityPtr ->
+        go rest (emptyCArcadiaTioOcbWriteColumnChunk{cOcbWriteColumnChunkColumnId = ocbWriteChunkColumnId chunk, cOcbWriteColumnChunkValues = values, cOcbWriteColumnChunkValidity = validityPtr} : acc)
+
+withPrimitiveValuesForWrite :: OcbPrimitiveValues -> (CArcadiaTioOcbPrimitiveValues -> IO a) -> IO a
+withPrimitiveValuesForWrite values action = case values of
+  OcbValuesI32 xs -> withArrayOrNull xs $ \ptr len -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = 0, cOcbPrimitiveValuesData = castPtr ptr, cOcbPrimitiveValuesLen = len}
+  OcbValuesI64 xs -> withArrayOrNull xs $ \ptr len -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = 1, cOcbPrimitiveValuesData = castPtr ptr, cOcbPrimitiveValuesLen = len}
+  OcbValuesF32 xs -> withArrayOrNull (map CFloat xs) $ \ptr len -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = 2, cOcbPrimitiveValuesData = castPtr ptr, cOcbPrimitiveValuesLen = len}
+  OcbValuesF64 xs -> withArrayOrNull xs $ \ptr len -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = 3, cOcbPrimitiveValuesData = castPtr ptr, cOcbPrimitiveValuesLen = len}
+  OcbValuesFixedBinary width bytes -> withWord8Array bytes $ \ptr _ -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = 4, cOcbPrimitiveValuesData = castPtr ptr, cOcbPrimitiveValuesLen = fromIntegral (fixedBinaryRows width bytes)}
+  OcbValuesUnknown physical rows -> action emptyCArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesPhysicalType = toOcbPhysicalType physical, cOcbPrimitiveValuesData = nullPtr, cOcbPrimitiveValuesLen = fromIntegral rows}
+
+withMaybeValidity :: Maybe OcbValidityBitmap -> (Ptr CArcadiaTioOcbValidityBitmap -> IO a) -> IO a
+withMaybeValidity Nothing action = action nullPtr
+withMaybeValidity (Just validity) action =
+  withWord8Array (ocbValidityBytes validity) $ \bytesPtr bytesLen ->
+    alloca $ \validityPtr -> do
+      poke validityPtr emptyCArcadiaTioOcbValidityBitmap{cOcbValidityBitmapData = bytesPtr, cOcbValidityBitmapLen = bytesLen, cOcbValidityBitmapRowCount = ocbValidityRowCount validity}
+      action validityPtr
+
+withWriteOrderingKeys :: [OcbWriteOrderingKey] -> (Ptr CArcadiaTioOcbWriteOrderingKey -> CSize -> IO a) -> IO a
+withWriteOrderingKeys [] action = action nullPtr 0
+withWriteOrderingKeys keys action = withArray (map toCWriteOrderingKey keys) $ \ptr -> action ptr (fromIntegral (length keys))
+
+toCWriteOptions :: OcbWriteOptions -> CArcadiaTioOcbWriteOptions
+toCWriteOptions options =
+  emptyCArcadiaTioOcbWriteOptions
+    { cOcbWriteOptionsWriteThreads = fromIntegral (ocbWriteThreads options)
+    , cOcbWriteOptionsChunkCodec = toOcbWriteChunkCodec (ocbWriteChunkCodec options)
+    , cOcbWriteOptionsZstdLevel = ocbWriteZstdLevel options
+    }
+
+toCWriteColumn :: CString -> OcbWriteColumn -> CArcadiaTioOcbWriteColumn
+toCWriteColumn namePtr column =
+  emptyCArcadiaTioOcbWriteColumn
+    { cOcbWriteColumnName = namePtr
+    , cOcbWriteColumnPhysicalType = toOcbPhysicalType (ocbWriteColumnPhysicalType column)
+    , cOcbWriteColumnLogicalKind = toOcbLogicalKind (ocbWriteColumnLogicalKind column)
+    , cOcbWriteColumnHasDictionaryId = maybe 0 (const 1) (ocbWriteColumnDictionaryId column)
+    , cOcbWriteColumnDictionaryId = maybe 0 id (ocbWriteColumnDictionaryId column)
+    , cOcbWriteColumnScale = ocbWriteColumnScale column
+    , cOcbWriteColumnNullable = boolByte (ocbWriteColumnNullable column)
+    }
+
+toCWriteDictionary :: CString -> Ptr CArcadiaTioOcbDictionaryEntry -> CSize -> OcbWriteDictionary -> CArcadiaTioOcbWriteDictionary
+toCWriteDictionary namePtr entriesPtr entriesLen dictionary =
+  emptyCArcadiaTioOcbWriteDictionary
+    { cOcbWriteDictionaryId = ocbWriteDictionaryId dictionary
+    , cOcbWriteDictionaryName = namePtr
+    , cOcbWriteDictionaryCodePhysicalType = toOcbPhysicalType (ocbWriteDictionaryCodePhysicalType dictionary)
+    , cOcbWriteDictionaryValueKind = toOcbDictionaryValueKind (ocbWriteDictionaryValueKind dictionary)
+    , cOcbWriteDictionaryFixedWidth = ocbWriteDictionaryFixedWidth dictionary
+    , cOcbWriteDictionaryEntries = entriesPtr
+    , cOcbWriteDictionaryEntriesLen = entriesLen
+    }
+
+toCWriteOrderingKey :: OcbWriteOrderingKey -> CArcadiaTioOcbWriteOrderingKey
+toCWriteOrderingKey key =
+  emptyCArcadiaTioOcbWriteOrderingKey
+    { cOcbWriteOrderingKeyColumnId = ocbWriteOrderingColumnId key
+    , cOcbWriteOrderingKeyDirection = toOcbOrderingDirection (ocbWriteOrderingDirection key)
+    , cOcbWriteOrderingKeyNullOrder = toOcbNullOrder (ocbWriteOrderingNullOrder key)
+    }
+
+withWord8Array :: [Word8] -> (Ptr Word8 -> CSize -> IO a) -> IO a
+withWord8Array [] action = action nullPtr 0
+withWord8Array xs action = withArray xs $ \ptr -> action ptr (fromIntegral (length xs))
+
+withArrayOrNull :: Storable a => [a] -> (Ptr a -> CSize -> IO b) -> IO b
+withArrayOrNull [] action = action nullPtr 0
+withArrayOrNull xs action = withArray xs $ \ptr -> action ptr (fromIntegral (length xs))
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust = foldr (<|>) Nothing
+
+(<|>) :: Maybe a -> Maybe a -> Maybe a
+Nothing <|> rhs = rhs
+lhs <|> _ = lhs
+
+require :: Bool -> String -> Maybe TioError
+require True _ = Nothing
+require False message = Just (invalidArgument message)
+
+hasNul :: String -> Bool
+hasNul = elem '\0'
+
+allUnique :: Eq a => [a] -> Bool
+allUnique [] = True
+allUnique (x:xs) = x `notElem` xs && allUnique xs
+
+allSame :: Eq a => [a] -> Bool
+allSame [] = True
+allSame (x:xs) = all (== x) xs
+
+chunkRowCount :: OcbWriteColumnChunk -> Word64
+chunkRowCount = valueRowCount . ocbWriteChunkValues
+
+valueRowCount :: OcbPrimitiveValues -> Word64
+valueRowCount = \case
+  OcbValuesI32 xs -> fromIntegral (length xs)
+  OcbValuesI64 xs -> fromIntegral (length xs)
+  OcbValuesF32 xs -> fromIntegral (length xs)
+  OcbValuesF64 xs -> fromIntegral (length xs)
+  OcbValuesFixedBinary width bytes -> fromIntegral (fixedBinaryRows width bytes)
+  OcbValuesUnknown _ rows -> rows
+
+valuePhysicalType :: OcbPrimitiveValues -> OcbPhysicalType
+valuePhysicalType = \case
+  OcbValuesI32 _ -> OcbPhysicalI32
+  OcbValuesI64 _ -> OcbPhysicalI64
+  OcbValuesF32 _ -> OcbPhysicalF32
+  OcbValuesF64 _ -> OcbPhysicalF64
+  OcbValuesFixedBinary _ _ -> OcbPhysicalFixedBinary
+  OcbValuesUnknown physical _ -> physical
+
+fixedBinaryRows :: Word32 -> [Word8] -> Int
+fixedBinaryRows 0 _ = 0
+fixedBinaryRows width bytes = length bytes `div` fromIntegral width
+
+fixedBytesLenMatches :: Word32 -> Word64 -> [Word8] -> Bool
+fixedBytesLenMatches 0 _ _ = False
+fixedBytesLenMatches width rows bytes = fromIntegral (length bytes) == rows * fromIntegral width
+
+exactValidityBytes :: Word64 -> Word64
+exactValidityBytes rows = (rows + 7) `div` 8
+
+fixedEntryLen :: Word32 -> OcbDictionaryEntry -> Bool
+fixedEntryLen width entry = case entry of
+  OcbDictionaryEntryBytes bytes -> length bytes == fromIntegral width
+  OcbDictionaryEntryUtf8 _ -> False
+
+isUtf8Entry :: OcbDictionaryEntry -> Bool
+isUtf8Entry OcbDictionaryEntryUtf8{} = True
+isUtf8Entry _ = False
+
+isBytesEntry :: OcbDictionaryEntry -> Bool
+isBytesEntry OcbDictionaryEntryBytes{} = True
+isBytesEntry _ = False
+
+knownPhysicalType :: OcbPhysicalType -> Bool
+knownPhysicalType OcbPhysicalUnknown{} = False
+knownPhysicalType _ = True
+
+knownLogicalKind :: OcbLogicalKind -> Bool
+knownLogicalKind OcbLogicalUnknown{} = False
+knownLogicalKind _ = True
+
+knownOrderingDirection :: OcbOrderingDirection -> Bool
+knownOrderingDirection OcbOrderingDirectionUnknown{} = False
+knownOrderingDirection _ = True
+
+knownNullOrder :: OcbNullOrder -> Bool
+knownNullOrder OcbNullOrderUnknown{} = False
+knownNullOrder _ = True
+
+knownWriteChunkCodec :: OcbWriteChunkCodec -> Bool
+knownWriteChunkCodec OcbWriteChunkCodecUnknown{} = False
+knownWriteChunkCodec _ = True
+
+knownPrimitiveValues :: OcbPrimitiveValues -> Bool
+knownPrimitiveValues OcbValuesUnknown{} = False
+knownPrimitiveValues values = knownPhysicalType (valuePhysicalType values)
 
 copyOcbRowGroupSummaries :: CArcadiaTioOcbRowGroupSummaries -> IO (Result OcbRowGroupSummaries)
 copyOcbRowGroupSummaries raw = do
@@ -1109,6 +1661,44 @@ toOcbPhysicalType = \case
   OcbPhysicalF64 -> 3
   OcbPhysicalFixedBinary -> 4
   OcbPhysicalUnknown raw -> fromIntegral raw
+
+
+toOcbLogicalKind :: OcbLogicalKind -> CInt
+toOcbLogicalKind = \case
+  OcbLogicalPlain -> 0
+  OcbLogicalTimestampNanosLike -> 1
+  OcbLogicalScaledInteger -> 2
+  OcbLogicalDictionaryCode -> 3
+  OcbLogicalEnumCode -> 4
+  OcbLogicalOpaqueKey -> 5
+  OcbLogicalUnknown raw -> fromIntegral raw
+
+toOcbDictionaryValueKind :: OcbDictionaryValueKind -> CInt
+toOcbDictionaryValueKind = \case
+  OcbDictionaryUtf8 -> 0
+  OcbDictionaryBytes -> 1
+  OcbDictionaryFixedBytes -> 2
+  OcbDictionaryEnumLabels -> 3
+  OcbDictionaryValueUnknown raw -> fromIntegral raw
+
+toOcbOrderingDirection :: OcbOrderingDirection -> CInt
+toOcbOrderingDirection = \case
+  OcbOrderingAscending -> 0
+  OcbOrderingDescending -> 1
+  OcbOrderingDirectionUnknown raw -> fromIntegral raw
+
+toOcbNullOrder :: OcbNullOrder -> CInt
+toOcbNullOrder = \case
+  OcbNullsFirst -> 0
+  OcbNullsLast -> 1
+  OcbNoNulls -> 2
+  OcbNullOrderUnknown raw -> fromIntegral raw
+
+toOcbWriteChunkCodec :: OcbWriteChunkCodec -> CInt
+toOcbWriteChunkCodec = \case
+  OcbWriteChunkCodecNone -> 0
+  OcbWriteChunkCodecZstd -> 1
+  OcbWriteChunkCodecUnknown raw -> fromIntegral raw
 
 fromOcbBodyKind :: CInt -> OcbBodyKind
 fromOcbBodyKind (CInt raw) = case raw of

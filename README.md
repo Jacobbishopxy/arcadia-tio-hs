@@ -90,6 +90,10 @@ Implemented:
   inspect structured OCB errors, copy full metadata/dictionaries, read batches
   with reports/attribution, inspect/execute read plans, and copy generic
   row-group summaries;
+- create and append appendable OCB files from validated write specs, including
+  primitive/fixed-binary column chunks, validity bitmaps, dictionaries, ordering
+  keys, write options, fixed-binary schema helpers, cleanup-orphan-tail results,
+  and generated fixture read/dictionary/summary cross-checks;
 - free C-owned tensors, masks, strings, chunk plans, commit lists, OCB metadata,
   OCB read outcomes/reports/attribution/plans/summaries, and file metadata with
   the matching C ABI free functions after copying.
@@ -97,9 +101,8 @@ Implemented:
 Not yet supported:
 
 - parsing `.tio` or `.ocb` in Haskell;
-- OCB write/create/append/cleanup APIs, plus read cursor callbacks and row-group
-  fill APIs until safe Haskell callback and caller-owned buffer lifetimes are
-  represented;
+- OCB read cursor callbacks and row-group fill APIs until safe Haskell callback
+  and caller-owned buffer lifetimes are represented;
 - legacy coordinate index/range helpers, richer coordinate fixed-text/dictionary
   authoring ergonomics, Python/NumPy interop, or C++ helpers;
 - macOS/Windows native-library lookup;
@@ -151,7 +154,8 @@ roundtrips, random-access create, sparse-intent append, diagnostics/precise
 accounting, retained-history compaction, reform helpers, metadata queries,
 selector reads, option/report reads, read-index, mutation and Arrow ownership
 wrappers, dense-mask reads, coordinate create/read/lookup/append smokes,
-universe create/append/explicit-read smokes, and removes generated files:
+universe create/append/explicit-read smokes, OCB create/append/cleanup and
+read/dictionary/summary smokes, and removes generated files:
 
 ```sh
 cabal test all
@@ -196,6 +200,9 @@ A compilable version lives at `examples/Roundtrip.hs` and is built by
 - Raw C-owned tensor buffers are never exposed from the public safe API.
 - Append calls borrow Haskell vector memory only for the duration of one FFI
   call.
+- OCB create/append calls borrow write-spec strings, arrays, primitive buffers,
+  dictionary entries, and validity bitmaps only for the duration of one FFI call;
+  native read/cleanup results are copied before returning.
 
 ## Development boundaries
 
