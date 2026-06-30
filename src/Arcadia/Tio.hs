@@ -82,12 +82,20 @@ module Arcadia.Tio
   , getIndexCheckpointEveryCommits
   , setIndexCheckpointEveryCommits
   , analyzeCompaction
+  , analyzeV4Compaction
+  , analyzeV4CompactionPrecise
   , compactTo
+  , compactV4RetainedHistoryTo
+  , compactV4RetainedHistoryToPrecise
+  , reformTo
+  , reformToEx
   , maybeCompact
   , getAutoCompactionConfig
   , setAutoCompactionConfig
   , compactionState
   , maybeCompactAuto
+  , v4Diagnostics
+  , v4DiagnosticsPrecise
   , analyzeSparseAppend
   , analyzeSparseAppendF32
   , analyzeSparseAppendF64

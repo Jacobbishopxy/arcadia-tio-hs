@@ -38,9 +38,9 @@ blockers remain visible and can be promoted to a hard failure with
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 205
+- wrapped: 236
 - intentionally not applicable: 20
-- deferred blockers: 179
+- deferred blockers: 148
 - unknown/unmapped: 0
 
 These counts are an inventory baseline, not a packaging, support, or deployment statement.
@@ -83,9 +83,9 @@ Legend:
 | Commit history: head/list/read-at-commit | ✅ | ✅ | `headCommit`, `listCommits`, full/selector-bearing historical reads, dense variants, and historical option/report variants are exposed. |
 | Revert/pop rollback markers | ✅ | ⚠️ partial | `pop`, `popBatched`, and `revertCommit` wrappers surface native status; broader tests for supported/unsupported layout states remain missing. |
 | Rewrite / rewrite-slice / clear-block | ✅ | ⚠️ partial | `rewriteF32`/`rewriteF64`, slice variants, and `clearBlocks` are exposed with Haskell validation; native V4 may still report unsupported/invalid for current runtime layouts. |
-| Compaction / retained-history compaction | ✅ | ⚠️ partial | Shallow `analyzeCompaction`, `compactTo`, `maybeCompact`, auto-compaction config/state, and `maybeCompactAuto` are exposed; retained-history and detailed report families remain missing. |
-| Reform | ✅ | ❌ | Requires report/option ownership wrappers. |
-| Diagnostics / precise accounting | ✅ | ❌ | Requires report structs and free functions. |
+| Compaction / retained-history compaction | ✅ | ✅ | Shallow `analyzeCompaction`, detailed `analyzeV4Compaction{,Precise}` reports, `compactTo`, retained-history compaction destinations with reports, `maybeCompact`, and auto-compaction config/state helpers are exposed. Native V4 may still report unsupported for some policy/config paths. |
+| Reform | ✅ | ✅ | `reformTo` and `reformToEx` expose target-layout options, regular-chunked block-shape validation, copied report reason metadata, and native report cleanup. |
+| Diagnostics / precise accounting | ✅ | ✅ | `v4Diagnostics` and `v4DiagnosticsPrecise` expose status-aware report ADTs, byte families, precise-accounting validity/omitted-field details, owned strings, and matching native report frees. |
 | Arrow C Data export | ✅ via C ABI/C++ | ✅ | `readValuesArrow` returns an explicit owned `ArrowCData`; callbacks are released by `releaseArrowCData`/finalizers without exposing raw release functions. |
 | OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/close and minimal metadata row/root counts. OCB create/append/dictionary/read/summary APIs remain missing. |
 | OCB direct Rust-core reader path | ✅ public Rust `arcadia-tio-ocb-core` | ❌ | Haskell should still use C ABI unless a separate pure Haskell/Rust-core bridge is approved. |
@@ -101,10 +101,9 @@ Before closing a later parity slice, run the machine inventory with
 deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.
 
-1. Add retained-history compaction, reform, and detailed diagnostics/accounting report wrappers.
-2. Expand coordinate parity beyond the current partial surface: legacy coordinate index/range helpers, fixed-text/dictionary append authoring ergonomics, and richer index status typing.
-3. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
+1. Expand coordinate parity beyond the current partial surface: legacy coordinate index/range helpers, fixed-text/dictionary append authoring ergonomics, and richer index status typing.
+2. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
    row-group summaries, read requests/outcomes, cleanup, and structured OCB errors.
-6. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
+3. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
    `cabal test all` without native env, and an optional native-library job gated
    by secrets/artifacts.

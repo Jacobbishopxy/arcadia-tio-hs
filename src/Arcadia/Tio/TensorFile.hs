@@ -74,12 +74,20 @@ module Arcadia.Tio.TensorFile
   , getIndexCheckpointEveryCommits
   , setIndexCheckpointEveryCommits
   , analyzeCompaction
+  , analyzeV4Compaction
+  , analyzeV4CompactionPrecise
   , compactTo
+  , compactV4RetainedHistoryTo
+  , compactV4RetainedHistoryToPrecise
+  , reformTo
+  , reformToEx
   , maybeCompact
   , getAutoCompactionConfig
   , setAutoCompactionConfig
   , compactionState
   , maybeCompactAuto
+  , v4Diagnostics
+  , v4DiagnosticsPrecise
   , analyzeSparseAppend
   , analyzeSparseAppendF32
   , analyzeSparseAppendF64
@@ -147,7 +155,7 @@ import Foreign.Storable (Storable, peek, poke)
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 
-import Arcadia.Tio.Error (Result, invalidArgument)
+import Arcadia.Tio.Error (Result, TioError(..), invalidArgument)
 import Arcadia.Tio.Internal.CApi
   ( CArcadiaTioAxisLabel(..)
   , CArcadiaTioAxisCoordinateInput(..)
@@ -179,6 +187,22 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompactionMode(..)
   , CArcadiaTioCompactionState(..)
   , CArcadiaTioCompactionStats(..)
+  , CArcadiaTioV4CurrentHeadBytes(..)
+  , CArcadiaTioV4AuditBytes(..)
+  , CArcadiaTioV4PayloadReuseBytes(..)
+  , CArcadiaTioV4SupersededBytes(..)
+  , CArcadiaTioV4PreciseAccountingOptions(..)
+  , CArcadiaTioV4OmittedPreciseAccountingField(..)
+  , CArcadiaTioV4PreciseAccountingBytes(..)
+  , CArcadiaTioV4DiagnosticsReport(..)
+  , CArcadiaTioV4DiagnosticsPreciseReport(..)
+  , CArcadiaTioV4CompactionAnalysisReport(..)
+  , CArcadiaTioV4CompactionAnalysisPreciseReport(..)
+  , CArcadiaTioV4RetainedHistoryCompactionOptions(..)
+  , CArcadiaTioV4RetainedHistoryCompactionReport(..)
+  , CArcadiaTioV4RetainedHistoryCompactionPreciseReport(..)
+  , CArcadiaTioReformOptions(..)
+  , CArcadiaTioReformReport(..)
   , CArcadiaTioCompressionConfig(..)
   , CArcadiaTioDimSpec(..)
   , CArcadiaTioEntrySelector(..)
@@ -285,6 +309,21 @@ import Arcadia.Tio.Internal.CApi
   , capiMaskFree
   , capiMaybeCompact
   , capiMaybeCompactAuto
+  , capiV4Diagnostics
+  , capiV4DiagnosticsReportFree
+  , capiV4DiagnosticsPrecise
+  , capiV4DiagnosticsPreciseReportFree
+  , capiAnalyzeV4Compaction
+  , capiV4CompactionAnalysisReportFree
+  , capiAnalyzeV4CompactionPrecise
+  , capiV4CompactionAnalysisPreciseReportFree
+  , capiCompactV4RetainedHistoryTo
+  , capiV4RetainedHistoryCompactionReportFree
+  , capiCompactV4RetainedHistoryToPrecise
+  , capiV4RetainedHistoryCompactionPreciseReportFree
+  , capiReformTo
+  , capiReformToEx
+  , capiReformReportFree
   , capiOpen
   , capiPop
   , capiPopBatched
@@ -341,6 +380,16 @@ import Arcadia.Tio.Internal.CApi
   , emptyCArcadiaTioQueryTraceJson
   , emptyCArcadiaTioReadIndexReport
   , emptyCArcadiaTioHistoricalReadExecutionReport
+  , emptyCArcadiaTioV4PreciseAccountingOptions
+  , emptyCArcadiaTioV4DiagnosticsReport
+  , emptyCArcadiaTioV4DiagnosticsPreciseReport
+  , emptyCArcadiaTioV4CompactionAnalysisReport
+  , emptyCArcadiaTioV4CompactionAnalysisPreciseReport
+  , emptyCArcadiaTioV4RetainedHistoryCompactionOptions
+  , emptyCArcadiaTioV4RetainedHistoryCompactionReport
+  , emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport
+  , emptyCArcadiaTioReformOptions
+  , emptyCArcadiaTioReformReport
   , emptyCArcadiaTioReadShapePolicyOptions
   , emptyCArrowArray
   , emptyCArrowSchema
@@ -401,6 +450,27 @@ import Arcadia.Tio.Types
   , CreateInferredOptions(..)
   , CreatePolicyOptions(..)
   , CompactionStats(..)
+  , V4ReportStatus(..)
+  , V4CurrentHeadBytes(..)
+  , V4AuditBytes(..)
+  , V4PayloadReuseBytes(..)
+  , V4SupersededBytes(..)
+  , V4PreciseAccountingField(..)
+  , V4PreciseAccountingOptions(..)
+  , V4OmittedPreciseAccountingField(..)
+  , V4PreciseAccountingBytes(..)
+  , V4DiagnosticsReport(..)
+  , V4DiagnosticsPreciseReport(..)
+  , V4CompactionAnalysisPolicy(..)
+  , V4CompactionAnalysisReport(..)
+  , V4CompactionAnalysisPreciseReport(..)
+  , V4RetainedHistoryPolicy(..)
+  , V4RetainedHistoryCompactionOptions(..)
+  , V4RetainedHistoryCompactionReport(..)
+  , V4RetainedHistoryCompactionPreciseReport(..)
+  , ReformTargetLayout(..)
+  , ReformOptions(..)
+  , ReformReport(..)
   , FileMeta(..)
   , FilePopulation(..)
   , MetadataStability(..)
@@ -2388,6 +2458,421 @@ maybeCompactAuto TensorFile{tensorFileNative, tensorFileHandle} =
       if status == okStatus
         then Right . (/= 0) <$> peek outCompactedPtr
         else Left <$> lastError tensorFileNative
+
+
+-- | Return detailed V4 source-file diagnostics, including in-band report status.
+v4Diagnostics :: TensorFile -> IO (Result V4DiagnosticsReport)
+v4Diagnostics TensorFile{tensorFileNative, tensorFileHandle} =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \reportPtr -> do
+      poke reportPtr emptyCArcadiaTioV4DiagnosticsReport
+      status <- capiV4Diagnostics tensorFileNative handle reportPtr
+      if status == okStatus
+        then (peek reportPtr >>= copyV4DiagnosticsReport) `finally` capiV4DiagnosticsReportFree tensorFileNative reportPtr
+        else do
+          err <- lastError tensorFileNative
+          capiV4DiagnosticsReportFree tensorFileNative reportPtr
+          pure (Left err)
+
+-- | Return detailed V4 source-file diagnostics with precise accounting validity.
+v4DiagnosticsPrecise :: TensorFile -> V4PreciseAccountingOptions -> IO (Result V4DiagnosticsPreciseReport)
+v4DiagnosticsPrecise TensorFile{tensorFileNative, tensorFileHandle} options =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \optionsPtr ->
+      alloca $ \reportPtr -> do
+        poke optionsPtr (v4PreciseAccountingOptionsToC options)
+        poke reportPtr emptyCArcadiaTioV4DiagnosticsPreciseReport
+        status <- capiV4DiagnosticsPrecise tensorFileNative handle optionsPtr reportPtr
+        if status == okStatus
+          then (peek reportPtr >>= copyV4DiagnosticsPreciseReport) `finally` capiV4DiagnosticsPreciseReportFree tensorFileNative reportPtr
+          else do
+            err <- lastError tensorFileNative
+            capiV4DiagnosticsPreciseReportFree tensorFileNative reportPtr
+            pure (Left err)
+
+v4PreciseAccountingOptionsToC :: V4PreciseAccountingOptions -> CArcadiaTioV4PreciseAccountingOptions
+v4PreciseAccountingOptionsToC V4PreciseAccountingOptions{v4PreciseRequestedFields, v4PreciseIncludeOmittedFieldReasons} =
+  emptyCArcadiaTioV4PreciseAccountingOptions
+    { cV4PreciseAccountingOptionsRequestedFieldsMask = foldr ((.|.) . v4PreciseAccountingFieldMask) 0 v4PreciseRequestedFields
+    , cV4PreciseAccountingOptionsIncludeOmittedFieldReasons = boolToWord8 v4PreciseIncludeOmittedFieldReasons
+    }
+
+v4PreciseAccountingFieldMask :: V4PreciseAccountingField -> Word32
+v4PreciseAccountingFieldMask field = case field of
+  V4PreciseUnreachableBytes -> 1 `shiftL` 0
+  V4PreciseRetainedHistoryRequiredBytes -> 1 `shiftL` 1
+  V4PrecisePoppedSkippedBytes -> 1 `shiftL` 2
+  V4PreciseReclaimableBytes -> 1 `shiftL` 3
+  V4PreciseAccountingFieldUnknown raw | raw >= 0 && raw < 32 -> 1 `shiftL` fromIntegral raw
+  V4PreciseAccountingFieldUnknown _ -> 0
+
+v4ReportStatusFromRaw :: CInt -> V4ReportStatus
+v4ReportStatusFromRaw (CInt raw) = case raw of
+  0 -> V4ReportComplete
+  1 -> V4ReportUnsupported
+  2 -> V4ReportUnknown
+  _ -> V4ReportStatusUnknown raw
+
+v4PreciseAccountingFieldFromRaw :: CInt -> V4PreciseAccountingField
+v4PreciseAccountingFieldFromRaw (CInt raw) = case raw of
+  0 -> V4PreciseUnreachableBytes
+  1 -> V4PreciseRetainedHistoryRequiredBytes
+  2 -> V4PrecisePoppedSkippedBytes
+  3 -> V4PreciseReclaimableBytes
+  _ -> V4PreciseAccountingFieldUnknown raw
+
+copyV4DiagnosticsReport :: CArcadiaTioV4DiagnosticsReport -> IO (Result V4DiagnosticsReport)
+copyV4DiagnosticsReport raw = do
+  reason <- peekOptionalCString (cV4DiagnosticsReportReason raw)
+  omittedReason <- peekOptionalCString (cV4DiagnosticsReportOmittedUnreachableBytesReason raw)
+  pure $ Right V4DiagnosticsReport
+    { v4DiagnosticsStatus = v4ReportStatusFromRaw (cV4DiagnosticsReportStatus raw)
+    , v4DiagnosticsReason = reason
+    , v4DiagnosticsCurrentHead = copyV4CurrentHeadBytes (cV4DiagnosticsReportCurrentHead raw)
+    , v4DiagnosticsVisibleChainAudit = copyV4AuditBytes (cV4DiagnosticsReportVisibleChainAudit raw)
+    , v4DiagnosticsPayloadReuse = copyV4PayloadReuseBytes (cV4DiagnosticsReportPayloadReuse raw)
+    , v4DiagnosticsSuperseded = copyV4SupersededBytes (cV4DiagnosticsReportSuperseded raw)
+    , v4DiagnosticsUnknownBytes = cV4DiagnosticsReportUnknownBytes raw
+    , v4DiagnosticsOmittedUnreachableBytes = cV4DiagnosticsReportOmittedUnreachableBytes raw /= 0
+    , v4DiagnosticsOmittedUnreachableBytesReason = omittedReason
+    }
+
+copyV4DiagnosticsPreciseReport :: CArcadiaTioV4DiagnosticsPreciseReport -> IO (Result V4DiagnosticsPreciseReport)
+copyV4DiagnosticsPreciseReport raw = do
+  reason <- peekOptionalCString (cV4DiagnosticsPreciseReportReason raw)
+  reasonCode <- peekOptionalCString (cV4DiagnosticsPreciseReportReasonCode raw)
+  precise <- copyV4PreciseAccountingBytes (cV4DiagnosticsPreciseReportPreciseAccounting raw)
+  pure $ do
+    preciseAccounting <- precise
+    Right V4DiagnosticsPreciseReport
+      { v4DiagnosticsPreciseStatus = v4ReportStatusFromRaw (cV4DiagnosticsPreciseReportStatus raw)
+      , v4DiagnosticsPreciseReason = reason
+      , v4DiagnosticsPreciseCurrentHead = copyV4CurrentHeadBytes (cV4DiagnosticsPreciseReportCurrentHead raw)
+      , v4DiagnosticsPreciseVisibleChainAudit = copyV4AuditBytes (cV4DiagnosticsPreciseReportVisibleChainAudit raw)
+      , v4DiagnosticsPrecisePayloadReuse = copyV4PayloadReuseBytes (cV4DiagnosticsPreciseReportPayloadReuse raw)
+      , v4DiagnosticsPreciseSuperseded = copyV4SupersededBytes (cV4DiagnosticsPreciseReportSuperseded raw)
+      , v4DiagnosticsPreciseUnknownBytes = cV4DiagnosticsPreciseReportUnknownBytes raw
+      , v4DiagnosticsPreciseAccounting = preciseAccounting
+      , v4DiagnosticsPreciseReasonCode = reasonCode
+      }
+
+copyV4CurrentHeadBytes :: CArcadiaTioV4CurrentHeadBytes -> V4CurrentHeadBytes
+copyV4CurrentHeadBytes CArcadiaTioV4CurrentHeadBytes{cV4CurrentHeadPayloadBytes, cV4CurrentHeadIndexBytes, cV4CurrentHeadEpochBytes, cV4CurrentHeadAuxBytes, cV4CurrentHeadCommitBytes} =
+  V4CurrentHeadBytes cV4CurrentHeadPayloadBytes cV4CurrentHeadIndexBytes cV4CurrentHeadEpochBytes cV4CurrentHeadAuxBytes cV4CurrentHeadCommitBytes
+
+copyV4AuditBytes :: CArcadiaTioV4AuditBytes -> V4AuditBytes
+copyV4AuditBytes CArcadiaTioV4AuditBytes{cV4AuditCommitBytes, cV4AuditIndexBytes, cV4AuditEpochBytes, cV4AuditAuxBytes} =
+  V4AuditBytes cV4AuditCommitBytes cV4AuditIndexBytes cV4AuditEpochBytes cV4AuditAuxBytes
+
+copyV4PayloadReuseBytes :: CArcadiaTioV4PayloadReuseBytes -> V4PayloadReuseBytes
+copyV4PayloadReuseBytes CArcadiaTioV4PayloadReuseBytes{cV4PayloadReuseResurrectedPayloadBytes, cV4PayloadReuseSharedPayloadBytes} =
+  V4PayloadReuseBytes cV4PayloadReuseResurrectedPayloadBytes cV4PayloadReuseSharedPayloadBytes
+
+copyV4SupersededBytes :: CArcadiaTioV4SupersededBytes -> V4SupersededBytes
+copyV4SupersededBytes CArcadiaTioV4SupersededBytes{cV4SupersededPayloadBytes, cV4SupersededIndexBytes, cV4SupersededEpochBytes, cV4SupersededAuxBytes} =
+  V4SupersededBytes cV4SupersededPayloadBytes cV4SupersededIndexBytes cV4SupersededEpochBytes cV4SupersededAuxBytes
+
+copyV4PreciseAccountingBytes :: CArcadiaTioV4PreciseAccountingBytes -> IO (Result V4PreciseAccountingBytes)
+copyV4PreciseAccountingBytes raw = do
+  omitted <- copyV4OmittedPreciseFields raw
+  pure $ do
+    omittedFields <- omitted
+    Right V4PreciseAccountingBytes
+      { v4PreciseUnreachableBytes = present (cV4PreciseAccountingHasUnreachableBytes raw) (cV4PreciseAccountingUnreachableBytes raw)
+      , v4PreciseRetainedHistoryRequiredBytes = present (cV4PreciseAccountingHasRetainedHistoryRequiredBytes raw) (cV4PreciseAccountingRetainedHistoryRequiredBytes raw)
+      , v4PrecisePoppedSkippedBytes = present (cV4PreciseAccountingHasPoppedSkippedBytes raw) (cV4PreciseAccountingPoppedSkippedBytes raw)
+      , v4PreciseReclaimableBytes = present (cV4PreciseAccountingHasReclaimableBytes raw) (cV4PreciseAccountingReclaimableBytes raw)
+      , v4PreciseOmittedFields = omittedFields
+      }
+ where
+  present flag value = if flag == 0 then Nothing else Just value
+
+copyV4OmittedPreciseFields :: CArcadiaTioV4PreciseAccountingBytes -> IO (Result [V4OmittedPreciseAccountingField])
+copyV4OmittedPreciseFields raw = do
+  let fieldsLen = fromIntegralCSize (cV4PreciseAccountingOmittedFieldsLen raw)
+      codesLen = fromIntegralCSize (cV4PreciseAccountingOmittedFieldReasonCodesLen raw)
+  fieldRows <- copyCArray "V4 omitted precise accounting fields" (cV4PreciseAccountingOmittedFields raw) fieldsLen pureOmittedField
+  case fieldRows of
+    Left err -> pure (Left err)
+    Right rows -> do
+      codes <- copyOptionalCStringSlots (cV4PreciseAccountingOmittedFieldReasonCodes raw) codesLen
+      pure $ case codes of
+        Left err -> Left err
+        Right codeSlots ->
+          if not (null codeSlots) && length codeSlots /= length rows
+            then Left (invalidArgument "V4 omitted precise field reason-code count does not match omitted field count")
+            else Right (zipWith attachCode rows (codeSlots <> repeat Nothing))
+ where
+  pureOmittedField row = do
+    reason <- peekOptionalCString (cV4OmittedPreciseAccountingFieldReason row)
+    pure $ Right V4OmittedPreciseAccountingField
+      { v4OmittedPreciseField = v4PreciseAccountingFieldFromRaw (cV4OmittedPreciseAccountingFieldField row)
+      , v4OmittedPreciseReason = reason
+      , v4OmittedPreciseReasonCode = Nothing
+      }
+  attachCode row code = row{v4OmittedPreciseReasonCode = code}
+
+copyOptionalCStringSlots :: Ptr CString -> Int -> IO (Result [Maybe String])
+copyOptionalCStringSlots ptr len
+  | len < 0 = pure (Left (invalidArgument "CString slot array length is negative"))
+  | len == 0 = pure (Right [])
+  | ptr == nullPtr = pure (Left (invalidArgument "CString slot array pointer is null"))
+  | otherwise = Right <$> (mapM peekOptionalCString =<< peekArray len ptr)
+
+
+-- | Return detailed V4 ordinary current-state compaction analysis.
+analyzeV4Compaction :: TensorFile -> IO (Result V4CompactionAnalysisReport)
+analyzeV4Compaction TensorFile{tensorFileNative, tensorFileHandle} =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \reportPtr -> do
+      poke reportPtr emptyCArcadiaTioV4CompactionAnalysisReport
+      status <- capiAnalyzeV4Compaction tensorFileNative handle reportPtr
+      if status == okStatus
+        then (peek reportPtr >>= copyV4CompactionAnalysisReport) `finally` capiV4CompactionAnalysisReportFree tensorFileNative reportPtr
+        else do
+          err <- lastError tensorFileNative
+          capiV4CompactionAnalysisReportFree tensorFileNative reportPtr
+          pure (Left err)
+
+-- | Return detailed V4 ordinary current-state compaction analysis with precise accounting.
+analyzeV4CompactionPrecise :: TensorFile -> V4PreciseAccountingOptions -> IO (Result V4CompactionAnalysisPreciseReport)
+analyzeV4CompactionPrecise TensorFile{tensorFileNative, tensorFileHandle} options =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \optionsPtr ->
+      alloca $ \reportPtr -> do
+        poke optionsPtr (v4PreciseAccountingOptionsToC options)
+        poke reportPtr emptyCArcadiaTioV4CompactionAnalysisPreciseReport
+        status <- capiAnalyzeV4CompactionPrecise tensorFileNative handle optionsPtr reportPtr
+        if status == okStatus
+          then (peek reportPtr >>= copyV4CompactionAnalysisPreciseReport) `finally` capiV4CompactionAnalysisPreciseReportFree tensorFileNative reportPtr
+          else do
+            err <- lastError tensorFileNative
+            capiV4CompactionAnalysisPreciseReportFree tensorFileNative reportPtr
+            pure (Left err)
+
+-- | Compact visible V4 data into a destination while retaining bounded visible history.
+compactV4RetainedHistoryTo :: TensorFile -> FilePath -> V4RetainedHistoryCompactionOptions -> IO (Result V4RetainedHistoryCompactionReport)
+compactV4RetainedHistoryTo TensorFile{tensorFileNative, tensorFileHandle} dstPath options =
+  case validateRetainedHistoryOptions options of
+    Left err -> pure (Left err)
+    Right () -> withPath dstPath $ \cPath ->
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \optionsPtr ->
+          alloca $ \reportPtr -> do
+            poke optionsPtr (retainedHistoryOptionsToC options)
+            poke reportPtr emptyCArcadiaTioV4RetainedHistoryCompactionReport
+            status <- capiCompactV4RetainedHistoryTo tensorFileNative handle cPath optionsPtr reportPtr
+            if status == okStatus
+              then (peek reportPtr >>= copyV4RetainedHistoryCompactionReport) `finally` capiV4RetainedHistoryCompactionReportFree tensorFileNative reportPtr
+              else do
+                err <- lastError tensorFileNative
+                capiV4RetainedHistoryCompactionReportFree tensorFileNative reportPtr
+                pure (Left err)
+
+-- | Compact visible V4 data into a retained-history destination with source precise accounting.
+compactV4RetainedHistoryToPrecise :: TensorFile -> FilePath -> V4RetainedHistoryCompactionOptions -> V4PreciseAccountingOptions -> IO (Result V4RetainedHistoryCompactionPreciseReport)
+compactV4RetainedHistoryToPrecise TensorFile{tensorFileNative, tensorFileHandle} dstPath retentionOptions preciseOptions =
+  case validateRetainedHistoryOptions retentionOptions of
+    Left err -> pure (Left err)
+    Right () -> withPath dstPath $ \cPath ->
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \retentionPtr ->
+          alloca $ \precisePtr ->
+            alloca $ \reportPtr -> do
+              poke retentionPtr (retainedHistoryOptionsToC retentionOptions)
+              poke precisePtr (v4PreciseAccountingOptionsToC preciseOptions)
+              poke reportPtr emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport
+              status <- capiCompactV4RetainedHistoryToPrecise tensorFileNative handle cPath retentionPtr precisePtr reportPtr
+              if status == okStatus
+                then (peek reportPtr >>= copyV4RetainedHistoryCompactionPreciseReport) `finally` capiV4RetainedHistoryCompactionPreciseReportFree tensorFileNative reportPtr
+                else do
+                  err <- lastError tensorFileNative
+                  capiV4RetainedHistoryCompactionPreciseReportFree tensorFileNative reportPtr
+                  pure (Left err)
+
+validateRetainedHistoryOptions :: V4RetainedHistoryCompactionOptions -> Result ()
+validateRetainedHistoryOptions V4RetainedHistoryCompactionOptions{v4RetainedHistoryPolicy, v4RetainedHistoryRetainLastN}
+  | v4RetainedHistoryRetainLastN == 0 = Left (invalidArgument "retained-history compaction retain_last_n must be positive")
+  | otherwise = case v4RetainedHistoryPolicy of
+      V4RetainLast -> Right ()
+      V4RetainedHistoryPolicyUnknown raw -> Left (invalidArgument ("unknown retained-history compaction policy " <> show raw))
+
+retainedHistoryOptionsToC :: V4RetainedHistoryCompactionOptions -> CArcadiaTioV4RetainedHistoryCompactionOptions
+retainedHistoryOptionsToC V4RetainedHistoryCompactionOptions{v4RetainedHistoryPolicy, v4RetainedHistoryRetainLastN} =
+  emptyCArcadiaTioV4RetainedHistoryCompactionOptions
+    { cV4RetainedHistoryCompactionOptionsPolicy = retainedHistoryPolicyToRaw v4RetainedHistoryPolicy
+    , cV4RetainedHistoryCompactionOptionsRetainLastN = v4RetainedHistoryRetainLastN
+    }
+
+retainedHistoryPolicyToRaw :: V4RetainedHistoryPolicy -> CInt
+retainedHistoryPolicyToRaw policy = case policy of
+  V4RetainLast -> 0
+  V4RetainedHistoryPolicyUnknown raw -> CInt raw
+
+v4CompactionAnalysisPolicyFromRaw :: CInt -> V4CompactionAnalysisPolicy
+v4CompactionAnalysisPolicyFromRaw (CInt raw) = case raw of
+  0 -> V4CompactionPolicyCompactToCurrentState
+  _ -> V4CompactionAnalysisPolicyUnknown raw
+
+copyV4CompactionAnalysisReport :: CArcadiaTioV4CompactionAnalysisReport -> IO (Result V4CompactionAnalysisReport)
+copyV4CompactionAnalysisReport raw = do
+  reason <- peekOptionalCString (cV4CompactionAnalysisReportReason raw)
+  omittedReason <- peekOptionalCString (cV4CompactionAnalysisReportOmittedUnreachableBytesReason raw)
+  pure $ Right V4CompactionAnalysisReport
+    { v4CompactionAnalysisStatus = v4ReportStatusFromRaw (cV4CompactionAnalysisReportStatus raw)
+    , v4CompactionAnalysisReason = reason
+    , v4CompactionAnalysisPolicy = v4CompactionAnalysisPolicyFromRaw (cV4CompactionAnalysisReportPolicy raw)
+    , v4CompactionAnalysisSourceFileBytes = cV4CompactionAnalysisReportSourceFileBytes raw
+    , v4CompactionAnalysisCurrentStateRequiredBytes = cV4CompactionAnalysisReportCurrentStateRequiredBytes raw
+    , v4CompactionAnalysisOrdinaryReclaimableBytes = cV4CompactionAnalysisReportOrdinaryReclaimableBytes raw
+    , v4CompactionAnalysisUnknownBytes = cV4CompactionAnalysisReportUnknownBytes raw
+    , v4CompactionAnalysisOmittedUnreachableBytes = cV4CompactionAnalysisReportOmittedUnreachableBytes raw /= 0
+    , v4CompactionAnalysisOmittedUnreachableBytesReason = omittedReason
+    }
+
+copyV4CompactionAnalysisPreciseReport :: CArcadiaTioV4CompactionAnalysisPreciseReport -> IO (Result V4CompactionAnalysisPreciseReport)
+copyV4CompactionAnalysisPreciseReport raw = do
+  reason <- peekOptionalCString (cV4CompactionAnalysisPreciseReportReason raw)
+  reasonCode <- peekOptionalCString (cV4CompactionAnalysisPreciseReportReasonCode raw)
+  precise <- copyV4PreciseAccountingBytes (cV4CompactionAnalysisPreciseReportPreciseAccounting raw)
+  pure $ do
+    preciseAccounting <- precise
+    Right V4CompactionAnalysisPreciseReport
+      { v4CompactionAnalysisPreciseStatus = v4ReportStatusFromRaw (cV4CompactionAnalysisPreciseReportStatus raw)
+      , v4CompactionAnalysisPreciseReason = reason
+      , v4CompactionAnalysisPrecisePolicy = v4CompactionAnalysisPolicyFromRaw (cV4CompactionAnalysisPreciseReportPolicy raw)
+      , v4CompactionAnalysisPreciseSourceFileBytes = cV4CompactionAnalysisPreciseReportSourceFileBytes raw
+      , v4CompactionAnalysisPreciseCurrentStateRequiredBytes = cV4CompactionAnalysisPreciseReportCurrentStateRequiredBytes raw
+      , v4CompactionAnalysisPreciseOrdinaryReclaimableBytes = cV4CompactionAnalysisPreciseReportOrdinaryReclaimableBytes raw
+      , v4CompactionAnalysisPreciseUnknownBytes = cV4CompactionAnalysisPreciseReportUnknownBytes raw
+      , v4CompactionAnalysisPreciseAccounting = preciseAccounting
+      , v4CompactionAnalysisPreciseReasonCode = reasonCode
+      }
+
+copyV4RetainedHistoryCompactionReport :: CArcadiaTioV4RetainedHistoryCompactionReport -> IO (Result V4RetainedHistoryCompactionReport)
+copyV4RetainedHistoryCompactionReport raw = do
+  reason <- peekOptionalCString (cV4RetainedHistoryCompactionReportReason raw)
+  omittedReason <- peekOptionalCString (cV4RetainedHistoryCompactionReportOmittedUnreachableBytesReason raw)
+  seqsResult <- copyWord64Array "retained history commit seqs" (cV4RetainedHistoryCompactionReportRetainedCommitSeqs raw) (fromIntegralCSize (cV4RetainedHistoryCompactionReportRetainedCommitSeqsLen raw))
+  pure $ do
+    seqs <- seqsResult
+    Right V4RetainedHistoryCompactionReport
+      { v4RetainedHistoryStatus = v4ReportStatusFromRaw (cV4RetainedHistoryCompactionReportStatus raw)
+      , v4RetainedHistoryReason = reason
+      , v4RetainedHistoryRetainedCommitCount = cV4RetainedHistoryCompactionReportRetainedCommitCount raw
+      , v4RetainedHistoryRetainedCommitSeqs = seqs
+      , v4RetainedHistoryUnretainedOlderCommitCount = present (cV4RetainedHistoryCompactionReportHasUnretainedOlderCommitCount raw) (cV4RetainedHistoryCompactionReportUnretainedOlderCommitCount raw)
+      , v4RetainedHistorySourceFileBytes = cV4RetainedHistoryCompactionReportSourceFileBytes raw
+      , v4RetainedHistoryDestinationFileBytes = cV4RetainedHistoryCompactionReportDestinationFileBytes raw
+      , v4RetainedHistoryOmittedUnreachableBytes = cV4RetainedHistoryCompactionReportOmittedUnreachableBytes raw /= 0
+      , v4RetainedHistoryOmittedUnreachableBytesReason = omittedReason
+      }
+ where
+  present flag value = if flag == 0 then Nothing else Just value
+
+copyV4RetainedHistoryCompactionPreciseReport :: CArcadiaTioV4RetainedHistoryCompactionPreciseReport -> IO (Result V4RetainedHistoryCompactionPreciseReport)
+copyV4RetainedHistoryCompactionPreciseReport raw = do
+  reason <- peekOptionalCString (cV4RetainedHistoryCompactionPreciseReportReason raw)
+  reasonCode <- peekOptionalCString (cV4RetainedHistoryCompactionPreciseReportReasonCode raw)
+  seqsResult <- copyWord64Array "retained history precise commit seqs" (cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqs raw) (fromIntegralCSize (cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqsLen raw))
+  precise <- copyV4PreciseAccountingBytes (cV4RetainedHistoryCompactionPreciseReportPreciseSourceAccounting raw)
+  pure $ do
+    seqs <- seqsResult
+    preciseAccounting <- precise
+    Right V4RetainedHistoryCompactionPreciseReport
+      { v4RetainedHistoryPreciseStatus = v4ReportStatusFromRaw (cV4RetainedHistoryCompactionPreciseReportStatus raw)
+      , v4RetainedHistoryPreciseReason = reason
+      , v4RetainedHistoryPreciseRetainedCommitCount = cV4RetainedHistoryCompactionPreciseReportRetainedCommitCount raw
+      , v4RetainedHistoryPreciseRetainedCommitSeqs = seqs
+      , v4RetainedHistoryPreciseUnretainedOlderCommitCount = present (cV4RetainedHistoryCompactionPreciseReportHasUnretainedOlderCommitCount raw) (cV4RetainedHistoryCompactionPreciseReportUnretainedOlderCommitCount raw)
+      , v4RetainedHistoryPreciseSourceFileBytes = cV4RetainedHistoryCompactionPreciseReportSourceFileBytes raw
+      , v4RetainedHistoryPreciseDestinationFileBytes = cV4RetainedHistoryCompactionPreciseReportDestinationFileBytes raw
+      , v4RetainedHistoryPreciseSourceAccounting = preciseAccounting
+      , v4RetainedHistoryPreciseReasonCode = reasonCode
+      }
+ where
+  present flag value = if flag == 0 then Nothing else Just value
+
+copyWord64Array :: String -> Ptr Word64 -> Int -> IO (Result [Word64])
+copyWord64Array label ptr len
+  | len < 0 = pure (Left (invalidArgument (label <> " length is negative")))
+  | len == 0 = pure (Right [])
+  | ptr == nullPtr = pure (Left (invalidArgument (label <> " pointer is null")))
+  | otherwise = Right <$> peekArray len ptr
+
+
+-- | Reform visible data into a fresh destination with an explicit target layout.
+reformTo :: TensorFile -> FilePath -> ReformOptions -> IO (Result ())
+reformTo file@TensorFile{tensorFileNative} dstPath options =
+  case validateReformOptions options of
+    Left err -> pure (Left err)
+    Right () -> withPath dstPath $ \cPath ->
+      withReformOptions options $ \optionsPtr ->
+        callStatus file $ \handle -> capiReformTo tensorFileNative handle cPath optionsPtr
+
+-- | Reform visible data into a fresh destination and return diagnostic report metadata.
+reformToEx :: TensorFile -> FilePath -> ReformOptions -> IO (Result ReformReport)
+reformToEx TensorFile{tensorFileNative, tensorFileHandle} dstPath options =
+  case validateReformOptions options of
+    Left err -> pure (Left err)
+    Right () -> withPath dstPath $ \cPath ->
+      withReformOptions options $ \optionsPtr ->
+        withForeignPtr tensorFileHandle $ \handle ->
+          alloca $ \reportPtr -> do
+            poke reportPtr emptyCArcadiaTioReformReport
+            status <- capiReformToEx tensorFileNative handle cPath optionsPtr reportPtr
+            report <- peek reportPtr >>= copyReformReport
+            capiReformReportFree tensorFileNative reportPtr
+            if status == okStatus
+              then pure (Right report)
+              else do
+                err <- lastError tensorFileNative
+                pure (Left err{tioErrorMessage = tioErrorMessage err <> reformReportSuffix report})
+
+validateReformOptions :: ReformOptions -> Result ()
+validateReformOptions ReformOptions{reformTargetLayout} = case reformTargetLayout of
+  ReformPreserveFamily -> Right ()
+  ReformWholeAppendUnit -> Right ()
+  ReformRegularChunked shape
+    | null shape -> Left (invalidArgument "regular-chunked reform block shape must not be empty")
+    | any (== 0) shape -> Left (invalidArgument "regular-chunked reform block shape entries must be positive")
+    | otherwise -> Right ()
+
+withReformOptions :: ReformOptions -> (Ptr CArcadiaTioReformOptions -> IO a) -> IO a
+withReformOptions options action =
+  case reformTargetLayout options of
+    ReformRegularChunked shape -> withArray shape $ \shapePtr -> pokeAndRun shapePtr (CSize (fromIntegral (length shape)))
+    _ -> pokeAndRun nullPtr 0
+ where
+  pokeAndRun shapePtr shapeLen = alloca $ \optionsPtr -> do
+    poke optionsPtr (reformOptionsToC options shapePtr shapeLen)
+    action optionsPtr
+
+reformOptionsToC :: ReformOptions -> Ptr Word32 -> CSize -> CArcadiaTioReformOptions
+reformOptionsToC ReformOptions{reformTargetLayout} shapePtr shapeLen =
+  emptyCArcadiaTioReformOptions
+    { cReformOptionsTargetLayout = reformTargetLayoutToRaw reformTargetLayout
+    , cReformOptionsRegularChunkedBlockShape = shapePtr
+    , cReformOptionsRegularChunkedBlockShapeLen = shapeLen
+    }
+
+reformTargetLayoutToRaw :: ReformTargetLayout -> CInt
+reformTargetLayoutToRaw layout = case layout of
+  ReformPreserveFamily -> 0
+  ReformWholeAppendUnit -> 1
+  ReformRegularChunked _ -> 2
+
+copyReformReport :: CArcadiaTioReformReport -> IO ReformReport
+copyReformReport raw = do
+  reasonCode <- peekOptionalCString (cReformReportReasonCode raw)
+  taxonomy <- peekOptionalCString (cReformReportReasonCodeTaxonomy raw)
+  reason <- peekOptionalCString (cReformReportReason raw)
+  pure ReformReport{reformReasonCode = reasonCode, reformReasonCodeTaxonomy = taxonomy, reformReason = reason}
+
+reformReportSuffix :: ReformReport -> String
+reformReportSuffix ReformReport{reformReasonCode, reformReasonCodeTaxonomy, reformReason}
+  | reformReasonCode == Nothing && reformReasonCodeTaxonomy == Nothing && reformReason == Nothing = ""
+  | otherwise = " (reform report: code=" <> show reformReasonCode <> ", taxonomy=" <> show reformReasonCodeTaxonomy <> ", reason=" <> show reformReason <> ")"
 
 compactionModeToC :: CompactionMode -> CArcadiaTioCompactionMode
 compactionModeToC mode = case mode of

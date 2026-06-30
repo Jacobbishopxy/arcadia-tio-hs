@@ -31,6 +31,8 @@ main = do
   testRandomAccessF64 native
   testSparseAppend native
   testCompactionHelpers native
+  testReformHelpers native
+  testDetailedDiagnostics native
   testInferredAndPolicyCreate native
   testMetadataRichCreateSettersAndScalar native
   testCoordinateMetadataValueReads native
@@ -303,7 +305,9 @@ testCompactionHelpers native = do
       compactPath = ".test-output" </> "compaction-compact.tio"
       maybeSkipPath = ".test-output" </> "compaction-skip.tio"
       maybeRunPath = ".test-output" </> "compaction-run.tio"
-  mapM_ cleanup [path, compactPath, maybeSkipPath, maybeRunPath]
+      retainedPath = ".test-output" </> "compaction-retained.tio"
+      retainedPrecisePath = ".test-output" </> "compaction-retained-precise.tio"
+  mapM_ cleanup [path, compactPath, maybeSkipPath, maybeRunPath, retainedPath, retainedPrecisePath]
   file <- unwrap "createStreaming compaction" =<< createStreaming native path F64 [dim AxisTime 0, dim AxisChannel 2] 0
   _ <- unwrap "append compaction first" =<< appendDenseF64 file [1, 2] (VS.fromList [1.0, 2.0])
   _ <- unwrap "append compaction second" =<< appendDenseF64 file [1, 2] (VS.fromList [3.0, 4.0])
@@ -323,6 +327,28 @@ testCompactionHelpers native = do
           }
   setAutoResult <- setAutoCompactionConfig file (Just autoConfig)
   assertErrorCode "setAutoCompactionConfig native status" ErrorUnimplemented setAutoResult
+
+  analysis <- unwrap "analyzeV4Compaction" =<< analyzeV4Compaction file
+  assertEqual "v4 compaction analysis status" True (isKnownV4Status (v4CompactionAnalysisStatus analysis))
+  preciseAnalysis <- unwrap "analyzeV4CompactionPrecise" =<< analyzeV4CompactionPrecise file defaultV4PreciseAccountingOptions{v4PreciseIncludeOmittedFieldReasons = True}
+  assertEqual "v4 precise compaction status" True (isKnownV4Status (v4CompactionAnalysisPreciseStatus preciseAnalysis))
+
+  let retainOne = defaultV4RetainedHistoryCompactionOptions{v4RetainedHistoryRetainLastN = 1}
+  invalidRetain <- compactV4RetainedHistoryTo file retainedPath defaultV4RetainedHistoryCompactionOptions{v4RetainedHistoryRetainLastN = 0}
+  assertErrorCode "retained history validation" ErrorInvalidArgument invalidRetain
+  retainedReport <- unwrap "compactV4RetainedHistoryTo" =<< compactV4RetainedHistoryTo file retainedPath retainOne
+  assertEqual "retained compaction status" True (isKnownV4Status (v4RetainedHistoryStatus retainedReport))
+  retainedFile <- unwrap "open retained compacted" =<< open native retainedPath
+  retainedTensor <- unwrap "read retained compacted" =<< readAllF64 retainedFile
+  assertTensor "retained compacted visible data" [2, 2] [1.0, 2.0, 3.0, 4.0] retainedTensor
+  close retainedFile
+  retainedPreciseReport <- unwrap "compactV4RetainedHistoryToPrecise" =<< compactV4RetainedHistoryToPrecise file retainedPrecisePath retainOne defaultV4PreciseAccountingOptions{v4PreciseIncludeOmittedFieldReasons = True}
+  assertEqual "retained precise compaction status" True (isKnownV4Status (v4RetainedHistoryPreciseStatus retainedPreciseReport))
+  retainedPreciseFile <- unwrap "open retained precise compacted" =<< open native retainedPrecisePath
+  retainedPreciseTensor <- unwrap "read retained precise compacted" =<< readAllF64 retainedPreciseFile
+  assertTensor "retained precise compacted visible data" [2, 2] [1.0, 2.0, 3.0, 4.0] retainedPreciseTensor
+  close retainedPreciseFile
+
   unwrap "compactTo" =<< compactTo file compactPath 1 CompactionCopyLive
   compacted <- unwrap "open compacted" =<< open native compactPath
   compactedTensor <- unwrap "read compacted" =<< readAllF64 compacted
@@ -337,7 +363,69 @@ testCompactionHelpers native = do
   assertTensor "maybe compacted visible data" [2, 2] [1.0, 2.0, 3.0, 4.0] maybeTensor
   close maybeCompacted
   close file
-  mapM_ cleanup [path, compactPath, maybeSkipPath, maybeRunPath]
+  mapM_ cleanup [path, compactPath, maybeSkipPath, maybeRunPath, retainedPath, retainedPrecisePath]
+
+testReformHelpers :: NativeLibrary -> IO ()
+testReformHelpers native = do
+  let path = ".test-output" </> "reform-source.tio"
+      reformPath = ".test-output" </> "reform-preserve.tio"
+      reformExPath = ".test-output" </> "reform-regular.tio"
+  mapM_ cleanup [path, reformPath, reformExPath]
+  file <- unwrap "createStreaming reform" =<< createStreaming native path F64 [dim AxisTime 0, dim AxisChannel 2] 0
+  _ <- unwrap "appendDenseF64 reform" =<< appendDenseF64 file [2, 2] (VS.fromList [1.0, 2.0, 3.0, 4.0])
+
+  invalidEmpty <- reformTo file reformPath defaultReformOptions{reformTargetLayout = ReformRegularChunked []}
+  assertErrorCode "regular chunked empty validation" ErrorInvalidArgument invalidEmpty
+  invalidZero <- reformTo file reformPath defaultReformOptions{reformTargetLayout = ReformRegularChunked [1, 0]}
+  assertErrorCode "regular chunked zero validation" ErrorInvalidArgument invalidZero
+
+  unwrap "reformTo regular" =<< reformTo file reformPath defaultReformOptions{reformTargetLayout = ReformRegularChunked [1, 1]}
+  reformed <- unwrap "open reform regular" =<< open native reformPath
+  reformedTensor <- unwrap "read reform regular" =<< readAllF64 reformed
+  assertTensor "reform regular visible data" [2, 2] [1.0, 2.0, 3.0, 4.0] reformedTensor
+  close reformed
+
+  report <- unwrap "reformToEx regular" =<< reformToEx file reformExPath defaultReformOptions{reformTargetLayout = ReformRegularChunked [1, 1]}
+  assertEqual "reform report reason code copied" True (reformReasonCode report == Nothing || not (null (maybe "" id (reformReasonCode report))))
+  reformedEx <- unwrap "open reform regular" =<< open native reformExPath
+  reformedExTensor <- unwrap "read reform regular" =<< readAllF64 reformedEx
+  assertTensor "reform regular visible data" [2, 2] [1.0, 2.0, 3.0, 4.0] reformedExTensor
+  close reformedEx
+
+  close file
+  mapM_ cleanup [path, reformPath, reformExPath]
+
+testDetailedDiagnostics :: NativeLibrary -> IO ()
+testDetailedDiagnostics native = do
+  let path = ".test-output" </> "v4-diagnostics.tio"
+  cleanup path
+  file <- unwrap "createStreaming diagnostics" =<< createStreaming native path F64 [dim AxisTime 0, dim AxisChannel 2] 0
+  _ <- unwrap "appendDenseF64 diagnostics" =<< appendDenseF64 file [2, 2] (VS.fromList [1.0, 2.0, 3.0, 4.0])
+
+  report <- unwrap "v4Diagnostics" =<< v4Diagnostics file
+  assertEqual "diagnostics status is native report status" True (isKnownV4Status (v4DiagnosticsStatus report))
+  assertEqual "diagnostics current head payload non-negative" True (v4CurrentHeadPayloadBytes (v4DiagnosticsCurrentHead report) >= 0)
+  assertEqual "diagnostics omitted reason consistent" True (v4DiagnosticsOmittedUnreachableBytes report || v4DiagnosticsOmittedUnreachableBytesReason report == Nothing)
+
+  precise <- unwrap "v4DiagnosticsPrecise" =<< v4DiagnosticsPrecise file defaultV4PreciseAccountingOptions{v4PreciseIncludeOmittedFieldReasons = True}
+  assertEqual "precise diagnostics status is native report status" True (isKnownV4Status (v4DiagnosticsPreciseStatus precise))
+  assertEqual "precise diagnostics copied current-head bytes" (v4DiagnosticsCurrentHead report) (v4DiagnosticsPreciseCurrentHead precise)
+  assertEqual "precise omitted fields copied safely" True (all omittedFieldHasStableShape (v4PreciseOmittedFields (v4DiagnosticsPreciseAccounting precise)))
+
+  close file
+  cleanup path
+
+isKnownV4Status :: V4ReportStatus -> Bool
+isKnownV4Status status = case status of
+  V4ReportComplete -> True
+  V4ReportUnsupported -> True
+  V4ReportUnknown -> True
+  V4ReportStatusUnknown _ -> False
+
+omittedFieldHasStableShape :: V4OmittedPreciseAccountingField -> Bool
+omittedFieldHasStableShape field = case v4OmittedPreciseField field of
+  V4PreciseAccountingFieldUnknown _ -> False
+  _ -> True
 
 testInferredAndPolicyCreate :: NativeLibrary -> IO ()
 testInferredAndPolicyCreate native = do

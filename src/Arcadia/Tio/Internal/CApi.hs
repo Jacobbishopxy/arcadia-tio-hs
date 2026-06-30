@@ -88,6 +88,32 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompactionStats(..)
   , CArcadiaTioAutoCompactionConfig(..)
   , CArcadiaTioCompactionState(..)
+  , CArcadiaTioV4CurrentHeadBytes(..)
+  , CArcadiaTioV4AuditBytes(..)
+  , CArcadiaTioV4PayloadReuseBytes(..)
+  , CArcadiaTioV4SupersededBytes(..)
+  , CArcadiaTioV4PreciseAccountingOptions(..)
+  , CArcadiaTioV4OmittedPreciseAccountingField(..)
+  , CArcadiaTioV4PreciseAccountingBytes(..)
+  , CArcadiaTioV4DiagnosticsReport(..)
+  , CArcadiaTioV4DiagnosticsPreciseReport(..)
+  , CArcadiaTioV4CompactionAnalysisReport(..)
+  , CArcadiaTioV4CompactionAnalysisPreciseReport(..)
+  , CArcadiaTioV4RetainedHistoryCompactionOptions(..)
+  , CArcadiaTioV4RetainedHistoryCompactionReport(..)
+  , CArcadiaTioV4RetainedHistoryCompactionPreciseReport(..)
+  , CArcadiaTioReformOptions(..)
+  , CArcadiaTioReformReport(..)
+  , emptyCArcadiaTioV4PreciseAccountingOptions
+  , emptyCArcadiaTioV4DiagnosticsReport
+  , emptyCArcadiaTioV4DiagnosticsPreciseReport
+  , emptyCArcadiaTioV4CompactionAnalysisReport
+  , emptyCArcadiaTioV4CompactionAnalysisPreciseReport
+  , emptyCArcadiaTioV4RetainedHistoryCompactionOptions
+  , emptyCArcadiaTioV4RetainedHistoryCompactionReport
+  , emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport
+  , emptyCArcadiaTioReformOptions
+  , emptyCArcadiaTioReformReport
   , CArcadiaTioSparseValuePredicateV2(..)
   , CArcadiaTioSparseRuleV2(..)
   , sparseRuleV2StructSize
@@ -203,6 +229,21 @@ module Arcadia.Tio.Internal.CApi
   , capiSetAutoCompactionConfig
   , capiCompactionState
   , capiMaybeCompactAuto
+  , capiV4Diagnostics
+  , capiV4DiagnosticsReportFree
+  , capiV4DiagnosticsPrecise
+  , capiV4DiagnosticsPreciseReportFree
+  , capiAnalyzeV4Compaction
+  , capiV4CompactionAnalysisReportFree
+  , capiAnalyzeV4CompactionPrecise
+  , capiV4CompactionAnalysisPreciseReportFree
+  , capiCompactV4RetainedHistoryTo
+  , capiV4RetainedHistoryCompactionReportFree
+  , capiCompactV4RetainedHistoryToPrecise
+  , capiV4RetainedHistoryCompactionPreciseReportFree
+  , capiReformTo
+  , capiReformToEx
+  , capiReformReportFree
   , capiAnalyzeSparseAppendF32V2
   , capiAnalyzeSparseAppendF64V2
   , capiAnalyzeSparseAppendI32V2
@@ -1853,6 +1894,470 @@ instance Storable CArcadiaTioCompactionState where
     pokeByteOff ptr 0 cCompactionStateLastCompactedCommitSeq
     pokeByteOff ptr 8 cCompactionStateLastCompactedAtUnixMs
 
+
+-- | Raw detailed V4 current-head byte family.
+data CArcadiaTioV4CurrentHeadBytes = CArcadiaTioV4CurrentHeadBytes
+  { cV4CurrentHeadPayloadBytes :: Word64
+  , cV4CurrentHeadIndexBytes :: Word64
+  , cV4CurrentHeadEpochBytes :: Word64
+  , cV4CurrentHeadAuxBytes :: Word64
+  , cV4CurrentHeadCommitBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4CurrentHeadBytes where
+  sizeOf _ = 40
+  alignment _ = alignment (undefined :: Word64)
+  peek ptr = CArcadiaTioV4CurrentHeadBytes <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioV4CurrentHeadBytes{cV4CurrentHeadPayloadBytes, cV4CurrentHeadIndexBytes, cV4CurrentHeadEpochBytes, cV4CurrentHeadAuxBytes, cV4CurrentHeadCommitBytes} = do
+    pokeByteOff ptr 0 cV4CurrentHeadPayloadBytes
+    pokeByteOff ptr 8 cV4CurrentHeadIndexBytes
+    pokeByteOff ptr 16 cV4CurrentHeadEpochBytes
+    pokeByteOff ptr 24 cV4CurrentHeadAuxBytes
+    pokeByteOff ptr 32 cV4CurrentHeadCommitBytes
+
+-- | Raw detailed V4 visible-chain audit byte family.
+data CArcadiaTioV4AuditBytes = CArcadiaTioV4AuditBytes
+  { cV4AuditCommitBytes :: Word64
+  , cV4AuditIndexBytes :: Word64
+  , cV4AuditEpochBytes :: Word64
+  , cV4AuditAuxBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4AuditBytes where
+  sizeOf _ = 32
+  alignment _ = alignment (undefined :: Word64)
+  peek ptr = CArcadiaTioV4AuditBytes <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioV4AuditBytes{cV4AuditCommitBytes, cV4AuditIndexBytes, cV4AuditEpochBytes, cV4AuditAuxBytes} = do
+    pokeByteOff ptr 0 cV4AuditCommitBytes
+    pokeByteOff ptr 8 cV4AuditIndexBytes
+    pokeByteOff ptr 16 cV4AuditEpochBytes
+    pokeByteOff ptr 24 cV4AuditAuxBytes
+
+-- | Raw detailed V4 payload-reuse byte family.
+data CArcadiaTioV4PayloadReuseBytes = CArcadiaTioV4PayloadReuseBytes
+  { cV4PayloadReuseResurrectedPayloadBytes :: Word64
+  , cV4PayloadReuseSharedPayloadBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4PayloadReuseBytes where
+  sizeOf _ = 16
+  alignment _ = alignment (undefined :: Word64)
+  peek ptr = CArcadiaTioV4PayloadReuseBytes <$> peekByteOff ptr 0 <*> peekByteOff ptr 8
+  poke ptr CArcadiaTioV4PayloadReuseBytes{cV4PayloadReuseResurrectedPayloadBytes, cV4PayloadReuseSharedPayloadBytes} = do
+    pokeByteOff ptr 0 cV4PayloadReuseResurrectedPayloadBytes
+    pokeByteOff ptr 8 cV4PayloadReuseSharedPayloadBytes
+
+-- | Raw detailed V4 superseded byte family.
+data CArcadiaTioV4SupersededBytes = CArcadiaTioV4SupersededBytes
+  { cV4SupersededPayloadBytes :: Word64
+  , cV4SupersededIndexBytes :: Word64
+  , cV4SupersededEpochBytes :: Word64
+  , cV4SupersededAuxBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4SupersededBytes where
+  sizeOf _ = 32
+  alignment _ = alignment (undefined :: Word64)
+  peek ptr = CArcadiaTioV4SupersededBytes <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioV4SupersededBytes{cV4SupersededPayloadBytes, cV4SupersededIndexBytes, cV4SupersededEpochBytes, cV4SupersededAuxBytes} = do
+    pokeByteOff ptr 0 cV4SupersededPayloadBytes
+    pokeByteOff ptr 8 cV4SupersededIndexBytes
+    pokeByteOff ptr 16 cV4SupersededEpochBytes
+    pokeByteOff ptr 24 cV4SupersededAuxBytes
+
+-- | Raw options for precise V4 accounting reports.
+data CArcadiaTioV4PreciseAccountingOptions = CArcadiaTioV4PreciseAccountingOptions
+  { cV4PreciseAccountingOptionsVersion :: Word32
+  , cV4PreciseAccountingOptionsStructSize :: CSize
+  , cV4PreciseAccountingOptionsRequestedFieldsMask :: Word32
+  , cV4PreciseAccountingOptionsIncludeOmittedFieldReasons :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4PreciseAccountingOptions where
+  sizeOf _ = 24
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4PreciseAccountingOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20
+  poke ptr CArcadiaTioV4PreciseAccountingOptions{cV4PreciseAccountingOptionsVersion, cV4PreciseAccountingOptionsStructSize, cV4PreciseAccountingOptionsRequestedFieldsMask, cV4PreciseAccountingOptionsIncludeOmittedFieldReasons} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4PreciseAccountingOptions))
+    pokeByteOff ptr 0 cV4PreciseAccountingOptionsVersion
+    pokeByteOff ptr 8 cV4PreciseAccountingOptionsStructSize
+    pokeByteOff ptr 16 cV4PreciseAccountingOptionsRequestedFieldsMask
+    pokeByteOff ptr 20 cV4PreciseAccountingOptionsIncludeOmittedFieldReasons
+
+emptyCArcadiaTioV4PreciseAccountingOptions :: CArcadiaTioV4PreciseAccountingOptions
+emptyCArcadiaTioV4PreciseAccountingOptions = CArcadiaTioV4PreciseAccountingOptions 1 24 0 0
+
+-- | Raw omitted precise-accounting field descriptor.
+data CArcadiaTioV4OmittedPreciseAccountingField = CArcadiaTioV4OmittedPreciseAccountingField
+  { cV4OmittedPreciseAccountingFieldVersion :: Word32
+  , cV4OmittedPreciseAccountingFieldStructSize :: CSize
+  , cV4OmittedPreciseAccountingFieldField :: CInt
+  , cV4OmittedPreciseAccountingFieldReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4OmittedPreciseAccountingField where
+  sizeOf _ = 32
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4OmittedPreciseAccountingField <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioV4OmittedPreciseAccountingField{cV4OmittedPreciseAccountingFieldVersion, cV4OmittedPreciseAccountingFieldStructSize, cV4OmittedPreciseAccountingFieldField, cV4OmittedPreciseAccountingFieldReason} = do
+    pokeByteOff ptr 0 cV4OmittedPreciseAccountingFieldVersion
+    pokeByteOff ptr 8 cV4OmittedPreciseAccountingFieldStructSize
+    pokeByteOff ptr 16 cV4OmittedPreciseAccountingFieldField
+    pokeByteOff ptr 24 cV4OmittedPreciseAccountingFieldReason
+
+-- | Raw precise-accounting byte family with report-owned nested arrays.
+data CArcadiaTioV4PreciseAccountingBytes = CArcadiaTioV4PreciseAccountingBytes
+  { cV4PreciseAccountingBytesVersion :: Word32
+  , cV4PreciseAccountingBytesStructSize :: CSize
+  , cV4PreciseAccountingHasUnreachableBytes :: Word8
+  , cV4PreciseAccountingUnreachableBytes :: Word64
+  , cV4PreciseAccountingHasRetainedHistoryRequiredBytes :: Word8
+  , cV4PreciseAccountingRetainedHistoryRequiredBytes :: Word64
+  , cV4PreciseAccountingHasPoppedSkippedBytes :: Word8
+  , cV4PreciseAccountingPoppedSkippedBytes :: Word64
+  , cV4PreciseAccountingHasReclaimableBytes :: Word8
+  , cV4PreciseAccountingReclaimableBytes :: Word64
+  , cV4PreciseAccountingOmittedFields :: Ptr CArcadiaTioV4OmittedPreciseAccountingField
+  , cV4PreciseAccountingOmittedFieldsLen :: CSize
+  , cV4PreciseAccountingOmittedFieldReasonCodes :: Ptr CString
+  , cV4PreciseAccountingOmittedFieldReasonCodesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4PreciseAccountingBytes where
+  sizeOf _ = 112
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4PreciseAccountingBytes <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104
+  poke ptr CArcadiaTioV4PreciseAccountingBytes{cV4PreciseAccountingBytesVersion, cV4PreciseAccountingBytesStructSize, cV4PreciseAccountingHasUnreachableBytes, cV4PreciseAccountingUnreachableBytes, cV4PreciseAccountingHasRetainedHistoryRequiredBytes, cV4PreciseAccountingRetainedHistoryRequiredBytes, cV4PreciseAccountingHasPoppedSkippedBytes, cV4PreciseAccountingPoppedSkippedBytes, cV4PreciseAccountingHasReclaimableBytes, cV4PreciseAccountingReclaimableBytes, cV4PreciseAccountingOmittedFields, cV4PreciseAccountingOmittedFieldsLen, cV4PreciseAccountingOmittedFieldReasonCodes, cV4PreciseAccountingOmittedFieldReasonCodesLen} = do
+    pokeByteOff ptr 0 cV4PreciseAccountingBytesVersion
+    pokeByteOff ptr 8 cV4PreciseAccountingBytesStructSize
+    pokeByteOff ptr 16 cV4PreciseAccountingHasUnreachableBytes
+    pokeByteOff ptr 24 cV4PreciseAccountingUnreachableBytes
+    pokeByteOff ptr 32 cV4PreciseAccountingHasRetainedHistoryRequiredBytes
+    pokeByteOff ptr 40 cV4PreciseAccountingRetainedHistoryRequiredBytes
+    pokeByteOff ptr 48 cV4PreciseAccountingHasPoppedSkippedBytes
+    pokeByteOff ptr 56 cV4PreciseAccountingPoppedSkippedBytes
+    pokeByteOff ptr 64 cV4PreciseAccountingHasReclaimableBytes
+    pokeByteOff ptr 72 cV4PreciseAccountingReclaimableBytes
+    pokeByteOff ptr 80 cV4PreciseAccountingOmittedFields
+    pokeByteOff ptr 88 cV4PreciseAccountingOmittedFieldsLen
+    pokeByteOff ptr 96 cV4PreciseAccountingOmittedFieldReasonCodes
+    pokeByteOff ptr 104 cV4PreciseAccountingOmittedFieldReasonCodesLen
+
+emptyCArcadiaTioV4PreciseAccountingBytes :: CArcadiaTioV4PreciseAccountingBytes
+emptyCArcadiaTioV4PreciseAccountingBytes = CArcadiaTioV4PreciseAccountingBytes 1 112 0 0 0 0 0 0 0 0 nullPtr 0 nullPtr 0
+
+-- | Raw detailed V4 diagnostics report.
+data CArcadiaTioV4DiagnosticsReport = CArcadiaTioV4DiagnosticsReport
+  { cV4DiagnosticsReportVersion :: Word32
+  , cV4DiagnosticsReportStructSize :: CSize
+  , cV4DiagnosticsReportStatus :: CInt
+  , cV4DiagnosticsReportReason :: CString
+  , cV4DiagnosticsReportCurrentHead :: CArcadiaTioV4CurrentHeadBytes
+  , cV4DiagnosticsReportVisibleChainAudit :: CArcadiaTioV4AuditBytes
+  , cV4DiagnosticsReportPayloadReuse :: CArcadiaTioV4PayloadReuseBytes
+  , cV4DiagnosticsReportSuperseded :: CArcadiaTioV4SupersededBytes
+  , cV4DiagnosticsReportUnknownBytes :: Word64
+  , cV4DiagnosticsReportOmittedUnreachableBytes :: Word8
+  , cV4DiagnosticsReportOmittedUnreachableBytesReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4DiagnosticsReport where
+  sizeOf _ = 176
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4DiagnosticsReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 72 <*> peekByteOff ptr 104 <*> peekByteOff ptr 120 <*> peekByteOff ptr 152 <*> peekByteOff ptr 160 <*> peekByteOff ptr 168
+  poke ptr CArcadiaTioV4DiagnosticsReport{cV4DiagnosticsReportVersion, cV4DiagnosticsReportStructSize, cV4DiagnosticsReportStatus, cV4DiagnosticsReportReason, cV4DiagnosticsReportCurrentHead, cV4DiagnosticsReportVisibleChainAudit, cV4DiagnosticsReportPayloadReuse, cV4DiagnosticsReportSuperseded, cV4DiagnosticsReportUnknownBytes, cV4DiagnosticsReportOmittedUnreachableBytes, cV4DiagnosticsReportOmittedUnreachableBytesReason} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4DiagnosticsReport))
+    pokeByteOff ptr 0 cV4DiagnosticsReportVersion
+    pokeByteOff ptr 8 cV4DiagnosticsReportStructSize
+    pokeByteOff ptr 16 cV4DiagnosticsReportStatus
+    pokeByteOff ptr 24 cV4DiagnosticsReportReason
+    pokeByteOff ptr 32 cV4DiagnosticsReportCurrentHead
+    pokeByteOff ptr 72 cV4DiagnosticsReportVisibleChainAudit
+    pokeByteOff ptr 104 cV4DiagnosticsReportPayloadReuse
+    pokeByteOff ptr 120 cV4DiagnosticsReportSuperseded
+    pokeByteOff ptr 152 cV4DiagnosticsReportUnknownBytes
+    pokeByteOff ptr 160 cV4DiagnosticsReportOmittedUnreachableBytes
+    pokeByteOff ptr 168 cV4DiagnosticsReportOmittedUnreachableBytesReason
+
+emptyCArcadiaTioV4DiagnosticsReport :: CArcadiaTioV4DiagnosticsReport
+emptyCArcadiaTioV4DiagnosticsReport = CArcadiaTioV4DiagnosticsReport 1 176 0 nullPtr (CArcadiaTioV4CurrentHeadBytes 0 0 0 0 0) (CArcadiaTioV4AuditBytes 0 0 0 0) (CArcadiaTioV4PayloadReuseBytes 0 0) (CArcadiaTioV4SupersededBytes 0 0 0 0) 0 0 nullPtr
+
+-- | Raw detailed V4 diagnostics report with precise accounting.
+data CArcadiaTioV4DiagnosticsPreciseReport = CArcadiaTioV4DiagnosticsPreciseReport
+  { cV4DiagnosticsPreciseReportVersion :: Word32
+  , cV4DiagnosticsPreciseReportStructSize :: CSize
+  , cV4DiagnosticsPreciseReportStatus :: CInt
+  , cV4DiagnosticsPreciseReportReason :: CString
+  , cV4DiagnosticsPreciseReportCurrentHead :: CArcadiaTioV4CurrentHeadBytes
+  , cV4DiagnosticsPreciseReportVisibleChainAudit :: CArcadiaTioV4AuditBytes
+  , cV4DiagnosticsPreciseReportPayloadReuse :: CArcadiaTioV4PayloadReuseBytes
+  , cV4DiagnosticsPreciseReportSuperseded :: CArcadiaTioV4SupersededBytes
+  , cV4DiagnosticsPreciseReportUnknownBytes :: Word64
+  , cV4DiagnosticsPreciseReportPreciseAccounting :: CArcadiaTioV4PreciseAccountingBytes
+  , cV4DiagnosticsPreciseReportReasonCode :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4DiagnosticsPreciseReport where
+  sizeOf _ = 280
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4DiagnosticsPreciseReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 72 <*> peekByteOff ptr 104 <*> peekByteOff ptr 120 <*> peekByteOff ptr 152 <*> peekByteOff ptr 160 <*> peekByteOff ptr 272
+  poke ptr CArcadiaTioV4DiagnosticsPreciseReport{cV4DiagnosticsPreciseReportVersion, cV4DiagnosticsPreciseReportStructSize, cV4DiagnosticsPreciseReportStatus, cV4DiagnosticsPreciseReportReason, cV4DiagnosticsPreciseReportCurrentHead, cV4DiagnosticsPreciseReportVisibleChainAudit, cV4DiagnosticsPreciseReportPayloadReuse, cV4DiagnosticsPreciseReportSuperseded, cV4DiagnosticsPreciseReportUnknownBytes, cV4DiagnosticsPreciseReportPreciseAccounting, cV4DiagnosticsPreciseReportReasonCode} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4DiagnosticsPreciseReport))
+    pokeByteOff ptr 0 cV4DiagnosticsPreciseReportVersion
+    pokeByteOff ptr 8 cV4DiagnosticsPreciseReportStructSize
+    pokeByteOff ptr 16 cV4DiagnosticsPreciseReportStatus
+    pokeByteOff ptr 24 cV4DiagnosticsPreciseReportReason
+    pokeByteOff ptr 32 cV4DiagnosticsPreciseReportCurrentHead
+    pokeByteOff ptr 72 cV4DiagnosticsPreciseReportVisibleChainAudit
+    pokeByteOff ptr 104 cV4DiagnosticsPreciseReportPayloadReuse
+    pokeByteOff ptr 120 cV4DiagnosticsPreciseReportSuperseded
+    pokeByteOff ptr 152 cV4DiagnosticsPreciseReportUnknownBytes
+    pokeByteOff ptr 160 cV4DiagnosticsPreciseReportPreciseAccounting
+    pokeByteOff ptr 272 cV4DiagnosticsPreciseReportReasonCode
+
+emptyCArcadiaTioV4DiagnosticsPreciseReport :: CArcadiaTioV4DiagnosticsPreciseReport
+emptyCArcadiaTioV4DiagnosticsPreciseReport = CArcadiaTioV4DiagnosticsPreciseReport 1 280 0 nullPtr (CArcadiaTioV4CurrentHeadBytes 0 0 0 0 0) (CArcadiaTioV4AuditBytes 0 0 0 0) (CArcadiaTioV4PayloadReuseBytes 0 0) (CArcadiaTioV4SupersededBytes 0 0 0 0) 0 emptyCArcadiaTioV4PreciseAccountingBytes nullPtr
+
+
+-- | Raw status-aware V4 ordinary current-state compaction analysis report.
+data CArcadiaTioV4CompactionAnalysisReport = CArcadiaTioV4CompactionAnalysisReport
+  { cV4CompactionAnalysisReportVersion :: Word32
+  , cV4CompactionAnalysisReportStructSize :: CSize
+  , cV4CompactionAnalysisReportStatus :: CInt
+  , cV4CompactionAnalysisReportReason :: CString
+  , cV4CompactionAnalysisReportPolicy :: CInt
+  , cV4CompactionAnalysisReportSourceFileBytes :: Word64
+  , cV4CompactionAnalysisReportCurrentStateRequiredBytes :: Word64
+  , cV4CompactionAnalysisReportOrdinaryReclaimableBytes :: Word64
+  , cV4CompactionAnalysisReportUnknownBytes :: Word64
+  , cV4CompactionAnalysisReportOmittedUnreachableBytes :: Word8
+  , cV4CompactionAnalysisReportOmittedUnreachableBytesReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4CompactionAnalysisReport where
+  sizeOf _ = 88
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4CompactionAnalysisReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80
+  poke ptr CArcadiaTioV4CompactionAnalysisReport{cV4CompactionAnalysisReportVersion, cV4CompactionAnalysisReportStructSize, cV4CompactionAnalysisReportStatus, cV4CompactionAnalysisReportReason, cV4CompactionAnalysisReportPolicy, cV4CompactionAnalysisReportSourceFileBytes, cV4CompactionAnalysisReportCurrentStateRequiredBytes, cV4CompactionAnalysisReportOrdinaryReclaimableBytes, cV4CompactionAnalysisReportUnknownBytes, cV4CompactionAnalysisReportOmittedUnreachableBytes, cV4CompactionAnalysisReportOmittedUnreachableBytesReason} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4CompactionAnalysisReport))
+    pokeByteOff ptr 0 cV4CompactionAnalysisReportVersion
+    pokeByteOff ptr 8 cV4CompactionAnalysisReportStructSize
+    pokeByteOff ptr 16 cV4CompactionAnalysisReportStatus
+    pokeByteOff ptr 24 cV4CompactionAnalysisReportReason
+    pokeByteOff ptr 32 cV4CompactionAnalysisReportPolicy
+    pokeByteOff ptr 40 cV4CompactionAnalysisReportSourceFileBytes
+    pokeByteOff ptr 48 cV4CompactionAnalysisReportCurrentStateRequiredBytes
+    pokeByteOff ptr 56 cV4CompactionAnalysisReportOrdinaryReclaimableBytes
+    pokeByteOff ptr 64 cV4CompactionAnalysisReportUnknownBytes
+    pokeByteOff ptr 72 cV4CompactionAnalysisReportOmittedUnreachableBytes
+    pokeByteOff ptr 80 cV4CompactionAnalysisReportOmittedUnreachableBytesReason
+
+emptyCArcadiaTioV4CompactionAnalysisReport :: CArcadiaTioV4CompactionAnalysisReport
+emptyCArcadiaTioV4CompactionAnalysisReport = CArcadiaTioV4CompactionAnalysisReport 1 88 0 nullPtr 0 0 0 0 0 0 nullPtr
+
+-- | Raw status-aware V4 ordinary current-state compaction analysis report with precise accounting.
+data CArcadiaTioV4CompactionAnalysisPreciseReport = CArcadiaTioV4CompactionAnalysisPreciseReport
+  { cV4CompactionAnalysisPreciseReportVersion :: Word32
+  , cV4CompactionAnalysisPreciseReportStructSize :: CSize
+  , cV4CompactionAnalysisPreciseReportStatus :: CInt
+  , cV4CompactionAnalysisPreciseReportReason :: CString
+  , cV4CompactionAnalysisPreciseReportPolicy :: CInt
+  , cV4CompactionAnalysisPreciseReportSourceFileBytes :: Word64
+  , cV4CompactionAnalysisPreciseReportCurrentStateRequiredBytes :: Word64
+  , cV4CompactionAnalysisPreciseReportOrdinaryReclaimableBytes :: Word64
+  , cV4CompactionAnalysisPreciseReportUnknownBytes :: Word64
+  , cV4CompactionAnalysisPreciseReportPreciseAccounting :: CArcadiaTioV4PreciseAccountingBytes
+  , cV4CompactionAnalysisPreciseReportReasonCode :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4CompactionAnalysisPreciseReport where
+  sizeOf _ = 192
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4CompactionAnalysisPreciseReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 184
+  poke ptr CArcadiaTioV4CompactionAnalysisPreciseReport{cV4CompactionAnalysisPreciseReportVersion, cV4CompactionAnalysisPreciseReportStructSize, cV4CompactionAnalysisPreciseReportStatus, cV4CompactionAnalysisPreciseReportReason, cV4CompactionAnalysisPreciseReportPolicy, cV4CompactionAnalysisPreciseReportSourceFileBytes, cV4CompactionAnalysisPreciseReportCurrentStateRequiredBytes, cV4CompactionAnalysisPreciseReportOrdinaryReclaimableBytes, cV4CompactionAnalysisPreciseReportUnknownBytes, cV4CompactionAnalysisPreciseReportPreciseAccounting, cV4CompactionAnalysisPreciseReportReasonCode} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4CompactionAnalysisPreciseReport))
+    pokeByteOff ptr 0 cV4CompactionAnalysisPreciseReportVersion
+    pokeByteOff ptr 8 cV4CompactionAnalysisPreciseReportStructSize
+    pokeByteOff ptr 16 cV4CompactionAnalysisPreciseReportStatus
+    pokeByteOff ptr 24 cV4CompactionAnalysisPreciseReportReason
+    pokeByteOff ptr 32 cV4CompactionAnalysisPreciseReportPolicy
+    pokeByteOff ptr 40 cV4CompactionAnalysisPreciseReportSourceFileBytes
+    pokeByteOff ptr 48 cV4CompactionAnalysisPreciseReportCurrentStateRequiredBytes
+    pokeByteOff ptr 56 cV4CompactionAnalysisPreciseReportOrdinaryReclaimableBytes
+    pokeByteOff ptr 64 cV4CompactionAnalysisPreciseReportUnknownBytes
+    pokeByteOff ptr 72 cV4CompactionAnalysisPreciseReportPreciseAccounting
+    pokeByteOff ptr 184 cV4CompactionAnalysisPreciseReportReasonCode
+
+emptyCArcadiaTioV4CompactionAnalysisPreciseReport :: CArcadiaTioV4CompactionAnalysisPreciseReport
+emptyCArcadiaTioV4CompactionAnalysisPreciseReport = CArcadiaTioV4CompactionAnalysisPreciseReport 1 192 0 nullPtr 0 0 0 0 0 emptyCArcadiaTioV4PreciseAccountingBytes nullPtr
+
+-- | Raw retained-history compaction options.
+data CArcadiaTioV4RetainedHistoryCompactionOptions = CArcadiaTioV4RetainedHistoryCompactionOptions
+  { cV4RetainedHistoryCompactionOptionsVersion :: Word32
+  , cV4RetainedHistoryCompactionOptionsStructSize :: CSize
+  , cV4RetainedHistoryCompactionOptionsPolicy :: CInt
+  , cV4RetainedHistoryCompactionOptionsRetainLastN :: Word32
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4RetainedHistoryCompactionOptions where
+  sizeOf _ = 24
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4RetainedHistoryCompactionOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20
+  poke ptr CArcadiaTioV4RetainedHistoryCompactionOptions{cV4RetainedHistoryCompactionOptionsVersion, cV4RetainedHistoryCompactionOptionsStructSize, cV4RetainedHistoryCompactionOptionsPolicy, cV4RetainedHistoryCompactionOptionsRetainLastN} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4RetainedHistoryCompactionOptions))
+    pokeByteOff ptr 0 cV4RetainedHistoryCompactionOptionsVersion
+    pokeByteOff ptr 8 cV4RetainedHistoryCompactionOptionsStructSize
+    pokeByteOff ptr 16 cV4RetainedHistoryCompactionOptionsPolicy
+    pokeByteOff ptr 20 cV4RetainedHistoryCompactionOptionsRetainLastN
+
+emptyCArcadiaTioV4RetainedHistoryCompactionOptions :: CArcadiaTioV4RetainedHistoryCompactionOptions
+emptyCArcadiaTioV4RetainedHistoryCompactionOptions = CArcadiaTioV4RetainedHistoryCompactionOptions 1 24 0 0
+
+-- | Raw retained-history compaction report.
+data CArcadiaTioV4RetainedHistoryCompactionReport = CArcadiaTioV4RetainedHistoryCompactionReport
+  { cV4RetainedHistoryCompactionReportVersion :: Word32
+  , cV4RetainedHistoryCompactionReportStructSize :: CSize
+  , cV4RetainedHistoryCompactionReportStatus :: CInt
+  , cV4RetainedHistoryCompactionReportReason :: CString
+  , cV4RetainedHistoryCompactionReportRetainedCommitCount :: Word32
+  , cV4RetainedHistoryCompactionReportRetainedCommitSeqs :: Ptr Word64
+  , cV4RetainedHistoryCompactionReportRetainedCommitSeqsLen :: CSize
+  , cV4RetainedHistoryCompactionReportHasUnretainedOlderCommitCount :: Word8
+  , cV4RetainedHistoryCompactionReportUnretainedOlderCommitCount :: Word64
+  , cV4RetainedHistoryCompactionReportSourceFileBytes :: Word64
+  , cV4RetainedHistoryCompactionReportDestinationFileBytes :: Word64
+  , cV4RetainedHistoryCompactionReportOmittedUnreachableBytes :: Word8
+  , cV4RetainedHistoryCompactionReportOmittedUnreachableBytesReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4RetainedHistoryCompactionReport where
+  sizeOf _ = 104
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4RetainedHistoryCompactionReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96
+  poke ptr CArcadiaTioV4RetainedHistoryCompactionReport{cV4RetainedHistoryCompactionReportVersion, cV4RetainedHistoryCompactionReportStructSize, cV4RetainedHistoryCompactionReportStatus, cV4RetainedHistoryCompactionReportReason, cV4RetainedHistoryCompactionReportRetainedCommitCount, cV4RetainedHistoryCompactionReportRetainedCommitSeqs, cV4RetainedHistoryCompactionReportRetainedCommitSeqsLen, cV4RetainedHistoryCompactionReportHasUnretainedOlderCommitCount, cV4RetainedHistoryCompactionReportUnretainedOlderCommitCount, cV4RetainedHistoryCompactionReportSourceFileBytes, cV4RetainedHistoryCompactionReportDestinationFileBytes, cV4RetainedHistoryCompactionReportOmittedUnreachableBytes, cV4RetainedHistoryCompactionReportOmittedUnreachableBytesReason} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4RetainedHistoryCompactionReport))
+    pokeByteOff ptr 0 cV4RetainedHistoryCompactionReportVersion
+    pokeByteOff ptr 8 cV4RetainedHistoryCompactionReportStructSize
+    pokeByteOff ptr 16 cV4RetainedHistoryCompactionReportStatus
+    pokeByteOff ptr 24 cV4RetainedHistoryCompactionReportReason
+    pokeByteOff ptr 32 cV4RetainedHistoryCompactionReportRetainedCommitCount
+    pokeByteOff ptr 40 cV4RetainedHistoryCompactionReportRetainedCommitSeqs
+    pokeByteOff ptr 48 cV4RetainedHistoryCompactionReportRetainedCommitSeqsLen
+    pokeByteOff ptr 56 cV4RetainedHistoryCompactionReportHasUnretainedOlderCommitCount
+    pokeByteOff ptr 64 cV4RetainedHistoryCompactionReportUnretainedOlderCommitCount
+    pokeByteOff ptr 72 cV4RetainedHistoryCompactionReportSourceFileBytes
+    pokeByteOff ptr 80 cV4RetainedHistoryCompactionReportDestinationFileBytes
+    pokeByteOff ptr 88 cV4RetainedHistoryCompactionReportOmittedUnreachableBytes
+    pokeByteOff ptr 96 cV4RetainedHistoryCompactionReportOmittedUnreachableBytesReason
+
+emptyCArcadiaTioV4RetainedHistoryCompactionReport :: CArcadiaTioV4RetainedHistoryCompactionReport
+emptyCArcadiaTioV4RetainedHistoryCompactionReport = CArcadiaTioV4RetainedHistoryCompactionReport 1 104 0 nullPtr 0 nullPtr 0 0 0 0 0 0 nullPtr
+
+-- | Raw retained-history compaction report with source precise accounting.
+data CArcadiaTioV4RetainedHistoryCompactionPreciseReport = CArcadiaTioV4RetainedHistoryCompactionPreciseReport
+  { cV4RetainedHistoryCompactionPreciseReportVersion :: Word32
+  , cV4RetainedHistoryCompactionPreciseReportStructSize :: CSize
+  , cV4RetainedHistoryCompactionPreciseReportStatus :: CInt
+  , cV4RetainedHistoryCompactionPreciseReportReason :: CString
+  , cV4RetainedHistoryCompactionPreciseReportRetainedCommitCount :: Word32
+  , cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqs :: Ptr Word64
+  , cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqsLen :: CSize
+  , cV4RetainedHistoryCompactionPreciseReportHasUnretainedOlderCommitCount :: Word8
+  , cV4RetainedHistoryCompactionPreciseReportUnretainedOlderCommitCount :: Word64
+  , cV4RetainedHistoryCompactionPreciseReportSourceFileBytes :: Word64
+  , cV4RetainedHistoryCompactionPreciseReportDestinationFileBytes :: Word64
+  , cV4RetainedHistoryCompactionPreciseReportPreciseSourceAccounting :: CArcadiaTioV4PreciseAccountingBytes
+  , cV4RetainedHistoryCompactionPreciseReportReasonCode :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioV4RetainedHistoryCompactionPreciseReport where
+  sizeOf _ = 208
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioV4RetainedHistoryCompactionPreciseReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 200
+  poke ptr CArcadiaTioV4RetainedHistoryCompactionPreciseReport{cV4RetainedHistoryCompactionPreciseReportVersion, cV4RetainedHistoryCompactionPreciseReportStructSize, cV4RetainedHistoryCompactionPreciseReportStatus, cV4RetainedHistoryCompactionPreciseReportReason, cV4RetainedHistoryCompactionPreciseReportRetainedCommitCount, cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqs, cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqsLen, cV4RetainedHistoryCompactionPreciseReportHasUnretainedOlderCommitCount, cV4RetainedHistoryCompactionPreciseReportUnretainedOlderCommitCount, cV4RetainedHistoryCompactionPreciseReportSourceFileBytes, cV4RetainedHistoryCompactionPreciseReportDestinationFileBytes, cV4RetainedHistoryCompactionPreciseReportPreciseSourceAccounting, cV4RetainedHistoryCompactionPreciseReportReasonCode} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioV4RetainedHistoryCompactionPreciseReport))
+    pokeByteOff ptr 0 cV4RetainedHistoryCompactionPreciseReportVersion
+    pokeByteOff ptr 8 cV4RetainedHistoryCompactionPreciseReportStructSize
+    pokeByteOff ptr 16 cV4RetainedHistoryCompactionPreciseReportStatus
+    pokeByteOff ptr 24 cV4RetainedHistoryCompactionPreciseReportReason
+    pokeByteOff ptr 32 cV4RetainedHistoryCompactionPreciseReportRetainedCommitCount
+    pokeByteOff ptr 40 cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqs
+    pokeByteOff ptr 48 cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqsLen
+    pokeByteOff ptr 56 cV4RetainedHistoryCompactionPreciseReportHasUnretainedOlderCommitCount
+    pokeByteOff ptr 64 cV4RetainedHistoryCompactionPreciseReportUnretainedOlderCommitCount
+    pokeByteOff ptr 72 cV4RetainedHistoryCompactionPreciseReportSourceFileBytes
+    pokeByteOff ptr 80 cV4RetainedHistoryCompactionPreciseReportDestinationFileBytes
+    pokeByteOff ptr 88 cV4RetainedHistoryCompactionPreciseReportPreciseSourceAccounting
+    pokeByteOff ptr 200 cV4RetainedHistoryCompactionPreciseReportReasonCode
+
+emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport :: CArcadiaTioV4RetainedHistoryCompactionPreciseReport
+emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport = CArcadiaTioV4RetainedHistoryCompactionPreciseReport 1 208 0 nullPtr 0 nullPtr 0 0 0 0 0 emptyCArcadiaTioV4PreciseAccountingBytes nullPtr
+
+
+-- | Raw reform options.
+data CArcadiaTioReformOptions = CArcadiaTioReformOptions
+  { cReformOptionsVersion :: Word32
+  , cReformOptionsStructSize :: CSize
+  , cReformOptionsTargetLayout :: CInt
+  , cReformOptionsRegularChunkedBlockShape :: Ptr Word32
+  , cReformOptionsRegularChunkedBlockShapeLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReformOptions where
+  sizeOf _ = 40
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioReformOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioReformOptions{cReformOptionsVersion, cReformOptionsStructSize, cReformOptionsTargetLayout, cReformOptionsRegularChunkedBlockShape, cReformOptionsRegularChunkedBlockShapeLen} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioReformOptions))
+    pokeByteOff ptr 0 cReformOptionsVersion
+    pokeByteOff ptr 8 cReformOptionsStructSize
+    pokeByteOff ptr 16 cReformOptionsTargetLayout
+    pokeByteOff ptr 24 cReformOptionsRegularChunkedBlockShape
+    pokeByteOff ptr 32 cReformOptionsRegularChunkedBlockShapeLen
+
+emptyCArcadiaTioReformOptions :: CArcadiaTioReformOptions
+emptyCArcadiaTioReformOptions = CArcadiaTioReformOptions 1 40 0 nullPtr 0
+
+-- | Raw reform diagnostic report.
+data CArcadiaTioReformReport = CArcadiaTioReformReport
+  { cReformReportVersion :: Word32
+  , cReformReportStructSize :: CSize
+  , cReformReportReasonCode :: CString
+  , cReformReportReasonCodeTaxonomy :: CString
+  , cReformReportReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReformReport where
+  sizeOf _ = 40
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioReformReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioReformReport{cReformReportVersion, cReformReportStructSize, cReformReportReasonCode, cReformReportReasonCodeTaxonomy, cReformReportReason} = do
+    fillBytes ptr 0 (sizeOf (undefined :: CArcadiaTioReformReport))
+    pokeByteOff ptr 0 cReformReportVersion
+    pokeByteOff ptr 8 cReformReportStructSize
+    pokeByteOff ptr 16 cReformReportReasonCode
+    pokeByteOff ptr 24 cReformReportReasonCodeTaxonomy
+    pokeByteOff ptr 32 cReformReportReason
+
+emptyCArcadiaTioReformReport :: CArcadiaTioReformReport
+emptyCArcadiaTioReformReport = CArcadiaTioReformReport 1 40 nullPtr nullPtr nullPtr
+
 -- | Raw sparse predicate matching @ArcadiaTioSparseValuePredicateV2@.
 data CArcadiaTioSparseValuePredicateV2 = CArcadiaTioSparseValuePredicateV2
   { cSparsePredicateKind :: CInt
@@ -2138,6 +2643,21 @@ type GetAutoCompactionConfigFn = Ptr CHandle -> Ptr CArcadiaTioAutoCompactionCon
 type SetAutoCompactionConfigFn = Ptr CHandle -> Ptr CArcadiaTioAutoCompactionConfig -> Word8 -> IO CInt
 type CompactionStateFn = Ptr CHandle -> Ptr CArcadiaTioCompactionState -> Ptr Word8 -> IO CInt
 type MaybeCompactAutoFn = Ptr CHandle -> Ptr Word8 -> IO CInt
+type V4DiagnosticsFn = Ptr CHandle -> Ptr CArcadiaTioV4DiagnosticsReport -> IO CInt
+type V4DiagnosticsReportFreeFn = Ptr CArcadiaTioV4DiagnosticsReport -> IO ()
+type V4DiagnosticsPreciseFn = Ptr CHandle -> Ptr CArcadiaTioV4PreciseAccountingOptions -> Ptr CArcadiaTioV4DiagnosticsPreciseReport -> IO CInt
+type V4DiagnosticsPreciseReportFreeFn = Ptr CArcadiaTioV4DiagnosticsPreciseReport -> IO ()
+type AnalyzeV4CompactionFn = Ptr CHandle -> Ptr CArcadiaTioV4CompactionAnalysisReport -> IO CInt
+type V4CompactionAnalysisReportFreeFn = Ptr CArcadiaTioV4CompactionAnalysisReport -> IO ()
+type AnalyzeV4CompactionPreciseFn = Ptr CHandle -> Ptr CArcadiaTioV4PreciseAccountingOptions -> Ptr CArcadiaTioV4CompactionAnalysisPreciseReport -> IO CInt
+type V4CompactionAnalysisPreciseReportFreeFn = Ptr CArcadiaTioV4CompactionAnalysisPreciseReport -> IO ()
+type CompactV4RetainedHistoryToFn = Ptr CHandle -> CString -> Ptr CArcadiaTioV4RetainedHistoryCompactionOptions -> Ptr CArcadiaTioV4RetainedHistoryCompactionReport -> IO CInt
+type V4RetainedHistoryCompactionReportFreeFn = Ptr CArcadiaTioV4RetainedHistoryCompactionReport -> IO ()
+type CompactV4RetainedHistoryToPreciseFn = Ptr CHandle -> CString -> Ptr CArcadiaTioV4RetainedHistoryCompactionOptions -> Ptr CArcadiaTioV4PreciseAccountingOptions -> Ptr CArcadiaTioV4RetainedHistoryCompactionPreciseReport -> IO CInt
+type V4RetainedHistoryCompactionPreciseReportFreeFn = Ptr CArcadiaTioV4RetainedHistoryCompactionPreciseReport -> IO ()
+type ReformToFn = Ptr CHandle -> CString -> Ptr CArcadiaTioReformOptions -> IO CInt
+type ReformToExFn = Ptr CHandle -> CString -> Ptr CArcadiaTioReformOptions -> Ptr CArcadiaTioReformReport -> IO CInt
+type ReformReportFreeFn = Ptr CArcadiaTioReformReport -> IO ()
 type AnalyzeSparseAppendV2Fn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioSparseRuleV2 -> Ptr CArcadiaTioSparseAppendAnalysis -> IO CInt
 type AppendSparseWithRangeV2Fn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioSparseRuleV2 -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type SparseAppendAnalysisFreeFn = Ptr CArcadiaTioSparseAppendAnalysis -> IO ()
@@ -2258,6 +2778,21 @@ foreign import ccall safe "dynamic" mkGetAutoCompactionConfig :: FunPtr GetAutoC
 foreign import ccall safe "dynamic" mkSetAutoCompactionConfig :: FunPtr SetAutoCompactionConfigFn -> SetAutoCompactionConfigFn
 foreign import ccall safe "dynamic" mkCompactionState :: FunPtr CompactionStateFn -> CompactionStateFn
 foreign import ccall safe "dynamic" mkMaybeCompactAuto :: FunPtr MaybeCompactAutoFn -> MaybeCompactAutoFn
+foreign import ccall safe "dynamic" mkV4Diagnostics :: FunPtr V4DiagnosticsFn -> V4DiagnosticsFn
+foreign import ccall safe "dynamic" mkV4DiagnosticsReportFree :: FunPtr V4DiagnosticsReportFreeFn -> V4DiagnosticsReportFreeFn
+foreign import ccall safe "dynamic" mkV4DiagnosticsPrecise :: FunPtr V4DiagnosticsPreciseFn -> V4DiagnosticsPreciseFn
+foreign import ccall safe "dynamic" mkV4DiagnosticsPreciseReportFree :: FunPtr V4DiagnosticsPreciseReportFreeFn -> V4DiagnosticsPreciseReportFreeFn
+foreign import ccall safe "dynamic" mkAnalyzeV4Compaction :: FunPtr AnalyzeV4CompactionFn -> AnalyzeV4CompactionFn
+foreign import ccall safe "dynamic" mkV4CompactionAnalysisReportFree :: FunPtr V4CompactionAnalysisReportFreeFn -> V4CompactionAnalysisReportFreeFn
+foreign import ccall safe "dynamic" mkAnalyzeV4CompactionPrecise :: FunPtr AnalyzeV4CompactionPreciseFn -> AnalyzeV4CompactionPreciseFn
+foreign import ccall safe "dynamic" mkV4CompactionAnalysisPreciseReportFree :: FunPtr V4CompactionAnalysisPreciseReportFreeFn -> V4CompactionAnalysisPreciseReportFreeFn
+foreign import ccall safe "dynamic" mkCompactV4RetainedHistoryTo :: FunPtr CompactV4RetainedHistoryToFn -> CompactV4RetainedHistoryToFn
+foreign import ccall safe "dynamic" mkV4RetainedHistoryCompactionReportFree :: FunPtr V4RetainedHistoryCompactionReportFreeFn -> V4RetainedHistoryCompactionReportFreeFn
+foreign import ccall safe "dynamic" mkCompactV4RetainedHistoryToPrecise :: FunPtr CompactV4RetainedHistoryToPreciseFn -> CompactV4RetainedHistoryToPreciseFn
+foreign import ccall safe "dynamic" mkV4RetainedHistoryCompactionPreciseReportFree :: FunPtr V4RetainedHistoryCompactionPreciseReportFreeFn -> V4RetainedHistoryCompactionPreciseReportFreeFn
+foreign import ccall safe "dynamic" mkReformTo :: FunPtr ReformToFn -> ReformToFn
+foreign import ccall safe "dynamic" mkReformToEx :: FunPtr ReformToExFn -> ReformToExFn
+foreign import ccall safe "dynamic" mkReformReportFree :: FunPtr ReformReportFreeFn -> ReformReportFreeFn
 foreign import ccall safe "dynamic" mkAnalyzeSparseAppendF32V2 :: FunPtr (AnalyzeSparseAppendV2Fn CFloat) -> AnalyzeSparseAppendV2Fn CFloat
 foreign import ccall safe "dynamic" mkAnalyzeSparseAppendF64V2 :: FunPtr (AnalyzeSparseAppendV2Fn Double) -> AnalyzeSparseAppendV2Fn Double
 foreign import ccall safe "dynamic" mkAnalyzeSparseAppendI32V2 :: FunPtr (AnalyzeSparseAppendV2Fn Int32) -> AnalyzeSparseAppendV2Fn Int32
@@ -2390,6 +2925,21 @@ data NativeLibrary = NativeLibrary
   , nativeSetAutoCompactionConfig :: SetAutoCompactionConfigFn
   , nativeCompactionState :: CompactionStateFn
   , nativeMaybeCompactAuto :: MaybeCompactAutoFn
+  , nativeV4Diagnostics :: V4DiagnosticsFn
+  , nativeV4DiagnosticsReportFree :: V4DiagnosticsReportFreeFn
+  , nativeV4DiagnosticsPrecise :: V4DiagnosticsPreciseFn
+  , nativeV4DiagnosticsPreciseReportFree :: V4DiagnosticsPreciseReportFreeFn
+  , nativeAnalyzeV4Compaction :: AnalyzeV4CompactionFn
+  , nativeV4CompactionAnalysisReportFree :: V4CompactionAnalysisReportFreeFn
+  , nativeAnalyzeV4CompactionPrecise :: AnalyzeV4CompactionPreciseFn
+  , nativeV4CompactionAnalysisPreciseReportFree :: V4CompactionAnalysisPreciseReportFreeFn
+  , nativeCompactV4RetainedHistoryTo :: CompactV4RetainedHistoryToFn
+  , nativeV4RetainedHistoryCompactionReportFree :: V4RetainedHistoryCompactionReportFreeFn
+  , nativeCompactV4RetainedHistoryToPrecise :: CompactV4RetainedHistoryToPreciseFn
+  , nativeV4RetainedHistoryCompactionPreciseReportFree :: V4RetainedHistoryCompactionPreciseReportFreeFn
+  , nativeReformTo :: ReformToFn
+  , nativeReformToEx :: ReformToExFn
+  , nativeReformReportFree :: ReformReportFreeFn
   , nativeAnalyzeSparseAppendF32V2 :: AnalyzeSparseAppendV2Fn CFloat
   , nativeAnalyzeSparseAppendF64V2 :: AnalyzeSparseAppendV2Fn Double
   , nativeAnalyzeSparseAppendI32V2 :: AnalyzeSparseAppendV2Fn Int32
@@ -2577,6 +3127,21 @@ loadUnchecked path = do
   nativeSetAutoCompactionConfig <- mkSetAutoCompactionConfig <$> dlsym dl "arcadia_tio_set_auto_compaction_config"
   nativeCompactionState <- mkCompactionState <$> dlsym dl "arcadia_tio_compaction_state"
   nativeMaybeCompactAuto <- mkMaybeCompactAuto <$> dlsym dl "arcadia_tio_maybe_compact_auto"
+  nativeV4Diagnostics <- mkV4Diagnostics <$> dlsym dl "arcadia_tio_v4_diagnostics"
+  nativeV4DiagnosticsReportFree <- mkV4DiagnosticsReportFree <$> dlsym dl "arcadia_tio_v4_diagnostics_report_free"
+  nativeV4DiagnosticsPrecise <- mkV4DiagnosticsPrecise <$> dlsym dl "arcadia_tio_v4_diagnostics_precise"
+  nativeV4DiagnosticsPreciseReportFree <- mkV4DiagnosticsPreciseReportFree <$> dlsym dl "arcadia_tio_v4_diagnostics_precise_report_free"
+  nativeAnalyzeV4Compaction <- mkAnalyzeV4Compaction <$> dlsym dl "arcadia_tio_analyze_v4_compaction"
+  nativeV4CompactionAnalysisReportFree <- mkV4CompactionAnalysisReportFree <$> dlsym dl "arcadia_tio_v4_compaction_analysis_report_free"
+  nativeAnalyzeV4CompactionPrecise <- mkAnalyzeV4CompactionPrecise <$> dlsym dl "arcadia_tio_analyze_v4_compaction_precise"
+  nativeV4CompactionAnalysisPreciseReportFree <- mkV4CompactionAnalysisPreciseReportFree <$> dlsym dl "arcadia_tio_v4_compaction_analysis_precise_report_free"
+  nativeCompactV4RetainedHistoryTo <- mkCompactV4RetainedHistoryTo <$> dlsym dl "arcadia_tio_compact_v4_retained_history_to"
+  nativeV4RetainedHistoryCompactionReportFree <- mkV4RetainedHistoryCompactionReportFree <$> dlsym dl "arcadia_tio_v4_retained_history_compaction_report_free"
+  nativeCompactV4RetainedHistoryToPrecise <- mkCompactV4RetainedHistoryToPrecise <$> dlsym dl "arcadia_tio_compact_v4_retained_history_to_precise"
+  nativeV4RetainedHistoryCompactionPreciseReportFree <- mkV4RetainedHistoryCompactionPreciseReportFree <$> dlsym dl "arcadia_tio_v4_retained_history_compaction_precise_report_free"
+  nativeReformTo <- mkReformTo <$> dlsym dl "arcadia_tio_reform_to"
+  nativeReformToEx <- mkReformToEx <$> dlsym dl "arcadia_tio_reform_to_ex"
+  nativeReformReportFree <- mkReformReportFree <$> dlsym dl "arcadia_tio_reform_report_free"
   nativeAnalyzeSparseAppendF32V2 <- mkAnalyzeSparseAppendF32V2 <$> dlsym dl "arcadia_tio_analyze_sparse_append_f32_v2"
   nativeAnalyzeSparseAppendF64V2 <- mkAnalyzeSparseAppendF64V2 <$> dlsym dl "arcadia_tio_analyze_sparse_append_f64_v2"
   nativeAnalyzeSparseAppendI32V2 <- mkAnalyzeSparseAppendI32V2 <$> dlsym dl "arcadia_tio_analyze_sparse_append_i32_v2"
@@ -2708,6 +3273,21 @@ loadUnchecked path = do
       , nativeSetAutoCompactionConfig
       , nativeCompactionState
       , nativeMaybeCompactAuto
+      , nativeV4Diagnostics
+      , nativeV4DiagnosticsReportFree
+      , nativeV4DiagnosticsPrecise
+      , nativeV4DiagnosticsPreciseReportFree
+      , nativeAnalyzeV4Compaction
+      , nativeV4CompactionAnalysisReportFree
+      , nativeAnalyzeV4CompactionPrecise
+      , nativeV4CompactionAnalysisPreciseReportFree
+      , nativeCompactV4RetainedHistoryTo
+      , nativeV4RetainedHistoryCompactionReportFree
+      , nativeCompactV4RetainedHistoryToPrecise
+      , nativeV4RetainedHistoryCompactionPreciseReportFree
+      , nativeReformTo
+      , nativeReformToEx
+      , nativeReformReportFree
       , nativeAnalyzeSparseAppendF32V2
       , nativeAnalyzeSparseAppendF64V2
       , nativeAnalyzeSparseAppendI32V2
@@ -3073,6 +3653,53 @@ capiCompactionState NativeLibrary{nativeCompactionState} = nativeCompactionState
 
 capiMaybeCompactAuto :: NativeLibrary -> MaybeCompactAutoFn
 capiMaybeCompactAuto NativeLibrary{nativeMaybeCompactAuto} = nativeMaybeCompactAuto
+
+capiV4Diagnostics :: NativeLibrary -> V4DiagnosticsFn
+capiV4Diagnostics NativeLibrary{nativeV4Diagnostics} = nativeV4Diagnostics
+
+capiV4DiagnosticsReportFree :: NativeLibrary -> V4DiagnosticsReportFreeFn
+capiV4DiagnosticsReportFree NativeLibrary{nativeV4DiagnosticsReportFree} = nativeV4DiagnosticsReportFree
+
+capiV4DiagnosticsPrecise :: NativeLibrary -> V4DiagnosticsPreciseFn
+capiV4DiagnosticsPrecise NativeLibrary{nativeV4DiagnosticsPrecise} = nativeV4DiagnosticsPrecise
+
+capiV4DiagnosticsPreciseReportFree :: NativeLibrary -> V4DiagnosticsPreciseReportFreeFn
+capiV4DiagnosticsPreciseReportFree NativeLibrary{nativeV4DiagnosticsPreciseReportFree} = nativeV4DiagnosticsPreciseReportFree
+
+
+capiAnalyzeV4Compaction :: NativeLibrary -> AnalyzeV4CompactionFn
+capiAnalyzeV4Compaction NativeLibrary{nativeAnalyzeV4Compaction} = nativeAnalyzeV4Compaction
+
+capiV4CompactionAnalysisReportFree :: NativeLibrary -> V4CompactionAnalysisReportFreeFn
+capiV4CompactionAnalysisReportFree NativeLibrary{nativeV4CompactionAnalysisReportFree} = nativeV4CompactionAnalysisReportFree
+
+capiAnalyzeV4CompactionPrecise :: NativeLibrary -> AnalyzeV4CompactionPreciseFn
+capiAnalyzeV4CompactionPrecise NativeLibrary{nativeAnalyzeV4CompactionPrecise} = nativeAnalyzeV4CompactionPrecise
+
+capiV4CompactionAnalysisPreciseReportFree :: NativeLibrary -> V4CompactionAnalysisPreciseReportFreeFn
+capiV4CompactionAnalysisPreciseReportFree NativeLibrary{nativeV4CompactionAnalysisPreciseReportFree} = nativeV4CompactionAnalysisPreciseReportFree
+
+capiCompactV4RetainedHistoryTo :: NativeLibrary -> CompactV4RetainedHistoryToFn
+capiCompactV4RetainedHistoryTo NativeLibrary{nativeCompactV4RetainedHistoryTo} = nativeCompactV4RetainedHistoryTo
+
+capiV4RetainedHistoryCompactionReportFree :: NativeLibrary -> V4RetainedHistoryCompactionReportFreeFn
+capiV4RetainedHistoryCompactionReportFree NativeLibrary{nativeV4RetainedHistoryCompactionReportFree} = nativeV4RetainedHistoryCompactionReportFree
+
+capiCompactV4RetainedHistoryToPrecise :: NativeLibrary -> CompactV4RetainedHistoryToPreciseFn
+capiCompactV4RetainedHistoryToPrecise NativeLibrary{nativeCompactV4RetainedHistoryToPrecise} = nativeCompactV4RetainedHistoryToPrecise
+
+capiV4RetainedHistoryCompactionPreciseReportFree :: NativeLibrary -> V4RetainedHistoryCompactionPreciseReportFreeFn
+capiV4RetainedHistoryCompactionPreciseReportFree NativeLibrary{nativeV4RetainedHistoryCompactionPreciseReportFree} = nativeV4RetainedHistoryCompactionPreciseReportFree
+
+
+capiReformTo :: NativeLibrary -> ReformToFn
+capiReformTo NativeLibrary{nativeReformTo} = nativeReformTo
+
+capiReformToEx :: NativeLibrary -> ReformToExFn
+capiReformToEx NativeLibrary{nativeReformToEx} = nativeReformToEx
+
+capiReformReportFree :: NativeLibrary -> ReformReportFreeFn
+capiReformReportFree NativeLibrary{nativeReformReportFree} = nativeReformReportFree
 
 capiAnalyzeSparseAppendF32V2 :: NativeLibrary -> AnalyzeSparseAppendV2Fn CFloat
 capiAnalyzeSparseAppendF32V2 NativeLibrary{nativeAnalyzeSparseAppendF32V2} = nativeAnalyzeSparseAppendF32V2

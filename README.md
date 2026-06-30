@@ -75,12 +75,15 @@ Implemented:
   Coordinate v2 exact/range lookup result carriers;
 - query/set index-checkpoint cadence, surfacing native unsupported status where
   the V4 runtime does not implement it;
-- inspect head/list commits and shallow compaction stats;
-- run copy-live compaction helpers (`compactTo`, `maybeCompact`) and query
-  auto-compaction config/state;
+- inspect head/list commits and shallow plus detailed V4 compaction/diagnostic
+  accounting reports;
+- run copy-live compaction helpers (`compactTo`, `maybeCompact`), retained-history
+  compaction helpers with copied reports, and query auto-compaction config/state;
 - call pop/revert helpers and surface the native status;
 - call rewrite/rewrite-slice/clear-block helpers for supported native dtypes and
   surface native unsupported/invalid status for current runtime/layout gaps;
+- reform visible data into fresh destinations with target-layout options and
+  copied reform diagnostic metadata;
 - export values through an explicit Arrow C Data ownership wrapper that releases
   Arrow callbacks without exposing raw release functions;
 - open OCB selected-snapshot handles and read minimal row/root metadata;
@@ -92,8 +95,7 @@ Not yet supported:
 - parsing `.tio` or `.ocb` in Haskell;
 - OCB write/read-batch/dictionary/summary APIs beyond minimal open/metadata/close;
 - legacy coordinate index/range helpers, richer coordinate fixed-text/dictionary
-  authoring ergonomics, retained-history/detailed compaction/reform/diagnostic
-  report families, Python/NumPy interop, or C++ helpers;
+  authoring ergonomics, Python/NumPy interop, or C++ helpers;
 - macOS/Windows native-library lookup;
 - native library vendoring, publishing, signing, or release assets.
 
@@ -139,10 +141,11 @@ cabal build all
 The test suite skips when neither `ARCADIA_TIO_CAPI_LIB` nor
 `ARCADIA_TIO_CAPI_LIB_DIR` is set. With the native library configured, it creates
 project-local `.test-output/*.tio` files, checks dense `f32`/`f64`/`i32`/`i64`
-roundtrips, random-access create, sparse-intent append, compaction helpers,
-metadata queries, selector reads, option/report reads, read-index, mutation and
-Arrow ownership wrappers, dense-mask reads, coordinate create/read/lookup/append
-smokes, universe create/append/explicit-read smokes, and removes generated files:
+roundtrips, random-access create, sparse-intent append, diagnostics/precise
+accounting, retained-history compaction, reform helpers, metadata queries,
+selector reads, option/report reads, read-index, mutation and Arrow ownership
+wrappers, dense-mask reads, coordinate create/read/lookup/append smokes,
+universe create/append/explicit-read smokes, and removes generated files:
 
 ```sh
 cabal test all

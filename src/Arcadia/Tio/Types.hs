@@ -73,6 +73,30 @@ module Arcadia.Tio.Types
   , CompactionStats(..)
   , AutoCompactionConfig(..)
   , CompactionState(..)
+  , V4ReportStatus(..)
+  , V4CurrentHeadBytes(..)
+  , V4AuditBytes(..)
+  , V4PayloadReuseBytes(..)
+  , V4SupersededBytes(..)
+  , V4PreciseAccountingField(..)
+  , V4PreciseAccountingOptions(..)
+  , defaultV4PreciseAccountingOptions
+  , V4OmittedPreciseAccountingField(..)
+  , V4PreciseAccountingBytes(..)
+  , V4DiagnosticsReport(..)
+  , V4DiagnosticsPreciseReport(..)
+  , V4CompactionAnalysisPolicy(..)
+  , V4CompactionAnalysisReport(..)
+  , V4CompactionAnalysisPreciseReport(..)
+  , V4RetainedHistoryPolicy(..)
+  , V4RetainedHistoryCompactionOptions(..)
+  , defaultV4RetainedHistoryCompactionOptions
+  , V4RetainedHistoryCompactionReport(..)
+  , V4RetainedHistoryCompactionPreciseReport(..)
+  , ReformTargetLayout(..)
+  , ReformOptions(..)
+  , defaultReformOptions
+  , ReformReport(..)
   , CoordinateKind(..)
   , coordinateKindToRaw
   , coordinateKindFromRaw
@@ -710,6 +734,220 @@ data AutoCompactionConfig = AutoCompactionConfig
 data CompactionState = CompactionState
   { compactionStateLastCompactedCommitSeq :: Word64
   , compactionStateLastCompactedAtUnixMs :: Word64
+  }
+  deriving (Eq, Show)
+
+
+-- | In-band status for detailed V4 diagnostics/accounting report families.
+data V4ReportStatus
+  = V4ReportComplete
+  | V4ReportUnsupported
+  | V4ReportUnknown
+  | V4ReportStatusUnknown Int32
+  deriving (Eq, Ord, Show)
+
+-- | Detailed bytes owned by the current visible V4 head.
+data V4CurrentHeadBytes = V4CurrentHeadBytes
+  { v4CurrentHeadPayloadBytes :: Word64
+  , v4CurrentHeadIndexBytes :: Word64
+  , v4CurrentHeadEpochBytes :: Word64
+  , v4CurrentHeadAuxBytes :: Word64
+  , v4CurrentHeadCommitBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+-- | Detailed bytes required by visible-chain audit data.
+data V4AuditBytes = V4AuditBytes
+  { v4AuditCommitBytes :: Word64
+  , v4AuditIndexBytes :: Word64
+  , v4AuditEpochBytes :: Word64
+  , v4AuditAuxBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+-- | Payload bytes reused across visible/superseded state.
+data V4PayloadReuseBytes = V4PayloadReuseBytes
+  { v4PayloadReuseResurrectedPayloadBytes :: Word64
+  , v4PayloadReuseSharedPayloadBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+-- | Detailed bytes superseded by the current visible V4 head.
+data V4SupersededBytes = V4SupersededBytes
+  { v4SupersededPayloadBytes :: Word64
+  , v4SupersededIndexBytes :: Word64
+  , v4SupersededEpochBytes :: Word64
+  , v4SupersededAuxBytes :: Word64
+  }
+  deriving (Eq, Show)
+
+-- | Precise V4 accounting fields that can be requested explicitly.
+data V4PreciseAccountingField
+  = V4PreciseUnreachableBytes
+  | V4PreciseRetainedHistoryRequiredBytes
+  | V4PrecisePoppedSkippedBytes
+  | V4PreciseReclaimableBytes
+  | V4PreciseAccountingFieldUnknown Int32
+  deriving (Eq, Ord, Show)
+
+-- | Options for precise V4 diagnostics/accounting reports.
+data V4PreciseAccountingOptions = V4PreciseAccountingOptions
+  { v4PreciseRequestedFields :: [V4PreciseAccountingField]
+    -- ^ Empty requests every precise field relevant to the report family.
+  , v4PreciseIncludeOmittedFieldReasons :: Bool
+  }
+  deriving (Eq, Show)
+
+defaultV4PreciseAccountingOptions :: V4PreciseAccountingOptions
+defaultV4PreciseAccountingOptions = V4PreciseAccountingOptions [] False
+
+-- | Omitted precise-accounting field copied from native-owned arrays.
+data V4OmittedPreciseAccountingField = V4OmittedPreciseAccountingField
+  { v4OmittedPreciseField :: V4PreciseAccountingField
+  , v4OmittedPreciseReason :: Maybe String
+  , v4OmittedPreciseReasonCode :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Precise byte counts with per-field validity and omission details.
+data V4PreciseAccountingBytes = V4PreciseAccountingBytes
+  { v4PreciseUnreachableBytes :: Maybe Word64
+  , v4PreciseRetainedHistoryRequiredBytes :: Maybe Word64
+  , v4PrecisePoppedSkippedBytes :: Maybe Word64
+  , v4PreciseReclaimableBytes :: Maybe Word64
+  , v4PreciseOmittedFields :: [V4OmittedPreciseAccountingField]
+  }
+  deriving (Eq, Show)
+
+-- | Detailed V4 diagnostics report copied into Haskell-owned values.
+data V4DiagnosticsReport = V4DiagnosticsReport
+  { v4DiagnosticsStatus :: V4ReportStatus
+  , v4DiagnosticsReason :: Maybe String
+  , v4DiagnosticsCurrentHead :: V4CurrentHeadBytes
+  , v4DiagnosticsVisibleChainAudit :: V4AuditBytes
+  , v4DiagnosticsPayloadReuse :: V4PayloadReuseBytes
+  , v4DiagnosticsSuperseded :: V4SupersededBytes
+  , v4DiagnosticsUnknownBytes :: Word64
+  , v4DiagnosticsOmittedUnreachableBytes :: Bool
+  , v4DiagnosticsOmittedUnreachableBytesReason :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Detailed V4 diagnostics report with explicit precise-accounting validity.
+data V4DiagnosticsPreciseReport = V4DiagnosticsPreciseReport
+  { v4DiagnosticsPreciseStatus :: V4ReportStatus
+  , v4DiagnosticsPreciseReason :: Maybe String
+  , v4DiagnosticsPreciseCurrentHead :: V4CurrentHeadBytes
+  , v4DiagnosticsPreciseVisibleChainAudit :: V4AuditBytes
+  , v4DiagnosticsPrecisePayloadReuse :: V4PayloadReuseBytes
+  , v4DiagnosticsPreciseSuperseded :: V4SupersededBytes
+  , v4DiagnosticsPreciseUnknownBytes :: Word64
+  , v4DiagnosticsPreciseAccounting :: V4PreciseAccountingBytes
+  , v4DiagnosticsPreciseReasonCode :: Maybe String
+  }
+  deriving (Eq, Show)
+
+
+-- | Native detailed V4 compaction analysis policy.
+data V4CompactionAnalysisPolicy
+  = V4CompactionPolicyCompactToCurrentState
+  | V4CompactionAnalysisPolicyUnknown Int32
+  deriving (Eq, Ord, Show)
+
+-- | Detailed ordinary current-state compaction analysis report.
+data V4CompactionAnalysisReport = V4CompactionAnalysisReport
+  { v4CompactionAnalysisStatus :: V4ReportStatus
+  , v4CompactionAnalysisReason :: Maybe String
+  , v4CompactionAnalysisPolicy :: V4CompactionAnalysisPolicy
+  , v4CompactionAnalysisSourceFileBytes :: Word64
+  , v4CompactionAnalysisCurrentStateRequiredBytes :: Word64
+  , v4CompactionAnalysisOrdinaryReclaimableBytes :: Word64
+  , v4CompactionAnalysisUnknownBytes :: Word64
+  , v4CompactionAnalysisOmittedUnreachableBytes :: Bool
+  , v4CompactionAnalysisOmittedUnreachableBytesReason :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Detailed ordinary current-state compaction analysis with precise accounting.
+data V4CompactionAnalysisPreciseReport = V4CompactionAnalysisPreciseReport
+  { v4CompactionAnalysisPreciseStatus :: V4ReportStatus
+  , v4CompactionAnalysisPreciseReason :: Maybe String
+  , v4CompactionAnalysisPrecisePolicy :: V4CompactionAnalysisPolicy
+  , v4CompactionAnalysisPreciseSourceFileBytes :: Word64
+  , v4CompactionAnalysisPreciseCurrentStateRequiredBytes :: Word64
+  , v4CompactionAnalysisPreciseOrdinaryReclaimableBytes :: Word64
+  , v4CompactionAnalysisPreciseUnknownBytes :: Word64
+  , v4CompactionAnalysisPreciseAccounting :: V4PreciseAccountingBytes
+  , v4CompactionAnalysisPreciseReasonCode :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Retained-history compaction policy.
+data V4RetainedHistoryPolicy
+  = V4RetainLast
+  | V4RetainedHistoryPolicyUnknown Int32
+  deriving (Eq, Ord, Show)
+
+-- | Options for retained-history V4 compaction.
+data V4RetainedHistoryCompactionOptions = V4RetainedHistoryCompactionOptions
+  { v4RetainedHistoryPolicy :: V4RetainedHistoryPolicy
+  , v4RetainedHistoryRetainLastN :: Word32
+  }
+  deriving (Eq, Show)
+
+defaultV4RetainedHistoryCompactionOptions :: V4RetainedHistoryCompactionOptions
+defaultV4RetainedHistoryCompactionOptions = V4RetainedHistoryCompactionOptions V4RetainLast 1
+
+-- | Retained-history compaction report copied into Haskell-owned values.
+data V4RetainedHistoryCompactionReport = V4RetainedHistoryCompactionReport
+  { v4RetainedHistoryStatus :: V4ReportStatus
+  , v4RetainedHistoryReason :: Maybe String
+  , v4RetainedHistoryRetainedCommitCount :: Word32
+  , v4RetainedHistoryRetainedCommitSeqs :: [Word64]
+  , v4RetainedHistoryUnretainedOlderCommitCount :: Maybe Word64
+  , v4RetainedHistorySourceFileBytes :: Word64
+  , v4RetainedHistoryDestinationFileBytes :: Word64
+  , v4RetainedHistoryOmittedUnreachableBytes :: Bool
+  , v4RetainedHistoryOmittedUnreachableBytesReason :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Retained-history compaction report with source precise accounting.
+data V4RetainedHistoryCompactionPreciseReport = V4RetainedHistoryCompactionPreciseReport
+  { v4RetainedHistoryPreciseStatus :: V4ReportStatus
+  , v4RetainedHistoryPreciseReason :: Maybe String
+  , v4RetainedHistoryPreciseRetainedCommitCount :: Word32
+  , v4RetainedHistoryPreciseRetainedCommitSeqs :: [Word64]
+  , v4RetainedHistoryPreciseUnretainedOlderCommitCount :: Maybe Word64
+  , v4RetainedHistoryPreciseSourceFileBytes :: Word64
+  , v4RetainedHistoryPreciseDestinationFileBytes :: Word64
+  , v4RetainedHistoryPreciseSourceAccounting :: V4PreciseAccountingBytes
+  , v4RetainedHistoryPreciseReasonCode :: Maybe String
+  }
+  deriving (Eq, Show)
+
+
+-- | Target layout policy for reforming visible data into a fresh destination.
+data ReformTargetLayout
+  = ReformPreserveFamily
+  | ReformWholeAppendUnit
+  | ReformRegularChunked [Word32]
+  deriving (Eq, Show)
+
+-- | Reform options copied to the C ABI.
+data ReformOptions = ReformOptions
+  { reformTargetLayout :: ReformTargetLayout
+  }
+  deriving (Eq, Show)
+
+defaultReformOptions :: ReformOptions
+defaultReformOptions = ReformOptions ReformPreserveFamily
+
+-- | Stable reform diagnostic metadata copied before native report cleanup.
+data ReformReport = ReformReport
+  { reformReasonCode :: Maybe String
+  , reformReasonCodeTaxonomy :: Maybe String
+  , reformReason :: Maybe String
   }
   deriving (Eq, Show)
 
