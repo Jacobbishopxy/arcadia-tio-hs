@@ -18,6 +18,25 @@ API-parity claim.
 
 See [docs/parity.md](docs/parity.md) for the current parity map against the original Arcadia TIO Rust surface and recommended next slices.
 
+A static inventory gate can compare the Haskell wrapper surface with the native
+C ABI headers without loading a native shared library:
+
+```sh
+python3 scripts/parity_inventory.py \
+  --include-root /path/to/arcadia-tio/crates/arcadia-tio-capi/include
+```
+
+The same check is available as a Cabal test target when the include root is
+provided explicitly:
+
+```sh
+ARCADIA_TIO_CAPI_INCLUDE_ROOT=/path/to/arcadia-tio/crates/arcadia-tio-capi/include \
+  cabal test arcadia-tio-hs-parity-inventory --test-show-details=direct
+```
+
+The inventory fails on unknown/unmapped C ABI items by default and leaves known
+deferred blockers visible for follow-up wrapper slices.
+
 ## Current scope
 
 Implemented:

@@ -8,6 +8,43 @@ ABI surface. It does not implement or parse the `.tio` / `.ocb` formats itself.
 Private Rust internals that are not exposed through the C ABI remain out of
 scope for Haskell parity.
 
+## Machine inventory gate
+
+The Haskell repo includes a static inventory gate at
+`scripts/parity_inventory.py`. It reads the frozen C ABI headers from a
+configurable include root and compares their functions/types with the Haskell
+wrapper's dynamic-loader surface and raw/public wrapper types. The gate runs
+without `libarcadia_tio_capi.so`; it only needs the headers.
+
+From this repo, run:
+
+```sh
+python3 scripts/parity_inventory.py \
+  --include-root /path/to/arcadia-tio/crates/arcadia-tio-capi/include
+```
+
+or, through Cabal's no-native-library test target:
+
+```sh
+ARCADIA_TIO_CAPI_INCLUDE_ROOT=/path/to/arcadia-tio/crates/arcadia-tio-capi/include \
+  cabal test arcadia-tio-hs-parity-inventory --test-show-details=direct
+```
+
+The current machine inventory reports wrapped items, intentionally
+not-applicable ABI conveniences, deferred blockers, and unknown/unmapped items.
+A passing default run means there are no unknown/unmapped C ABI items; deferred
+blockers remain visible and can be promoted to a hard failure with
+`--fail-on-deferred` when later parity slices are ready for that stricter gate.
+
+Current local header snapshot used while adding this gate:
+
+- wrapped: 111
+- intentionally not applicable: 20
+- deferred blockers: 273
+- unknown/unmapped: 0
+
+These counts are an inventory baseline, not a packaging, support, or deployment statement.
+
 Legend:
 
 - ✅ supported in current Haskell wrapper
@@ -58,6 +95,11 @@ Legend:
 | macOS/Windows support | ✅ Rust/C ABI can be built cross-platform in principle | ❌ Linux `.so` first slice only | Add `.dylib`/`.dll` path logic and validation later. |
 
 ## Recommended next slices
+
+Before closing a later parity slice, run the machine inventory with
+`--fail-on-deferred` against the same C ABI headers and resolve any remaining
+deferred blockers by either adding wrappers or documenting why they are truly
+not applicable to the Haskell C-ABI wrapper boundary.
 
 1. Add read-options/shape-policy reports for current and historical reads.
 2. Add retained-history compaction, reform, and detailed diagnostics/accounting report wrappers.
