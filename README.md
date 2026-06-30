@@ -43,7 +43,7 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 336 wrapped items, 24 intentionally not-applicable items, 44 deferred blockers, and 0 unknown/unmapped items; those deferred blockers prevent any broad 100% parity claim.
+deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 347 wrapped items, 24 intentionally not-applicable items, 33 deferred blockers, and 0 unknown/unmapped items; the remaining deferred blockers are OCB follow-up surfaces and prevent any broad 100% parity claim.
 
 ## Current scope
 

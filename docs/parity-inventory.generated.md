@@ -8,9 +8,9 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 336 |
+| wrapped | 347 |
 | not-applicable | 24 |
-| deferred-blocker | 44 |
+| deferred-blocker | 33 |
 | unknown-unmapped | 0 |
 | total | 404 |
 
@@ -217,6 +217,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioAxisCoordinateMeta` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioAxisCoordinateMetaV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioAxisIdentityInput` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioAxisIdentityMode` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioAxisKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioAxisLabel` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioChunkKey` — represented by Haskell public or raw C wrapper type
@@ -275,6 +276,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioFilePopulation` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioHandle` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioHeaderProfile` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioHistoricalQuerySourceKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioHistoricalReadExecutionReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioHistoricalReadWithOptionsOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioHistoricalReadWithShapePolicyOptions` — represented by Haskell public or raw C wrapper type
@@ -315,14 +317,19 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioOpenPattern` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioQueryTraceContext` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioQueryTraceJson` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioReadExecutionMode` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadExecutionReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadIndexItem` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioReadIndexItemTag` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioReadIndexLoweringKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadIndexReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadShapePolicyOptions` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioReadShapePolicyTag` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadWithOptionsOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReadWithShapePolicyOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReformOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioReformReport` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioReformTargetLayout` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioScalar` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioSlotUniverseBindingInput` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioSlotUniverseRemapInput` — represented by Haskell public or raw C wrapper type
@@ -341,6 +348,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioUniverseRemapInput` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioUserKv` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4AuditBytes` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioV4CompactionAnalysisPolicy` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4CompactionAnalysisPreciseReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4CompactionAnalysisReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4CurrentHeadBytes` — represented by Haskell public or raw C wrapper type
@@ -349,10 +357,13 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioV4OmittedPreciseAccountingField` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4PayloadReuseBytes` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4PreciseAccountingBytes` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioV4PreciseAccountingField` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4PreciseAccountingOptions` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioV4ReportStatus` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4RetainedHistoryCompactionOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4RetainedHistoryCompactionPreciseReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4RetainedHistoryCompactionReport` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioV4RetainedHistoryPolicy` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioV4SupersededBytes` — represented by Haskell public or raw C wrapper type
 
 ## not-applicable items
@@ -398,8 +409,6 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_row_group_fill_request_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_row_group_predicate_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_visit_batches` — OCB read/write/dictionary/plan surface deferred
-- `type` `ArcadiaTioAxisIdentityMode` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioHistoricalQuerySourceKind` — known C ABI type family deferred in parity docs
 - `type` `ArcadiaTioOcbBodyKind` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbChecksumKind` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbColumnChunkSummaryCodec` — OCB read/write/dictionary/plan type surface deferred
@@ -419,15 +428,6 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioOcbReadPlan` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbRowGroupFillRequest` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbWriteChunkCodec` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioReadExecutionMode` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioReadIndexItemTag` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioReadIndexLoweringKind` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioReadShapePolicyTag` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioReformTargetLayout` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioV4CompactionAnalysisPolicy` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioV4PreciseAccountingField` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioV4ReportStatus` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioV4RetainedHistoryPolicy` — known C ABI type family deferred in parity docs
 
 ## unknown-unmapped items
 

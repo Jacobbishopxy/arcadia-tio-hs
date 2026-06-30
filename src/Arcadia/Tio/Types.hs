@@ -44,11 +44,19 @@ module Arcadia.Tio.Types
   , SparseAppendAnalysis(..)
   , EntrySelector(..)
   , ReadExecutionMode(..)
+  , readExecutionModeToRaw
+  , readExecutionModeFromRaw
   , ReadOptions(..)
   , defaultReadOptions
+  , ReadShapePolicyTag(..)
+  , readShapePolicyTag
+  , readShapePolicyTagToRaw
+  , readShapePolicyTagFromRaw
   , ReadShapePolicy(..)
   , TioUuid(..)
   , AxisIdentityMode(..)
+  , axisIdentityModeToRaw
+  , axisIdentityModeFromRaw
   , AxisIdentityInput(..)
   , UniverseBindingInput(..)
   , SlotUniverseBindingInput(..)
@@ -63,10 +71,18 @@ module Arcadia.Tio.Types
   , ReadExecutionReport(..)
   , QueryTraceContext(..)
   , QueryTraceJson(..)
+  , ReadIndexItemTag(..)
+  , readIndexItemTag
+  , readIndexItemTagToRaw
+  , readIndexItemTagFromRaw
   , ReadIndexItem(..)
   , ReadIndexLoweringKind(..)
+  , readIndexLoweringKindToRaw
+  , readIndexLoweringKindFromRaw
   , ReadIndexReport(..)
   , HistoricalQuerySourceKind(..)
+  , historicalQuerySourceKindToRaw
+  , historicalQuerySourceKindFromRaw
   , HistoricalReadExecutionReport(..)
   , CommitInfo(..)
   , CompactionMode(..)
@@ -74,11 +90,15 @@ module Arcadia.Tio.Types
   , AutoCompactionConfig(..)
   , CompactionState(..)
   , V4ReportStatus(..)
+  , v4ReportStatusToRaw
+  , v4ReportStatusFromRaw
   , V4CurrentHeadBytes(..)
   , V4AuditBytes(..)
   , V4PayloadReuseBytes(..)
   , V4SupersededBytes(..)
   , V4PreciseAccountingField(..)
+  , v4PreciseAccountingFieldToRaw
+  , v4PreciseAccountingFieldFromRaw
   , V4PreciseAccountingOptions(..)
   , defaultV4PreciseAccountingOptions
   , V4OmittedPreciseAccountingField(..)
@@ -86,13 +106,21 @@ module Arcadia.Tio.Types
   , V4DiagnosticsReport(..)
   , V4DiagnosticsPreciseReport(..)
   , V4CompactionAnalysisPolicy(..)
+  , v4CompactionAnalysisPolicyToRaw
+  , v4CompactionAnalysisPolicyFromRaw
   , V4CompactionAnalysisReport(..)
   , V4CompactionAnalysisPreciseReport(..)
   , V4RetainedHistoryPolicy(..)
+  , v4RetainedHistoryPolicyToRaw
+  , v4RetainedHistoryPolicyFromRaw
   , V4RetainedHistoryCompactionOptions(..)
   , defaultV4RetainedHistoryCompactionOptions
   , V4RetainedHistoryCompactionReport(..)
   , V4RetainedHistoryCompactionPreciseReport(..)
+  , ReformTargetLayoutTag(..)
+  , reformTargetLayoutTag
+  , reformTargetLayoutTagToRaw
+  , reformTargetLayoutTagFromRaw
   , ReformTargetLayout(..)
   , ReformOptions(..)
   , defaultReformOptions
@@ -566,6 +594,52 @@ data ReadExecutionMode
   | ReadParallelThreads
   deriving (Eq, Ord, Show)
 
+readExecutionModeToRaw :: ReadExecutionMode -> CInt
+readExecutionModeToRaw mode = CInt $ case mode of
+  ReadSerial -> 0
+  ReadParallelThreads -> 1
+
+readExecutionModeFromRaw :: CInt -> Maybe ReadExecutionMode
+readExecutionModeFromRaw (CInt raw) = case raw of
+  0 -> Just ReadSerial
+  1 -> Just ReadParallelThreads
+  _ -> Nothing
+
+-- | Read shape-policy tag, separated from payload-bearing policy options.
+data ReadShapePolicyTag
+  = ReadShapePolicyFileEnvelopeTag
+  | ReadShapePolicyCurrentHeadTag
+  | ReadShapePolicyUnionTag
+  | ReadShapePolicyIntersectionTag
+  | ReadShapePolicyInitialRegisteredTag
+  | ReadShapePolicyExplicitExtentsTag
+  | ReadShapePolicyExplicitUniverseTag
+  | ReadShapePolicyExplicitUniverseAndExtentsTag
+  deriving (Eq, Ord, Show)
+
+readShapePolicyTagToRaw :: ReadShapePolicyTag -> CInt
+readShapePolicyTagToRaw tag = CInt $ case tag of
+  ReadShapePolicyFileEnvelopeTag -> 0
+  ReadShapePolicyCurrentHeadTag -> 1
+  ReadShapePolicyUnionTag -> 2
+  ReadShapePolicyIntersectionTag -> 3
+  ReadShapePolicyInitialRegisteredTag -> 4
+  ReadShapePolicyExplicitExtentsTag -> 5
+  ReadShapePolicyExplicitUniverseTag -> 6
+  ReadShapePolicyExplicitUniverseAndExtentsTag -> 7
+
+readShapePolicyTagFromRaw :: CInt -> Maybe ReadShapePolicyTag
+readShapePolicyTagFromRaw (CInt raw) = case raw of
+  0 -> Just ReadShapePolicyFileEnvelopeTag
+  1 -> Just ReadShapePolicyCurrentHeadTag
+  2 -> Just ReadShapePolicyUnionTag
+  3 -> Just ReadShapePolicyIntersectionTag
+  4 -> Just ReadShapePolicyInitialRegisteredTag
+  5 -> Just ReadShapePolicyExplicitExtentsTag
+  6 -> Just ReadShapePolicyExplicitUniverseTag
+  7 -> Just ReadShapePolicyExplicitUniverseAndExtentsTag
+  _ -> Nothing
+
 -- | Read execution options shared by current and historical option reads.
 data ReadOptions = ReadOptions
   { readOptionMode :: ReadExecutionMode
@@ -584,6 +658,17 @@ newtype TioUuid = TioUuid { tioUuidBytes :: [Word8] }
   deriving (Eq, Ord, Show)
 
 data AxisIdentityMode = AxisIdentityExtentOnly | AxisIdentityUniverseAware deriving (Eq, Ord, Show)
+
+axisIdentityModeToRaw :: AxisIdentityMode -> CInt
+axisIdentityModeToRaw mode = CInt $ case mode of
+  AxisIdentityExtentOnly -> 0
+  AxisIdentityUniverseAware -> 1
+
+axisIdentityModeFromRaw :: CInt -> Maybe AxisIdentityMode
+axisIdentityModeFromRaw (CInt raw) = case raw of
+  0 -> Just AxisIdentityExtentOnly
+  1 -> Just AxisIdentityUniverseAware
+  _ -> Nothing
 
 data AxisIdentityInput = AxisIdentityInput
   { axisIdentityAxis :: Int
@@ -657,6 +742,17 @@ data ReadShapePolicy
   | ReadShapeExplicitUniverseAndExtents [ExplicitUniverseAxisTarget] [ExplicitExtentAxisTarget]
   deriving (Eq, Show)
 
+readShapePolicyTag :: ReadShapePolicy -> ReadShapePolicyTag
+readShapePolicyTag policy = case policy of
+  ReadShapeFileEnvelope -> ReadShapePolicyFileEnvelopeTag
+  ReadShapeCurrentHead -> ReadShapePolicyCurrentHeadTag
+  ReadShapeUnion -> ReadShapePolicyUnionTag
+  ReadShapeIntersection -> ReadShapePolicyIntersectionTag
+  ReadShapeInitialRegistered -> ReadShapePolicyInitialRegisteredTag
+  ReadShapeExplicitExtents{} -> ReadShapePolicyExplicitExtentsTag
+  ReadShapeExplicitUniverse{} -> ReadShapePolicyExplicitUniverseTag
+  ReadShapeExplicitUniverseAndExtents{} -> ReadShapePolicyExplicitUniverseAndExtentsTag
+
 -- | Copied native read execution report. String fields are diagnostic only.
 data ReadExecutionReport = ReadExecutionReport
   { readReportRequestedMode :: ReadExecutionMode
@@ -687,6 +783,32 @@ data QueryTraceContext = QueryTraceContext
 newtype QueryTraceJson = QueryTraceJson { queryTraceJson :: String }
   deriving (Eq, Show)
 
+-- | Raw read-index item tag, separated from payload-bearing index items.
+data ReadIndexItemTag
+  = ReadIndexAllTag
+  | ReadIndexSliceTag
+  | ReadIndexIndexTag
+  | ReadIndexNewAxisTag
+  | ReadIndexEllipsisTag
+  deriving (Eq, Ord, Show)
+
+readIndexItemTagToRaw :: ReadIndexItemTag -> CInt
+readIndexItemTagToRaw tag = CInt $ case tag of
+  ReadIndexAllTag -> 0
+  ReadIndexSliceTag -> 1
+  ReadIndexIndexTag -> 2
+  ReadIndexNewAxisTag -> 3
+  ReadIndexEllipsisTag -> 4
+
+readIndexItemTagFromRaw :: CInt -> Maybe ReadIndexItemTag
+readIndexItemTagFromRaw (CInt raw) = case raw of
+  0 -> Just ReadIndexAllTag
+  1 -> Just ReadIndexSliceTag
+  2 -> Just ReadIndexIndexTag
+  3 -> Just ReadIndexNewAxisTag
+  4 -> Just ReadIndexEllipsisTag
+  _ -> Nothing
+
 -- | Python-style index item for @read_index@ lowering.
 data ReadIndexItem
   = ReadIndexAll
@@ -696,12 +818,33 @@ data ReadIndexItem
   | ReadIndexEllipsis
   deriving (Eq, Show)
 
+readIndexItemTag :: ReadIndexItem -> ReadIndexItemTag
+readIndexItemTag item = case item of
+  ReadIndexAll -> ReadIndexAllTag
+  ReadIndexSlice{} -> ReadIndexSliceTag
+  ReadIndexIndex{} -> ReadIndexIndexTag
+  ReadIndexNewAxis -> ReadIndexNewAxisTag
+  ReadIndexEllipsis -> ReadIndexEllipsisTag
+
 -- | Native read-index lowering selected by the runtime.
 data ReadIndexLoweringKind
   = ReadIndexLoweringUnknown
   | ReadIndexLoweringSelectorRead
   | ReadIndexLoweringSelectorReadWithShapePostprocess
   deriving (Eq, Ord, Show)
+
+readIndexLoweringKindToRaw :: ReadIndexLoweringKind -> CInt
+readIndexLoweringKindToRaw kind = CInt $ case kind of
+  ReadIndexLoweringUnknown -> 0
+  ReadIndexLoweringSelectorRead -> 1
+  ReadIndexLoweringSelectorReadWithShapePostprocess -> 2
+
+readIndexLoweringKindFromRaw :: CInt -> Maybe ReadIndexLoweringKind
+readIndexLoweringKindFromRaw (CInt raw) = case raw of
+  0 -> Just ReadIndexLoweringUnknown
+  1 -> Just ReadIndexLoweringSelectorRead
+  2 -> Just ReadIndexLoweringSelectorReadWithShapePostprocess
+  _ -> Nothing
 
 -- | Copied native read-index report.
 data ReadIndexReport = ReadIndexReport
@@ -714,6 +857,15 @@ data ReadIndexReport = ReadIndexReport
 data HistoricalQuerySourceKind
   = HistoricalQueryRetainedVisibleCommit
   deriving (Eq, Ord, Show)
+
+historicalQuerySourceKindToRaw :: HistoricalQuerySourceKind -> CInt
+historicalQuerySourceKindToRaw kind = CInt $ case kind of
+  HistoricalQueryRetainedVisibleCommit -> 0
+
+historicalQuerySourceKindFromRaw :: CInt -> Maybe HistoricalQuerySourceKind
+historicalQuerySourceKindFromRaw (CInt raw) = case raw of
+  0 -> Just HistoricalQueryRetainedVisibleCommit
+  _ -> Nothing
 
 -- | Copied native historical read execution report.
 data HistoricalReadExecutionReport = HistoricalReadExecutionReport
@@ -774,6 +926,20 @@ data V4ReportStatus
   | V4ReportStatusUnknown Int32
   deriving (Eq, Ord, Show)
 
+v4ReportStatusToRaw :: V4ReportStatus -> CInt
+v4ReportStatusToRaw status = CInt $ case status of
+  V4ReportComplete -> 0
+  V4ReportUnsupported -> 1
+  V4ReportUnknown -> 2
+  V4ReportStatusUnknown raw -> raw
+
+v4ReportStatusFromRaw :: CInt -> V4ReportStatus
+v4ReportStatusFromRaw (CInt raw) = case raw of
+  0 -> V4ReportComplete
+  1 -> V4ReportUnsupported
+  2 -> V4ReportUnknown
+  _ -> V4ReportStatusUnknown raw
+
 -- | Detailed bytes owned by the current visible V4 head.
 data V4CurrentHeadBytes = V4CurrentHeadBytes
   { v4CurrentHeadPayloadBytes :: Word64
@@ -817,6 +983,22 @@ data V4PreciseAccountingField
   | V4PreciseReclaimableBytes
   | V4PreciseAccountingFieldUnknown Int32
   deriving (Eq, Ord, Show)
+
+v4PreciseAccountingFieldToRaw :: V4PreciseAccountingField -> CInt
+v4PreciseAccountingFieldToRaw field = CInt $ case field of
+  V4PreciseUnreachableBytes -> 0
+  V4PreciseRetainedHistoryRequiredBytes -> 1
+  V4PrecisePoppedSkippedBytes -> 2
+  V4PreciseReclaimableBytes -> 3
+  V4PreciseAccountingFieldUnknown raw -> raw
+
+v4PreciseAccountingFieldFromRaw :: CInt -> V4PreciseAccountingField
+v4PreciseAccountingFieldFromRaw (CInt raw) = case raw of
+  0 -> V4PreciseUnreachableBytes
+  1 -> V4PreciseRetainedHistoryRequiredBytes
+  2 -> V4PrecisePoppedSkippedBytes
+  3 -> V4PreciseReclaimableBytes
+  _ -> V4PreciseAccountingFieldUnknown raw
 
 -- | Options for precise V4 diagnostics/accounting reports.
 data V4PreciseAccountingOptions = V4PreciseAccountingOptions
@@ -882,6 +1064,16 @@ data V4CompactionAnalysisPolicy
   | V4CompactionAnalysisPolicyUnknown Int32
   deriving (Eq, Ord, Show)
 
+v4CompactionAnalysisPolicyToRaw :: V4CompactionAnalysisPolicy -> CInt
+v4CompactionAnalysisPolicyToRaw policy = CInt $ case policy of
+  V4CompactionPolicyCompactToCurrentState -> 0
+  V4CompactionAnalysisPolicyUnknown raw -> raw
+
+v4CompactionAnalysisPolicyFromRaw :: CInt -> V4CompactionAnalysisPolicy
+v4CompactionAnalysisPolicyFromRaw (CInt raw) = case raw of
+  0 -> V4CompactionPolicyCompactToCurrentState
+  _ -> V4CompactionAnalysisPolicyUnknown raw
+
 -- | Detailed ordinary current-state compaction analysis report.
 data V4CompactionAnalysisReport = V4CompactionAnalysisReport
   { v4CompactionAnalysisStatus :: V4ReportStatus
@@ -915,6 +1107,16 @@ data V4RetainedHistoryPolicy
   = V4RetainLast
   | V4RetainedHistoryPolicyUnknown Int32
   deriving (Eq, Ord, Show)
+
+v4RetainedHistoryPolicyToRaw :: V4RetainedHistoryPolicy -> CInt
+v4RetainedHistoryPolicyToRaw policy = CInt $ case policy of
+  V4RetainLast -> 0
+  V4RetainedHistoryPolicyUnknown raw -> raw
+
+v4RetainedHistoryPolicyFromRaw :: CInt -> V4RetainedHistoryPolicy
+v4RetainedHistoryPolicyFromRaw (CInt raw) = case raw of
+  0 -> V4RetainLast
+  _ -> V4RetainedHistoryPolicyUnknown raw
 
 -- | Options for retained-history V4 compaction.
 data V4RetainedHistoryCompactionOptions = V4RetainedHistoryCompactionOptions
@@ -955,12 +1157,38 @@ data V4RetainedHistoryCompactionPreciseReport = V4RetainedHistoryCompactionPreci
   deriving (Eq, Show)
 
 
+-- | Raw target-layout tag for reforming visible data into a fresh destination.
+data ReformTargetLayoutTag
+  = ReformPreserveFamilyTag
+  | ReformWholeAppendUnitTag
+  | ReformRegularChunkedTag
+  deriving (Eq, Ord, Show)
+
+reformTargetLayoutTagToRaw :: ReformTargetLayoutTag -> CInt
+reformTargetLayoutTagToRaw tag = CInt $ case tag of
+  ReformPreserveFamilyTag -> 0
+  ReformWholeAppendUnitTag -> 1
+  ReformRegularChunkedTag -> 2
+
+reformTargetLayoutTagFromRaw :: CInt -> Maybe ReformTargetLayoutTag
+reformTargetLayoutTagFromRaw (CInt raw) = case raw of
+  0 -> Just ReformPreserveFamilyTag
+  1 -> Just ReformWholeAppendUnitTag
+  2 -> Just ReformRegularChunkedTag
+  _ -> Nothing
+
 -- | Target layout policy for reforming visible data into a fresh destination.
 data ReformTargetLayout
   = ReformPreserveFamily
   | ReformWholeAppendUnit
   | ReformRegularChunked [Word32]
   deriving (Eq, Show)
+
+reformTargetLayoutTag :: ReformTargetLayout -> ReformTargetLayoutTag
+reformTargetLayoutTag layout = case layout of
+  ReformPreserveFamily -> ReformPreserveFamilyTag
+  ReformWholeAppendUnit -> ReformWholeAppendUnitTag
+  ReformRegularChunked{} -> ReformRegularChunkedTag
 
 -- | Reform options copied to the C ABI.
 data ReformOptions = ReformOptions

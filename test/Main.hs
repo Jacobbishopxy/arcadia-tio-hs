@@ -24,6 +24,7 @@ main :: IO ()
 main = do
   testOcbWriteValidationPure
   testCoordinateEnumConversionsPure
+  testNonOcbEnumPolicyConversionsPure
   configured <- nativeLibraryConfigured
   unless configured $ do
     putStrLn "SKIP: ARCADIA_TIO_CAPI_LIB or ARCADIA_TIO_CAPI_LIB_DIR is not set"
@@ -81,6 +82,23 @@ testCoordinateEnumConversionsPure = do
   assertEqual "coordinate key domain raw-time raw" 7 (coordinateKeyDomainV2ToRaw CoordinateKeyRawTime)
   assertEqual "coordinate lookup error raw" 7 (coordinateLookupResultStatusV2ToRaw CoordinateLookupErrorV2)
   assertEqual "coordinate index use future raw preserved" 123 (coordinateIndexUseV2ToRaw (coordinateIndexUseV2FromRaw 123))
+
+testNonOcbEnumPolicyConversionsPure :: IO ()
+testNonOcbEnumPolicyConversionsPure = do
+  assertEqual "axis identity universe-aware raw" 1 (axisIdentityModeToRaw AxisIdentityUniverseAware)
+  assertEqual "axis identity unknown raw" Nothing (axisIdentityModeFromRaw 7)
+  assertEqual "read execution parallel raw" 1 (readExecutionModeToRaw ReadParallelThreads)
+  assertEqual "read execution serial from raw" (Just ReadSerial) (readExecutionModeFromRaw 0)
+  assertEqual "read shape explicit universe/extents raw" 7 (readShapePolicyTagToRaw (readShapePolicyTag (ReadShapeExplicitUniverseAndExtents [] [])))
+  assertEqual "read shape invalid raw" Nothing (readShapePolicyTagFromRaw 99)
+  assertEqual "read-index slice raw" 1 (readIndexItemTagToRaw (readIndexItemTag (ReadIndexSlice (Just 1) Nothing 1)))
+  assertEqual "read-index lowering postprocess raw" 2 (readIndexLoweringKindToRaw ReadIndexLoweringSelectorReadWithShapePostprocess)
+  assertEqual "historical retained commit raw" 0 (historicalQuerySourceKindToRaw HistoricalQueryRetainedVisibleCommit)
+  assertEqual "reform regular tag raw" 2 (reformTargetLayoutTagToRaw (reformTargetLayoutTag (ReformRegularChunked [1, 1])))
+  assertEqual "v4 status unknown preserved" 42 (v4ReportStatusToRaw (v4ReportStatusFromRaw 42))
+  assertEqual "v4 precise reclaimable raw" 3 (v4PreciseAccountingFieldToRaw V4PreciseReclaimableBytes)
+  assertEqual "v4 compaction policy unknown preserved" 5 (v4CompactionAnalysisPolicyToRaw (v4CompactionAnalysisPolicyFromRaw 5))
+  assertEqual "v4 retained history policy raw" 0 (v4RetainedHistoryPolicyToRaw V4RetainLast)
 
 
 testOcbWriteValidationPure :: IO ()

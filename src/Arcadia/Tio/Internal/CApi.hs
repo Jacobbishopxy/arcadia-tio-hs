@@ -35,6 +35,17 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioCoordinateUniqueness
   , CArcadiaTioCoordinateValidationStatus
   , CArcadiaTioCoordinateValueDomainV2
+  , CArcadiaTioAxisIdentityMode
+  , CArcadiaTioHistoricalQuerySourceKind
+  , CArcadiaTioReadExecutionMode
+  , CArcadiaTioReadIndexItemTag
+  , CArcadiaTioReadIndexLoweringKind
+  , CArcadiaTioReadShapePolicyTag
+  , CArcadiaTioReformTargetLayout
+  , CArcadiaTioV4CompactionAnalysisPolicy
+  , CArcadiaTioV4PreciseAccountingField
+  , CArcadiaTioV4ReportStatus
+  , CArcadiaTioV4RetainedHistoryPolicy
   , CArcadiaTioAxisCoordinateInput(..)
   , CArcadiaTioAxisCoordinateMeta(..)
   , CArcadiaTioAxisCoordinateMetaV2(..)
@@ -443,6 +454,19 @@ type CArcadiaTioCoordinateStorageKind = CInt
 type CArcadiaTioCoordinateUniqueness = CInt
 type CArcadiaTioCoordinateValidationStatus = CInt
 type CArcadiaTioCoordinateValueDomainV2 = CInt
+
+-- | Raw enum typedef aliases for exact non-OCB policy/report C ABI discriminants.
+type CArcadiaTioAxisIdentityMode = CInt
+type CArcadiaTioHistoricalQuerySourceKind = CInt
+type CArcadiaTioReadExecutionMode = CInt
+type CArcadiaTioReadIndexItemTag = CInt
+type CArcadiaTioReadIndexLoweringKind = CInt
+type CArcadiaTioReadShapePolicyTag = CInt
+type CArcadiaTioReformTargetLayout = CInt
+type CArcadiaTioV4CompactionAnalysisPolicy = CInt
+type CArcadiaTioV4PreciseAccountingField = CInt
+type CArcadiaTioV4ReportStatus = CInt
+type CArcadiaTioV4RetainedHistoryPolicy = CInt
 
 -- | Raw Coordinate v1 create input.
 data CArcadiaTioAxisCoordinateInput = CArcadiaTioAxisCoordinateInput
@@ -1425,7 +1449,7 @@ data CArcadiaTioAxisIdentityInput = CArcadiaTioAxisIdentityInput
   { cAxisIdentityInputVersion :: Word32
   , cAxisIdentityInputStructSize :: CSize
   , cAxisIdentityInputAxis :: Word32
-  , cAxisIdentityInputMode :: CInt
+  , cAxisIdentityInputMode :: CArcadiaTioAxisIdentityMode
   }
   deriving (Eq, Show)
 
@@ -1562,7 +1586,7 @@ instance Storable CArcadiaTioAppendWithUniverseOptions where
 data CArcadiaTioReadShapePolicyOptions = CArcadiaTioReadShapePolicyOptions
   { cReadShapePolicyVersion :: Word32
   , cReadShapePolicyStructSize :: CSize
-  , cReadShapePolicyPolicy :: CInt
+  , cReadShapePolicyPolicy :: CArcadiaTioReadShapePolicyTag
   , cReadShapePolicyExplicitExtents :: Ptr Word64
   , cReadShapePolicyExplicitExtentsLen :: CSize
   , cReadShapePolicyExplicitUniverseAxes :: Ptr ()
@@ -1615,7 +1639,7 @@ emptyCArcadiaTioReadShapePolicyOptions =
 data CArcadiaTioReadWithOptionsOptions = CArcadiaTioReadWithOptionsOptions
   { cReadOptionsVersion :: Word32
   , cReadOptionsStructSize :: CSize
-  , cReadOptionsMode :: CInt
+  , cReadOptionsMode :: CArcadiaTioReadExecutionMode
   , cReadOptionsMaxThreads :: CSize
   }
   deriving (Eq, Show)
@@ -1634,7 +1658,7 @@ instance Storable CArcadiaTioReadWithOptionsOptions where
 data CArcadiaTioReadWithShapePolicyOptions = CArcadiaTioReadWithShapePolicyOptions
   { cShapeReadOptionsVersion :: Word32
   , cShapeReadOptionsStructSize :: CSize
-  , cShapeReadOptionsMode :: CInt
+  , cShapeReadOptionsMode :: CArcadiaTioReadExecutionMode
   , cShapeReadOptionsMaxThreads :: CSize
   , cShapeReadOptionsShapePolicy :: CArcadiaTioReadShapePolicyOptions
   }
@@ -1655,9 +1679,9 @@ instance Storable CArcadiaTioReadWithShapePolicyOptions where
 data CArcadiaTioReadExecutionReport = CArcadiaTioReadExecutionReport
   { cReadReportVersion :: Word32
   , cReadReportStructSize :: CSize
-  , cReadReportRequestedMode :: CInt
+  , cReadReportRequestedMode :: CArcadiaTioReadExecutionMode
   , cReadReportQueryMaxThreads :: CSize
-  , cReadReportQueryEffectiveMode :: CInt
+  , cReadReportQueryEffectiveMode :: CArcadiaTioReadExecutionMode
   , cReadReportQueryEffectiveThreads :: CSize
   , cReadReportQueryParallelRuntime :: CString
   , cReadReportQueryParallelFallbackReason :: CString
@@ -1743,7 +1767,7 @@ emptyCArcadiaTioQueryTraceJson = CArcadiaTioQueryTraceJson 1 queryTraceJsonStruc
 
 -- | Raw read-index item matching @ArcadiaTioReadIndexItem@.
 data CArcadiaTioReadIndexItem = CArcadiaTioReadIndexItem
-  { cReadIndexItemKind :: CInt
+  { cReadIndexItemKind :: CArcadiaTioReadIndexItemTag
   , cReadIndexItemHasStart :: Word8
   , cReadIndexItemStart :: Int64
   , cReadIndexItemHasEnd :: Word8
@@ -1770,7 +1794,7 @@ instance Storable CArcadiaTioReadIndexItem where
 data CArcadiaTioReadIndexReport = CArcadiaTioReadIndexReport
   { cReadIndexReportVersion :: Word32
   , cReadIndexReportStructSize :: CSize
-  , cReadIndexReportLoweringKind :: CInt
+  , cReadIndexReportLoweringKind :: CArcadiaTioReadIndexLoweringKind
   , cReadIndexReportUsedFullTensorFallback :: Word8
   }
   deriving (Eq, Show)
@@ -1797,7 +1821,7 @@ type CArcadiaTioHistoricalReadWithShapePolicyOptions = CArcadiaTioReadWithShapeP
 -- | Raw historical read-execution report matching @ArcadiaTioHistoricalReadExecutionReport@.
 data CArcadiaTioHistoricalReadExecutionReport = CArcadiaTioHistoricalReadExecutionReport
   { cHistoricalReadReportBase :: CArcadiaTioReadExecutionReport
-  , cHistoricalReadReportQuerySourceKind :: CInt
+  , cHistoricalReadReportQuerySourceKind :: CArcadiaTioHistoricalQuerySourceKind
   , cHistoricalReadReportQueryCommitSeq :: Word64
   }
   deriving (Eq, Show)
@@ -2143,7 +2167,7 @@ emptyCArcadiaTioV4PreciseAccountingOptions = CArcadiaTioV4PreciseAccountingOptio
 data CArcadiaTioV4OmittedPreciseAccountingField = CArcadiaTioV4OmittedPreciseAccountingField
   { cV4OmittedPreciseAccountingFieldVersion :: Word32
   , cV4OmittedPreciseAccountingFieldStructSize :: CSize
-  , cV4OmittedPreciseAccountingFieldField :: CInt
+  , cV4OmittedPreciseAccountingFieldField :: CArcadiaTioV4PreciseAccountingField
   , cV4OmittedPreciseAccountingFieldReason :: CString
   }
   deriving (Eq, Show)
@@ -2204,7 +2228,7 @@ emptyCArcadiaTioV4PreciseAccountingBytes = CArcadiaTioV4PreciseAccountingBytes 1
 data CArcadiaTioV4DiagnosticsReport = CArcadiaTioV4DiagnosticsReport
   { cV4DiagnosticsReportVersion :: Word32
   , cV4DiagnosticsReportStructSize :: CSize
-  , cV4DiagnosticsReportStatus :: CInt
+  , cV4DiagnosticsReportStatus :: CArcadiaTioV4ReportStatus
   , cV4DiagnosticsReportReason :: CString
   , cV4DiagnosticsReportCurrentHead :: CArcadiaTioV4CurrentHeadBytes
   , cV4DiagnosticsReportVisibleChainAudit :: CArcadiaTioV4AuditBytes
@@ -2241,7 +2265,7 @@ emptyCArcadiaTioV4DiagnosticsReport = CArcadiaTioV4DiagnosticsReport 1 176 0 nul
 data CArcadiaTioV4DiagnosticsPreciseReport = CArcadiaTioV4DiagnosticsPreciseReport
   { cV4DiagnosticsPreciseReportVersion :: Word32
   , cV4DiagnosticsPreciseReportStructSize :: CSize
-  , cV4DiagnosticsPreciseReportStatus :: CInt
+  , cV4DiagnosticsPreciseReportStatus :: CArcadiaTioV4ReportStatus
   , cV4DiagnosticsPreciseReportReason :: CString
   , cV4DiagnosticsPreciseReportCurrentHead :: CArcadiaTioV4CurrentHeadBytes
   , cV4DiagnosticsPreciseReportVisibleChainAudit :: CArcadiaTioV4AuditBytes
@@ -2279,9 +2303,9 @@ emptyCArcadiaTioV4DiagnosticsPreciseReport = CArcadiaTioV4DiagnosticsPreciseRepo
 data CArcadiaTioV4CompactionAnalysisReport = CArcadiaTioV4CompactionAnalysisReport
   { cV4CompactionAnalysisReportVersion :: Word32
   , cV4CompactionAnalysisReportStructSize :: CSize
-  , cV4CompactionAnalysisReportStatus :: CInt
+  , cV4CompactionAnalysisReportStatus :: CArcadiaTioV4ReportStatus
   , cV4CompactionAnalysisReportReason :: CString
-  , cV4CompactionAnalysisReportPolicy :: CInt
+  , cV4CompactionAnalysisReportPolicy :: CArcadiaTioV4CompactionAnalysisPolicy
   , cV4CompactionAnalysisReportSourceFileBytes :: Word64
   , cV4CompactionAnalysisReportCurrentStateRequiredBytes :: Word64
   , cV4CompactionAnalysisReportOrdinaryReclaimableBytes :: Word64
@@ -2316,9 +2340,9 @@ emptyCArcadiaTioV4CompactionAnalysisReport = CArcadiaTioV4CompactionAnalysisRepo
 data CArcadiaTioV4CompactionAnalysisPreciseReport = CArcadiaTioV4CompactionAnalysisPreciseReport
   { cV4CompactionAnalysisPreciseReportVersion :: Word32
   , cV4CompactionAnalysisPreciseReportStructSize :: CSize
-  , cV4CompactionAnalysisPreciseReportStatus :: CInt
+  , cV4CompactionAnalysisPreciseReportStatus :: CArcadiaTioV4ReportStatus
   , cV4CompactionAnalysisPreciseReportReason :: CString
-  , cV4CompactionAnalysisPreciseReportPolicy :: CInt
+  , cV4CompactionAnalysisPreciseReportPolicy :: CArcadiaTioV4CompactionAnalysisPolicy
   , cV4CompactionAnalysisPreciseReportSourceFileBytes :: Word64
   , cV4CompactionAnalysisPreciseReportCurrentStateRequiredBytes :: Word64
   , cV4CompactionAnalysisPreciseReportOrdinaryReclaimableBytes :: Word64
@@ -2353,7 +2377,7 @@ emptyCArcadiaTioV4CompactionAnalysisPreciseReport = CArcadiaTioV4CompactionAnaly
 data CArcadiaTioV4RetainedHistoryCompactionOptions = CArcadiaTioV4RetainedHistoryCompactionOptions
   { cV4RetainedHistoryCompactionOptionsVersion :: Word32
   , cV4RetainedHistoryCompactionOptionsStructSize :: CSize
-  , cV4RetainedHistoryCompactionOptionsPolicy :: CInt
+  , cV4RetainedHistoryCompactionOptionsPolicy :: CArcadiaTioV4RetainedHistoryPolicy
   , cV4RetainedHistoryCompactionOptionsRetainLastN :: Word32
   }
   deriving (Eq, Show)
@@ -2376,7 +2400,7 @@ emptyCArcadiaTioV4RetainedHistoryCompactionOptions = CArcadiaTioV4RetainedHistor
 data CArcadiaTioV4RetainedHistoryCompactionReport = CArcadiaTioV4RetainedHistoryCompactionReport
   { cV4RetainedHistoryCompactionReportVersion :: Word32
   , cV4RetainedHistoryCompactionReportStructSize :: CSize
-  , cV4RetainedHistoryCompactionReportStatus :: CInt
+  , cV4RetainedHistoryCompactionReportStatus :: CArcadiaTioV4ReportStatus
   , cV4RetainedHistoryCompactionReportReason :: CString
   , cV4RetainedHistoryCompactionReportRetainedCommitCount :: Word32
   , cV4RetainedHistoryCompactionReportRetainedCommitSeqs :: Ptr Word64
@@ -2417,7 +2441,7 @@ emptyCArcadiaTioV4RetainedHistoryCompactionReport = CArcadiaTioV4RetainedHistory
 data CArcadiaTioV4RetainedHistoryCompactionPreciseReport = CArcadiaTioV4RetainedHistoryCompactionPreciseReport
   { cV4RetainedHistoryCompactionPreciseReportVersion :: Word32
   , cV4RetainedHistoryCompactionPreciseReportStructSize :: CSize
-  , cV4RetainedHistoryCompactionPreciseReportStatus :: CInt
+  , cV4RetainedHistoryCompactionPreciseReportStatus :: CArcadiaTioV4ReportStatus
   , cV4RetainedHistoryCompactionPreciseReportReason :: CString
   , cV4RetainedHistoryCompactionPreciseReportRetainedCommitCount :: Word32
   , cV4RetainedHistoryCompactionPreciseReportRetainedCommitSeqs :: Ptr Word64
@@ -2459,7 +2483,7 @@ emptyCArcadiaTioV4RetainedHistoryCompactionPreciseReport = CArcadiaTioV4Retained
 data CArcadiaTioReformOptions = CArcadiaTioReformOptions
   { cReformOptionsVersion :: Word32
   , cReformOptionsStructSize :: CSize
-  , cReformOptionsTargetLayout :: CInt
+  , cReformOptionsTargetLayout :: CArcadiaTioReformTargetLayout
   , cReformOptionsRegularChunkedBlockShape :: Ptr Word32
   , cReformOptionsRegularChunkedBlockShapeLen :: CSize
   }

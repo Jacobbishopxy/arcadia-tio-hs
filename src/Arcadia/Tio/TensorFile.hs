@@ -425,7 +425,6 @@ import Arcadia.Tio.Types
   , DimMeta(..)
   , EntrySelector(..)
   , TioUuid(..)
-  , AxisIdentityMode(..)
   , AxisIdentityInput(..)
   , UniverseBindingInput(..)
   , SlotUniverseBindingInput(..)
@@ -548,6 +547,7 @@ import Arcadia.Tio.Types
   , coordinateValueDomainV2ToRaw
   , headerProfileFromRaw
   )
+import qualified Arcadia.Tio.Types as Types
 
 -- | Safe TensorFile handle. The native handle is closed by a finalizer and can
 -- also be closed eagerly with 'close'.
@@ -1239,7 +1239,7 @@ withAxisIdentityInputs identities action = withArray (map axisIdentityToC identi
 
 axisIdentityToC :: AxisIdentityInput -> CArcadiaTioAxisIdentityInput
 axisIdentityToC AxisIdentityInput{axisIdentityAxis, axisIdentityMode} =
-  CArcadiaTioAxisIdentityInput 1 24 (fromIntegral axisIdentityAxis) (case axisIdentityMode of AxisIdentityExtentOnly -> 0; AxisIdentityUniverseAware -> 1)
+  CArcadiaTioAxisIdentityInput 1 24 (fromIntegral axisIdentityAxis) (Types.axisIdentityModeToRaw axisIdentityMode)
 
 withEntrySelectors :: [EntrySelector] -> (Ptr CArcadiaTioEntrySelector -> CSize -> IO a) -> IO a
 withEntrySelectors [] action = action nullPtr 0
@@ -1351,15 +1351,11 @@ readOptionsToC ReadOptions{readOptionMode, readOptionMaxThreads} =
     }
 
 readExecutionModeToRaw :: ReadExecutionMode -> CInt
-readExecutionModeToRaw mode = case mode of
-  ReadSerial -> 0
-  ReadParallelThreads -> 1
+readExecutionModeToRaw = Types.readExecutionModeToRaw
 
 readExecutionModeFromRaw :: CInt -> Result ReadExecutionMode
-readExecutionModeFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
-  0 -> Right ReadSerial
-  1 -> Right ReadParallelThreads
-  _ -> Left (invalidArgument "native read report has unknown execution mode")
+readExecutionModeFromRaw raw =
+  maybe (Left (invalidArgument "native read report has unknown execution mode")) Right (Types.readExecutionModeFromRaw raw)
 
 validateReadShapePolicy :: ReadShapePolicy -> Result ()
 validateReadShapePolicy policy = case policy of
@@ -1374,15 +1370,7 @@ validateReadShapePolicy policy = case policy of
   validateExtentTarget ExplicitExtentAxisTarget{explicitExtentAxis} = validateAxisIndex "explicit extent target" explicitExtentAxis
 
 readShapePolicyToRaw :: ReadShapePolicy -> CInt
-readShapePolicyToRaw policy = case policy of
-  ReadShapeFileEnvelope -> 0
-  ReadShapeCurrentHead -> 1
-  ReadShapeUnion -> 2
-  ReadShapeIntersection -> 3
-  ReadShapeInitialRegistered -> 4
-  ReadShapeExplicitExtents{} -> 5
-  ReadShapeExplicitUniverse{} -> 6
-  ReadShapeExplicitUniverseAndExtents{} -> 7
+readShapePolicyToRaw = Types.readShapePolicyTagToRaw . Types.readShapePolicyTag
 
 validateQueryTraceContext :: QueryTraceContext -> Result ()
 validateQueryTraceContext QueryTraceContext{queryTraceRunId, queryTraceRowId, queryTracePhase, queryTraceLanguage, queryTraceApiSurface, queryTraceOperation, queryTraceClock} = do
@@ -1405,31 +1393,29 @@ validateReadIndexItems items
 
 readIndexItemToC :: ReadIndexItem -> CArcadiaTioReadIndexItem
 readIndexItemToC item = case item of
-  ReadIndexAll -> CArcadiaTioReadIndexItem 0 0 0 0 0 1 0
+  ReadIndexAll -> CArcadiaTioReadIndexItem (rawTag item) 0 0 0 0 1 0
   ReadIndexSlice maybeStart maybeEnd step ->
     CArcadiaTioReadIndexItem
-      1
+      (rawTag item)
       (maybe 0 (const 1) maybeStart)
       (maybe 0 id maybeStart)
       (maybe 0 (const 1) maybeEnd)
       (maybe 0 id maybeEnd)
       step
       0
-  ReadIndexIndex index -> CArcadiaTioReadIndexItem 2 0 0 0 0 1 index
-  ReadIndexNewAxis -> CArcadiaTioReadIndexItem 3 0 0 0 0 1 0
-  ReadIndexEllipsis -> CArcadiaTioReadIndexItem 4 0 0 0 0 1 0
+  ReadIndexIndex index -> CArcadiaTioReadIndexItem (rawTag item) 0 0 0 0 1 index
+  ReadIndexNewAxis -> CArcadiaTioReadIndexItem (rawTag item) 0 0 0 0 1 0
+  ReadIndexEllipsis -> CArcadiaTioReadIndexItem (rawTag item) 0 0 0 0 1 0
+ where
+  rawTag = Types.readIndexItemTagToRaw . Types.readIndexItemTag
 
 readIndexLoweringFromRaw :: CInt -> Result ReadIndexLoweringKind
-readIndexLoweringFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
-  0 -> Right ReadIndexLoweringUnknown
-  1 -> Right ReadIndexLoweringSelectorRead
-  2 -> Right ReadIndexLoweringSelectorReadWithShapePostprocess
-  _ -> Left (invalidArgument "native read-index report has unknown lowering kind")
+readIndexLoweringFromRaw raw =
+  maybe (Left (invalidArgument "native read-index report has unknown lowering kind")) Right (Types.readIndexLoweringKindFromRaw raw)
 
 historicalQuerySourceKindFromRaw :: CInt -> Result HistoricalQuerySourceKind
-historicalQuerySourceKindFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
-  0 -> Right HistoricalQueryRetainedVisibleCommit
-  _ -> Left (invalidArgument "native historical read report has unknown source kind")
+historicalQuerySourceKindFromRaw raw =
+  maybe (Left (invalidArgument "native historical read report has unknown source kind")) Right (Types.historicalQuerySourceKindFromRaw raw)
 
 withManyCStrings :: [String] -> ([CString] -> IO a) -> IO a
 withManyCStrings [] action = action []
@@ -2567,28 +2553,15 @@ v4PreciseAccountingOptionsToC V4PreciseAccountingOptions{v4PreciseRequestedField
     }
 
 v4PreciseAccountingFieldMask :: V4PreciseAccountingField -> Word32
-v4PreciseAccountingFieldMask field = case field of
-  V4PreciseUnreachableBytes -> 1 `shiftL` 0
-  V4PreciseRetainedHistoryRequiredBytes -> 1 `shiftL` 1
-  V4PrecisePoppedSkippedBytes -> 1 `shiftL` 2
-  V4PreciseReclaimableBytes -> 1 `shiftL` 3
-  V4PreciseAccountingFieldUnknown raw | raw >= 0 && raw < 32 -> 1 `shiftL` fromIntegral raw
-  V4PreciseAccountingFieldUnknown _ -> 0
+v4PreciseAccountingFieldMask field =
+  let CInt raw = Types.v4PreciseAccountingFieldToRaw field
+  in if raw >= 0 && raw < 32 then 1 `shiftL` fromIntegral raw else 0
 
 v4ReportStatusFromRaw :: CInt -> V4ReportStatus
-v4ReportStatusFromRaw (CInt raw) = case raw of
-  0 -> V4ReportComplete
-  1 -> V4ReportUnsupported
-  2 -> V4ReportUnknown
-  _ -> V4ReportStatusUnknown raw
+v4ReportStatusFromRaw = Types.v4ReportStatusFromRaw
 
 v4PreciseAccountingFieldFromRaw :: CInt -> V4PreciseAccountingField
-v4PreciseAccountingFieldFromRaw (CInt raw) = case raw of
-  0 -> V4PreciseUnreachableBytes
-  1 -> V4PreciseRetainedHistoryRequiredBytes
-  2 -> V4PrecisePoppedSkippedBytes
-  3 -> V4PreciseReclaimableBytes
-  _ -> V4PreciseAccountingFieldUnknown raw
+v4PreciseAccountingFieldFromRaw = Types.v4PreciseAccountingFieldFromRaw
 
 copyV4DiagnosticsReport :: CArcadiaTioV4DiagnosticsReport -> IO (Result V4DiagnosticsReport)
 copyV4DiagnosticsReport raw = do
@@ -2774,14 +2747,10 @@ retainedHistoryOptionsToC V4RetainedHistoryCompactionOptions{v4RetainedHistoryPo
     }
 
 retainedHistoryPolicyToRaw :: V4RetainedHistoryPolicy -> CInt
-retainedHistoryPolicyToRaw policy = case policy of
-  V4RetainLast -> 0
-  V4RetainedHistoryPolicyUnknown raw -> CInt raw
+retainedHistoryPolicyToRaw = Types.v4RetainedHistoryPolicyToRaw
 
 v4CompactionAnalysisPolicyFromRaw :: CInt -> V4CompactionAnalysisPolicy
-v4CompactionAnalysisPolicyFromRaw (CInt raw) = case raw of
-  0 -> V4CompactionPolicyCompactToCurrentState
-  _ -> V4CompactionAnalysisPolicyUnknown raw
+v4CompactionAnalysisPolicyFromRaw = Types.v4CompactionAnalysisPolicyFromRaw
 
 copyV4CompactionAnalysisReport :: CArcadiaTioV4CompactionAnalysisReport -> IO (Result V4CompactionAnalysisReport)
 copyV4CompactionAnalysisReport raw = do
@@ -2926,10 +2895,7 @@ reformOptionsToC ReformOptions{reformTargetLayout} shapePtr shapeLen =
     }
 
 reformTargetLayoutToRaw :: ReformTargetLayout -> CInt
-reformTargetLayoutToRaw layout = case layout of
-  ReformPreserveFamily -> 0
-  ReformWholeAppendUnit -> 1
-  ReformRegularChunked _ -> 2
+reformTargetLayoutToRaw = Types.reformTargetLayoutTagToRaw . Types.reformTargetLayoutTag
 
 copyReformReport :: CArcadiaTioReformReport -> IO ReformReport
 copyReformReport raw = do

@@ -39,12 +39,12 @@ The checked-in generated item list is [parity-inventory.generated.md](parity-inv
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 336
+- wrapped: 347
 - intentionally not applicable: 24
-- deferred blockers: 44
+- deferred blockers: 33
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 44 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
+These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 33 remaining deferred blockers are OCB follow-up surfaces and mean the wrapper must not claim broad 100% C ABI/public-surface parity.
 
 Legend:
 
