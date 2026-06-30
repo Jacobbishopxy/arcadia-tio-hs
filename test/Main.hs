@@ -332,14 +332,16 @@ testRandomAccessF64 native = do
 testSparseAppend :: NativeLibrary -> IO ()
 testSparseAppend native = do
   let f32Path = ".test-output" </> "sparse-f32.tio"
+      f64Path = ".test-output" </> "sparse-f64.tio"
       i32Path = ".test-output" </> "sparse-i32.tio"
+      i64Path = ".test-output" </> "sparse-i64.tio"
       sparseRule = predicateSubtensorRule [1] SparsePredicateZero
   cleanup f32Path
   f32File <- unwrap "createRandomAccess sparse f32" =<< createRandomAccess native f32Path F32 [dim AxisTime 0, dim AxisSymbol 4, dim AxisChannel 2] 0
   f32Analysis <- unwrap "analyzeSparseAppendF32" =<< analyzeSparseAppendF32 f32File [1, 4, 2] (VS.fromList [21.0, 22.0, 0.0, 0.0, 25.0, 26.0, 27.0, 28.0]) sparseRule
   assertEqual "f32 sparse outcome" SparseAppendSparseChunkTree (sparseAppendOutcome f32Analysis)
   assertEqual "f32 sparse absent" 1 (sparseAppendAbsentSubtensorCount f32Analysis)
-  f32Range <- unwrap "appendSparseF32" =<< appendSparseF32 f32File [1, 4, 2] (VS.fromList [21.0, 22.0, 0.0, 0.0, 25.0, 26.0, 27.0, 28.0]) sparseRule
+  f32Range <- unwrap "appendSparseF32 range-superset" =<< appendSparseF32 f32File [1, 4, 2] (VS.fromList [21.0, 22.0, 0.0, 0.0, 25.0, 26.0, 27.0, 28.0]) sparseRule
   assertEqual "f32 sparse append range" (AppendRange 0 1) f32Range
   f32Dense <- unwrap "readAllDenseF32 sparse" =<< readAllDenseF32 f32File (-1.0)
   assertEqual "f32 sparse dense shape" [1, 4, 2] (tensorShape (denseReadTensor f32Dense))
@@ -348,14 +350,29 @@ testSparseAppend native = do
   close f32File
   cleanup f32Path
 
+  cleanup f64Path
+  f64File <- unwrap "createRandomAccess sparse f64" =<< createRandomAccess native f64Path F64 [dim AxisTime 0, dim AxisSymbol 4] 0
+  let f64Values = VS.fromList [10.5, 0.0, 12.5, 0.0]
+  f64Analysis <- unwrap "analyzeSparseAppendF64" =<< analyzeSparseAppendF64 f64File [1, 4] f64Values sparseRule
+  assertEqual "f64 sparse outcome" SparseAppendSparseChunkTree (sparseAppendOutcome f64Analysis)
+  assertEqual "f64 sparse absent" 2 (sparseAppendAbsentSubtensorCount f64Analysis)
+  f64Range <- unwrap "appendSparseF64 range-superset" =<< appendSparseF64 f64File [1, 4] f64Values sparseRule
+  assertEqual "f64 sparse append range" (AppendRange 0 1) f64Range
+  f64Dense <- unwrap "readAllDenseF64 sparse" =<< readAllDenseF64 f64File (-1.0)
+  assertEqual "f64 sparse dense shape" [1, 4] (tensorShape (denseReadTensor f64Dense))
+  assertEqual "f64 sparse dense values" (VS.fromList [10.5, -1.0, 12.5, -1.0]) (tensorValues (denseReadTensor f64Dense))
+  assertEqual "f64 sparse validity" (VS.fromList [1, 0, 1, 0]) (denseReadValidity f64Dense)
+  close f64File
+  cleanup f64Path
+
   cleanup i32Path
   i32File <- unwrap "createRandomAccess sparse i32" =<< createRandomAccess native i32Path I32 [dim AxisTime 0, dim AxisSymbol 4] 0
-  let exactRule = predicateSubtensorRule [1] (SparsePredicateEqualI32 (-7))
-      exactValues = VS.fromList ([21, -7, 23, -7] :: [Int32])
-  i32Analysis <- unwrap "analyzeSparseAppendI32 exact" =<< analyzeSparseAppendI32 i32File [1, 4] exactValues exactRule
+  let exactI32Rule = predicateSubtensorRule [1] (SparsePredicateEqualI32 (-7))
+      exactI32Values = VS.fromList ([21, -7, 23, -7] :: [Int32])
+  i32Analysis <- unwrap "analyzeSparseAppendI32 exact" =<< analyzeSparseAppendI32 i32File [1, 4] exactI32Values exactI32Rule
   assertEqual "i32 exact sparse outcome" SparseAppendSparseChunkTree (sparseAppendOutcome i32Analysis)
   assertEqual "i32 exact sparse absent" 2 (sparseAppendAbsentSubtensorCount i32Analysis)
-  i32Range <- unwrap "appendSparseI32 exact" =<< appendSparseI32 i32File [1, 4] exactValues exactRule
+  i32Range <- unwrap "appendSparseI32 exact range-superset" =<< appendSparseI32 i32File [1, 4] exactI32Values exactI32Rule
   assertEqual "i32 exact sparse append range" (AppendRange 0 1) i32Range
   i32Dense <- unwrap "readAllDenseI32 sparse" =<< readAllDenseI32 i32File 0.0
   assertEqual "i32 sparse dense shape" [1, 4] (tensorShape (denseReadTensor i32Dense))
@@ -363,6 +380,22 @@ testSparseAppend native = do
   assertEqual "i32 sparse validity" (VS.fromList [1, 0, 1, 0]) (denseReadValidity i32Dense)
   close i32File
   cleanup i32Path
+
+  cleanup i64Path
+  i64File <- unwrap "createRandomAccess sparse i64" =<< createRandomAccess native i64Path I64 [dim AxisTime 0, dim AxisSymbol 4] 0
+  let exactI64Rule = predicateSubtensorRule [1] (SparsePredicateEqualI64 (-7000000000))
+      exactI64Values = VS.fromList ([21000000000, -7000000000, 23000000000, -7000000000] :: [Int64])
+  i64Analysis <- unwrap "analyzeSparseAppendI64 exact" =<< analyzeSparseAppendI64 i64File [1, 4] exactI64Values exactI64Rule
+  assertEqual "i64 exact sparse outcome" SparseAppendSparseChunkTree (sparseAppendOutcome i64Analysis)
+  assertEqual "i64 exact sparse absent" 2 (sparseAppendAbsentSubtensorCount i64Analysis)
+  i64Range <- unwrap "appendSparseI64 exact range-superset" =<< appendSparseI64 i64File [1, 4] exactI64Values exactI64Rule
+  assertEqual "i64 exact sparse append range" (AppendRange 0 1) i64Range
+  i64Dense <- unwrap "readAllDenseI64 sparse" =<< readAllDenseI64 i64File 0.0
+  assertEqual "i64 sparse dense shape" [1, 4] (tensorShape (denseReadTensor i64Dense))
+  assertEqual "i64 sparse dense values" (VS.fromList ([21000000000, 0, 23000000000, 0] :: [Int64])) (tensorValues (denseReadTensor i64Dense))
+  assertEqual "i64 sparse validity" (VS.fromList [1, 0, 1, 0]) (denseReadValidity i64Dense)
+  close i64File
+  cleanup i64Path
 
 testCompactionHelpers :: NativeLibrary -> IO ()
 testCompactionHelpers native = do

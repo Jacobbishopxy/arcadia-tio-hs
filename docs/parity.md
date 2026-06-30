@@ -40,11 +40,11 @@ The checked-in generated item list is [parity-inventory.generated.md](parity-inv
 Current local header snapshot used while adding this gate:
 
 - wrapped: 310
-- intentionally not applicable: 20
-- deferred blockers: 74
+- intentionally not applicable: 24
+- deferred blockers: 70
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 74 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
+These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 70 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
 
 Legend:
 
@@ -77,7 +77,7 @@ Legend:
 | Scalar reads | ✅ | ✅ | `readScalar` returns dtype plus native double-valued scalar carrier. |
 | File metadata load/query | ✅ `load_meta`, metadata accessors | ⚠️ partial | `rank`, `dtype`, `appendAxis`, `dimLens`, `chunkPlan`, `filePath`, and basic `loadMeta` are exposed; richer coordinate/universe metadata remains missing. |
 | Tensor helper operations | ✅ Rust tensor ops | ❌ | Could add Haskell-owned tensor helpers independent of native ABI. |
-| Sparse-intent append/analyze | ✅ | ✅ | `SparseRule` ADTs plus `analyzeSparseAppend*` / `appendSparse*` wrappers use the C ABI V2 sparse rule and copy native analysis reasons. |
+| Sparse-intent append/analyze | ✅ | ✅ | `SparseRule` ADTs plus `analyzeSparseAppend*` / `appendSparse*` wrappers use the C ABI V2 sparse rule and copy native analysis reasons. Direct no-range sparse V2 append C helpers are intentionally not separate Haskell APIs because the range-returning wrappers call the same native inputs and return the assigned `AppendRange`. |
 | Signed integer sparse exact predicates | ✅ | ✅ | `SparsePredicateEqualI32` / `SparsePredicateEqualI64` are exposed and tested through V2 sparse rule calls. |
 | Coordinate metadata/create/read/lookup | ✅ | ⚠️ partial | Coordinate v1/v2 metadata/read/dictionary, v2 lookup/range lookup, coordinate-aware create variants, and append-axis v2 dense append bindings are exposed. Native append-sequence numeric value reads currently report unsupported-domain status; legacy coordinate index/range helpers and richer fixed-text/dictionary authoring remain deferred. |
 | Universe-aware authoring/reads | ✅ | ⚠️ partial | Streaming/random-access/policy create with universe axis identities, dense append with universe slot bindings/remaps, UUID/binding/remap ADTs, and explicit-universe shape-policy reads are exposed. No inferred-with-universe C ABI exists. |

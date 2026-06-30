@@ -9,8 +9,8 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 | Category | Count |
 | --- | ---: |
 | wrapped | 310 |
-| not-applicable | 20 |
-| deferred-blocker | 74 |
+| not-applicable | 24 |
+| deferred-blocker | 70 |
 | unknown-unmapped | 0 |
 | total | 404 |
 
@@ -340,12 +340,16 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_append_i32` — superseded by range-returning or V2 Haskell wrapper
 - `function` `arcadia_tio_append_i64` — superseded by range-returning or V2 Haskell wrapper
 - `function` `arcadia_tio_append_sparse_f32` — superseded by range-returning or V2 Haskell wrapper
+- `function` `arcadia_tio_append_sparse_f32_v2` — superseded by append_sparse_*_with_range_v2 Haskell wrappers; same inputs plus returned append range
 - `function` `arcadia_tio_append_sparse_f32_with_range` — superseded by range-returning or V2 Haskell wrapper
 - `function` `arcadia_tio_append_sparse_f64` — superseded by range-returning or V2 Haskell wrapper
+- `function` `arcadia_tio_append_sparse_f64_v2` — superseded by append_sparse_*_with_range_v2 Haskell wrappers; same inputs plus returned append range
 - `function` `arcadia_tio_append_sparse_f64_with_range` — superseded by range-returning or V2 Haskell wrapper
 - `function` `arcadia_tio_append_sparse_i32` — superseded by range-returning or V2 Haskell wrapper
+- `function` `arcadia_tio_append_sparse_i32_v2` — superseded by append_sparse_*_with_range_v2 Haskell wrappers; same inputs plus returned append range
 - `function` `arcadia_tio_append_sparse_i32_with_range` — superseded by range-returning or V2 Haskell wrapper
 - `function` `arcadia_tio_append_sparse_i64` — superseded by range-returning or V2 Haskell wrapper
+- `function` `arcadia_tio_append_sparse_i64_v2` — superseded by append_sparse_*_with_range_v2 Haskell wrappers; same inputs plus returned append range
 - `function` `arcadia_tio_append_sparse_i64_with_range` — superseded by range-returning or V2 Haskell wrapper
 - `type` `ArcadiaTioOcbBatchVisitor` — callback-only native shape not exposed as safe API
 - `type` `ArcadiaTioSparseRule` — callback-only native shape not exposed as safe API
@@ -354,10 +358,6 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 
 ## deferred-blocker items
 
-- `function` `arcadia_tio_append_sparse_f32_v2` — known C ABI area deferred in parity docs
-- `function` `arcadia_tio_append_sparse_f64_v2` — known C ABI area deferred in parity docs
-- `function` `arcadia_tio_append_sparse_i32_v2` — known C ABI area deferred in parity docs
-- `function` `arcadia_tio_append_sparse_i64_v2` — known C ABI area deferred in parity docs
 - `function` `arcadia_tio_coordinate_index_i32` — known C ABI family deferred in parity docs
 - `function` `arcadia_tio_coordinate_index_i64` — known C ABI family deferred in parity docs
 - `function` `arcadia_tio_coordinate_range_i32` — known C ABI family deferred in parity docs

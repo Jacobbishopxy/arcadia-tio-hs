@@ -77,10 +77,24 @@ NOT_APPLICABLE_FUNCTIONS = {
     "arcadia_tio_append_sparse_f64_with_range",
     "arcadia_tio_append_sparse_i32_with_range",
     "arcadia_tio_append_sparse_i64_with_range",
+    "arcadia_tio_append_sparse_f32_v2",
+    "arcadia_tio_append_sparse_f64_v2",
+    "arcadia_tio_append_sparse_i32_v2",
+    "arcadia_tio_append_sparse_i64_v2",
     "arcadia_tio_analyze_sparse_append_f32",
     "arcadia_tio_analyze_sparse_append_f64",
     "arcadia_tio_analyze_sparse_append_i32",
     "arcadia_tio_analyze_sparse_append_i64",
+}
+
+NOT_APPLICABLE_FUNCTION_REASONS = {
+    name: "superseded by append_sparse_*_with_range_v2 Haskell wrappers; same inputs plus returned append range"
+    for name in {
+        "arcadia_tio_append_sparse_f32_v2",
+        "arcadia_tio_append_sparse_f64_v2",
+        "arcadia_tio_append_sparse_i32_v2",
+        "arcadia_tio_append_sparse_i64_v2",
+    }
 }
 
 NOT_APPLICABLE_TYPES = {
@@ -132,10 +146,6 @@ DEFERRED_FUNCTIONS = {
     "arcadia_tio_query_trace_json_free",
     "arcadia_tio_historical_read_execution_report_free",
     "arcadia_tio_read_index_report_free",
-    "arcadia_tio_append_sparse_f32_v2",
-    "arcadia_tio_append_sparse_f64_v2",
-    "arcadia_tio_append_sparse_i32_v2",
-    "arcadia_tio_append_sparse_i64_v2",
 }
 
 WRAPPED_OCB_FUNCTIONS = {
@@ -268,7 +278,7 @@ def classify_function(name: str, wrapped: set[str]) -> tuple[str, str]:
     if name in wrapped or name in WRAPPED_OCB_FUNCTIONS:
         return CATEGORY_WRAPPED, "resolved by Haskell dynamic-loader surface"
     if name in NOT_APPLICABLE_FUNCTIONS:
-        return CATEGORY_NOT_APPLICABLE, "superseded by range-returning or V2 Haskell wrapper"
+        return CATEGORY_NOT_APPLICABLE, NOT_APPLICABLE_FUNCTION_REASONS.get(name, "superseded by range-returning or V2 Haskell wrapper")
     if name in DEFERRED_FUNCTIONS:
         return CATEGORY_DEFERRED, "known C ABI area deferred in parity docs"
     if name.startswith("arcadia_tio_ocb_") and name not in WRAPPED_OCB_FUNCTIONS:
@@ -378,6 +388,7 @@ def run_self_test() -> None:
             uint32_t arcadia_tio_abi_version(void);
             int32_t arcadia_tio_append_f32(void);
             int32_t arcadia_tio_coordinate_lookup_v2(void);
+            int32_t arcadia_tio_append_sparse_i64_v2(void);
             int32_t arcadia_tio_new_gap(void);
             """,
             encoding="utf-8",
@@ -401,6 +412,7 @@ def run_self_test() -> None:
             "arcadia_tio_abi_version": CATEGORY_WRAPPED,
             "arcadia_tio_append_f32": CATEGORY_NOT_APPLICABLE,
             "arcadia_tio_coordinate_lookup_v2": CATEGORY_DEFERRED,
+            "arcadia_tio_append_sparse_i64_v2": CATEGORY_NOT_APPLICABLE,
             "arcadia_tio_new_gap": CATEGORY_UNKNOWN,
             "ArcadiaTioDType": CATEGORY_WRAPPED,
             "ArcadiaTioCoordinateDictionaryV2": CATEGORY_DEFERRED,

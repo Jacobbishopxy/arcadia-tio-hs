@@ -43,7 +43,7 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 310 wrapped items, 20 intentionally not-applicable items, 74 deferred blockers, and 0 unknown/unmapped items; those deferred blockers prevent any broad 100% parity claim.
+deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 310 wrapped items, 24 intentionally not-applicable items, 70 deferred blockers, and 0 unknown/unmapped items; those deferred blockers prevent any broad 100% parity claim.
 
 ## Current scope
 
@@ -71,6 +71,8 @@ Implemented:
   append-axis batches and with universe slot bindings/remaps;
 - analyze and append sparse-intent `f32`, `f64`, `i32`, and `i64` payloads,
   including exact integer sparse predicates through the C ABI V2 sparse rule;
+  direct no-range sparse V2 C append helpers are intentionally superseded by
+  the Haskell range-returning wrappers;
 - read all values into Haskell-owned `Vector.Storable` buffers;
 - read all values with a copied validity mask;
 - read axis ranges/takes/one-index slices, append-entry ranges/takes, and scalar values;
