@@ -43,7 +43,7 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 364 wrapped items, 24 intentionally not-applicable items, 16 deferred blockers, and 0 unknown/unmapped items; the remaining deferred blockers are OCB fill/cursor/follow-up surfaces and prevent any broad 100% parity claim.
+deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 380 wrapped items, 24 intentionally not-applicable items, 0 deferred blockers, and 0 unknown/unmapped items. These are C ABI inventory counts for the frozen header snapshot, not a packaging, support, deployment, release, performance, or production-readiness claim.
 
 ## Current scope
 
@@ -106,15 +106,19 @@ Implemented:
   and generated fixture read/dictionary/summary cross-checks;
 - expose exact OCB enum/type raw conversion helpers plus native init-helper-backed
   open/read predicate defaults and copied fixed-binary descriptor widths;
+- read OCB row groups into scoped Haskell-owned fill buffers with capacity,
+  fixed-binary-width, and validity-bitmap validation before copying filled
+  results back into owned Haskell values;
+- visit OCB batches through a scoped Haskell callback wrapper that copies each
+  native callback batch before invoking user code and releases callback/report
+  resources after traversal;
 - free C-owned tensors, masks, strings, chunk plans, commit lists, OCB metadata,
-  OCB read outcomes/reports/attribution/plans/summaries, and file metadata with
-  the matching C ABI free functions after copying.
+  OCB read outcomes/reports/attribution/plans/summaries/cursor reports, and file
+  metadata with the matching C ABI free functions after copying.
 
 Not yet supported:
 
 - parsing `.tio` or `.ocb` in Haskell;
-- OCB read cursor callbacks and row-group fill APIs until safe Haskell callback
-  and caller-owned buffer lifetimes are represented;
 - richer coordinate fixed-text/dictionary authoring ergonomics, Python/NumPy
   interop, or C++ helpers;
 - macOS/Windows native-library lookup;
@@ -166,8 +170,9 @@ roundtrips, random-access create, sparse-intent append, diagnostics/precise
 accounting, retained-history compaction, reform helpers, metadata queries,
 selector reads, option/report reads, read-index, mutation and Arrow ownership
 wrappers, dense-mask reads, coordinate create/read/lookup/append smokes,
-universe create/append/explicit-read smokes, OCB create/append/cleanup and
-read/dictionary/summary smokes, and removes generated files:
+universe create/append/explicit-read smokes, OCB create/append/cleanup,
+read/dictionary/summary, row-group fill, and cursor traversal smokes, and removes
+generated files:
 
 ```sh
 cabal test all
@@ -215,6 +220,10 @@ A compilable version lives at `examples/Roundtrip.hs` and is built by
 - OCB create/append calls borrow write-spec strings, arrays, primitive buffers,
   dictionary entries, and validity bitmaps only for the duration of one FFI call;
   native read/cleanup results are copied before returning.
+- OCB row-group fill and cursor traversal APIs keep caller-owned buffers,
+  callback function pointers, and native callback batch pointers scoped to a
+  single FFI call; filled buffers, cursor reports, and callback batches are
+  copied before returning to user code.
 
 ## Development boundaries
 

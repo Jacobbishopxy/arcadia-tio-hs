@@ -179,6 +179,11 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioOcbColumnArray(..)
   , CArcadiaTioOcbColumnBatch(..)
   , CArcadiaTioOcbReadOutcome(..)
+  , CArcadiaTioOcbReadCursorOptions(..)
+  , CArcadiaTioOcbReadCursorReport(..)
+  , CArcadiaTioOcbColumnFillBuffer(..)
+  , CArcadiaTioOcbRowGroupFillRequest(..)
+  , CArcadiaTioOcbReadFillReport(..)
   , CArcadiaTioOcbBodyRefSummary(..)
   , CArcadiaTioOcbColumnChunkSummary(..)
   , CArcadiaTioOcbColumnStatsSummary(..)
@@ -204,6 +209,11 @@ module Arcadia.Tio.Internal.CApi
   , emptyCArcadiaTioOcbReadReport
   , emptyCArcadiaTioOcbReadAttribution
   , emptyCArcadiaTioOcbReadOutcome
+  , emptyCArcadiaTioOcbReadCursorOptions
+  , emptyCArcadiaTioOcbReadCursorReport
+  , emptyCArcadiaTioOcbColumnFillBuffer
+  , emptyCArcadiaTioOcbRowGroupFillRequest
+  , emptyCArcadiaTioOcbReadFillReport
   , emptyCArcadiaTioOcbRowGroupSummaries
   , capiCreateStreaming
   , capiCreateStreamingEx
@@ -375,7 +385,19 @@ module Arcadia.Tio.Internal.CApi
   , capiOcbPredicateValueInit
   , capiOcbRowGroupPredicateInit
   , capiOcbReadAttributionInit
+  , OcbBatchVisitorFn
+  , mkOcbBatchVisitorCallback
   , capiOcbReadOutcomeInit
+  , capiOcbReadCursorOptionsInit
+  , capiOcbReadCursorReportInit
+  , capiOcbReadCursorReportFree
+  , capiOcbVisitBatches
+  , capiOcbColumnFillBufferInit
+  , capiOcbColumnFillBufferSetFixedBinaryWidth
+  , capiOcbColumnFillBufferFixedBinaryWidth
+  , capiOcbRowGroupFillRequestInit
+  , capiOcbReadFillReportInit
+  , capiOcbReadRowGroupInto
   , capiOcbReadBatches
   , capiOcbReadBatchesWithAttribution
   , capiOcbReadReportFree
@@ -3499,6 +3521,167 @@ instance Storable CArcadiaTioOcbReadOutcome where
 emptyCArcadiaTioOcbReadOutcome :: CArcadiaTioOcbReadOutcome
 emptyCArcadiaTioOcbReadOutcome = CArcadiaTioOcbReadOutcome 1 160 nullPtr 0 emptyCArcadiaTioOcbReadReport
 
+-- | Raw OCB cursor options matching @ArcadiaTioOcbReadCursorOptions@.
+data CArcadiaTioOcbReadCursorOptions = CArcadiaTioOcbReadCursorOptions
+  { cOcbReadCursorOptionsVersion :: Word32
+  , cOcbReadCursorOptionsStructSize :: CSize
+  , cOcbReadCursorOptionsMaxInFlightRowGroups :: CSize
+  , cOcbReadCursorOptionsOrdered :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadCursorOptions where
+  sizeOf _ = 96
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadCursorOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioOcbReadCursorOptions{cOcbReadCursorOptionsVersion, cOcbReadCursorOptionsStructSize, cOcbReadCursorOptionsMaxInFlightRowGroups, cOcbReadCursorOptionsOrdered} = do
+    fillBytes ptr 0 96
+    pokeByteOff ptr 0 cOcbReadCursorOptionsVersion
+    pokeByteOff ptr 8 cOcbReadCursorOptionsStructSize
+    pokeByteOff ptr 16 cOcbReadCursorOptionsMaxInFlightRowGroups
+    pokeByteOff ptr 24 cOcbReadCursorOptionsOrdered
+
+emptyCArcadiaTioOcbReadCursorOptions :: CArcadiaTioOcbReadCursorOptions
+emptyCArcadiaTioOcbReadCursorOptions = CArcadiaTioOcbReadCursorOptions 1 96 0 0
+
+-- | Raw OCB cursor report matching @ArcadiaTioOcbReadCursorReport@.
+data CArcadiaTioOcbReadCursorReport = CArcadiaTioOcbReadCursorReport
+  { cOcbReadCursorReportVersion :: Word32
+  , cOcbReadCursorReportStructSize :: CSize
+  , cOcbReadCursorReportBaseReport :: CArcadiaTioOcbReadReport
+  , cOcbReadCursorReportBatchesYielded :: CSize
+  , cOcbReadCursorReportRowsYielded :: Word64
+  , cOcbReadCursorReportCancelled :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadCursorReport where
+  sizeOf _ = 168
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadCursorReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 128
+  poke ptr CArcadiaTioOcbReadCursorReport{cOcbReadCursorReportVersion, cOcbReadCursorReportStructSize, cOcbReadCursorReportBaseReport, cOcbReadCursorReportBatchesYielded, cOcbReadCursorReportRowsYielded, cOcbReadCursorReportCancelled} = do
+    fillBytes ptr 0 168
+    pokeByteOff ptr 0 cOcbReadCursorReportVersion
+    pokeByteOff ptr 8 cOcbReadCursorReportStructSize
+    pokeByteOff ptr 16 cOcbReadCursorReportBaseReport
+    pokeByteOff ptr 112 cOcbReadCursorReportBatchesYielded
+    pokeByteOff ptr 120 cOcbReadCursorReportRowsYielded
+    pokeByteOff ptr 128 cOcbReadCursorReportCancelled
+
+emptyCArcadiaTioOcbReadCursorReport :: CArcadiaTioOcbReadCursorReport
+emptyCArcadiaTioOcbReadCursorReport = CArcadiaTioOcbReadCursorReport 1 168 emptyCArcadiaTioOcbReadReport 0 0 0
+
+-- | Raw OCB caller-owned column fill buffer matching @ArcadiaTioOcbColumnFillBuffer@.
+data CArcadiaTioOcbColumnFillBuffer = CArcadiaTioOcbColumnFillBuffer
+  { cOcbColumnFillBufferVersion :: Word32
+  , cOcbColumnFillBufferStructSize :: CSize
+  , cOcbColumnFillBufferColumnName :: CString
+  , cOcbColumnFillBufferColumnId :: Word32
+  , cOcbColumnFillBufferHasColumnId :: Word8
+  , cOcbColumnFillBufferPhysicalType :: CInt
+  , cOcbColumnFillBufferValues :: Ptr ()
+  , cOcbColumnFillBufferValuesLen :: CSize
+  , cOcbColumnFillBufferValidityBytes :: Ptr Word8
+  , cOcbColumnFillBufferValidityBytesLen :: CSize
+  , cOcbColumnFillBufferAllowNulls :: Word8
+  , cOcbColumnFillBufferRowsFilled :: CSize
+  , cOcbColumnFillBufferValidityFilled :: Word8
+  , cOcbColumnFillBufferReserved0 :: Word64
+  , cOcbColumnFillBufferReserved1 :: Word64
+  , cOcbColumnFillBufferReserved2 :: Word64
+  , cOcbColumnFillBufferReserved3 :: Word64
+  , cOcbColumnFillBufferReserved4 :: Word64
+  , cOcbColumnFillBufferReserved5 :: Word64
+  , cOcbColumnFillBufferReserved6 :: Word64
+  , cOcbColumnFillBufferReserved7 :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnFillBuffer where
+  sizeOf _ = 160
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbColumnFillBuffer <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 128 <*> peekByteOff ptr 136 <*> peekByteOff ptr 144 <*> peekByteOff ptr 152
+  poke ptr CArcadiaTioOcbColumnFillBuffer{cOcbColumnFillBufferVersion, cOcbColumnFillBufferStructSize, cOcbColumnFillBufferColumnName, cOcbColumnFillBufferColumnId, cOcbColumnFillBufferHasColumnId, cOcbColumnFillBufferPhysicalType, cOcbColumnFillBufferValues, cOcbColumnFillBufferValuesLen, cOcbColumnFillBufferValidityBytes, cOcbColumnFillBufferValidityBytesLen, cOcbColumnFillBufferAllowNulls, cOcbColumnFillBufferRowsFilled, cOcbColumnFillBufferValidityFilled, cOcbColumnFillBufferReserved0, cOcbColumnFillBufferReserved1, cOcbColumnFillBufferReserved2, cOcbColumnFillBufferReserved3, cOcbColumnFillBufferReserved4, cOcbColumnFillBufferReserved5, cOcbColumnFillBufferReserved6, cOcbColumnFillBufferReserved7} = do
+    fillBytes ptr 0 160
+    pokeByteOff ptr 0 cOcbColumnFillBufferVersion
+    pokeByteOff ptr 8 cOcbColumnFillBufferStructSize
+    pokeByteOff ptr 16 cOcbColumnFillBufferColumnName
+    pokeByteOff ptr 24 cOcbColumnFillBufferColumnId
+    pokeByteOff ptr 28 cOcbColumnFillBufferHasColumnId
+    pokeByteOff ptr 32 cOcbColumnFillBufferPhysicalType
+    pokeByteOff ptr 40 cOcbColumnFillBufferValues
+    pokeByteOff ptr 48 cOcbColumnFillBufferValuesLen
+    pokeByteOff ptr 56 cOcbColumnFillBufferValidityBytes
+    pokeByteOff ptr 64 cOcbColumnFillBufferValidityBytesLen
+    pokeByteOff ptr 72 cOcbColumnFillBufferAllowNulls
+    pokeByteOff ptr 80 cOcbColumnFillBufferRowsFilled
+    pokeByteOff ptr 88 cOcbColumnFillBufferValidityFilled
+    pokeByteOff ptr 96 cOcbColumnFillBufferReserved0
+    pokeByteOff ptr 104 cOcbColumnFillBufferReserved1
+    pokeByteOff ptr 112 cOcbColumnFillBufferReserved2
+    pokeByteOff ptr 120 cOcbColumnFillBufferReserved3
+    pokeByteOff ptr 128 cOcbColumnFillBufferReserved4
+    pokeByteOff ptr 136 cOcbColumnFillBufferReserved5
+    pokeByteOff ptr 144 cOcbColumnFillBufferReserved6
+    pokeByteOff ptr 152 cOcbColumnFillBufferReserved7
+
+emptyCArcadiaTioOcbColumnFillBuffer :: CArcadiaTioOcbColumnFillBuffer
+emptyCArcadiaTioOcbColumnFillBuffer = CArcadiaTioOcbColumnFillBuffer 1 160 nullPtr 0 0 0 nullPtr 0 nullPtr 0 0 0 0 0 0 0 0 0 0 0 0
+
+-- | Raw OCB row-group fill request matching @ArcadiaTioOcbRowGroupFillRequest@.
+data CArcadiaTioOcbRowGroupFillRequest = CArcadiaTioOcbRowGroupFillRequest
+  { cOcbRowGroupFillRequestVersion :: Word32
+  , cOcbRowGroupFillRequestStructSize :: CSize
+  , cOcbRowGroupFillRequestRowGroupId :: Word32
+  , cOcbRowGroupFillRequestColumns :: Ptr CArcadiaTioOcbColumnFillBuffer
+  , cOcbRowGroupFillRequestColumnsLen :: CSize
+  , cOcbRowGroupFillRequestValidateChecksums :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbRowGroupFillRequest where
+  sizeOf _ = 112
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbRowGroupFillRequest <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40
+  poke ptr CArcadiaTioOcbRowGroupFillRequest{cOcbRowGroupFillRequestVersion, cOcbRowGroupFillRequestStructSize, cOcbRowGroupFillRequestRowGroupId, cOcbRowGroupFillRequestColumns, cOcbRowGroupFillRequestColumnsLen, cOcbRowGroupFillRequestValidateChecksums} = do
+    fillBytes ptr 0 112
+    pokeByteOff ptr 0 cOcbRowGroupFillRequestVersion
+    pokeByteOff ptr 8 cOcbRowGroupFillRequestStructSize
+    pokeByteOff ptr 16 cOcbRowGroupFillRequestRowGroupId
+    pokeByteOff ptr 24 cOcbRowGroupFillRequestColumns
+    pokeByteOff ptr 32 cOcbRowGroupFillRequestColumnsLen
+    pokeByteOff ptr 40 cOcbRowGroupFillRequestValidateChecksums
+
+emptyCArcadiaTioOcbRowGroupFillRequest :: CArcadiaTioOcbRowGroupFillRequest
+emptyCArcadiaTioOcbRowGroupFillRequest = CArcadiaTioOcbRowGroupFillRequest 1 112 0 nullPtr 0 1
+
+-- | Raw OCB row-group fill report matching @ArcadiaTioOcbReadFillReport@.
+data CArcadiaTioOcbReadFillReport = CArcadiaTioOcbReadFillReport
+  { cOcbReadFillReportVersion :: Word32
+  , cOcbReadFillReportStructSize :: CSize
+  , cOcbReadFillReportRowGroupId :: Word32
+  , cOcbReadFillReportBaseRow :: Word64
+  , cOcbReadFillReportRowCount :: Word64
+  , cOcbReadFillReportColumnsFilled :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadFillReport where
+  sizeOf _ = 112
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadFillReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40
+  poke ptr CArcadiaTioOcbReadFillReport{cOcbReadFillReportVersion, cOcbReadFillReportStructSize, cOcbReadFillReportRowGroupId, cOcbReadFillReportBaseRow, cOcbReadFillReportRowCount, cOcbReadFillReportColumnsFilled} = do
+    fillBytes ptr 0 112
+    pokeByteOff ptr 0 cOcbReadFillReportVersion
+    pokeByteOff ptr 8 cOcbReadFillReportStructSize
+    pokeByteOff ptr 16 cOcbReadFillReportRowGroupId
+    pokeByteOff ptr 24 cOcbReadFillReportBaseRow
+    pokeByteOff ptr 32 cOcbReadFillReportRowCount
+    pokeByteOff ptr 40 cOcbReadFillReportColumnsFilled
+
+emptyCArcadiaTioOcbReadFillReport :: CArcadiaTioOcbReadFillReport
+emptyCArcadiaTioOcbReadFillReport = CArcadiaTioOcbReadFillReport 1 112 0 0 0 0
+
 
 -- | Raw OCB body-reference summary matching @ArcadiaTioOcbBodyRefSummary@.
 data CArcadiaTioOcbBodyRefSummary = CArcadiaTioOcbBodyRefSummary
@@ -3821,6 +4004,17 @@ type OcbReadRequestInitFn = Ptr CArcadiaTioOcbReadRequest -> IO ()
 type OcbReadReportInitFn = Ptr CArcadiaTioOcbReadReport -> IO ()
 type OcbReadAttributionInitFn = Ptr CArcadiaTioOcbReadAttribution -> IO ()
 type OcbReadOutcomeInitFn = Ptr CArcadiaTioOcbReadOutcome -> IO ()
+type OcbReadCursorOptionsInitFn = Ptr CArcadiaTioOcbReadCursorOptions -> IO ()
+type OcbReadCursorReportInitFn = Ptr CArcadiaTioOcbReadCursorReport -> IO ()
+type OcbReadCursorReportFreeFn = Ptr CArcadiaTioOcbReadCursorReport -> IO ()
+type OcbBatchVisitorFn = Ptr () -> Ptr CArcadiaTioOcbColumnBatch -> Ptr Word8 -> IO CInt
+type OcbVisitBatchesFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr CArcadiaTioOcbReadCursorOptions -> FunPtr OcbBatchVisitorFn -> Ptr () -> Ptr CArcadiaTioOcbReadCursorReport -> IO CInt
+type OcbColumnFillBufferInitFn = Ptr CArcadiaTioOcbColumnFillBuffer -> IO ()
+type OcbColumnFillBufferSetFixedBinaryWidthFn = Ptr CArcadiaTioOcbColumnFillBuffer -> Word32 -> IO ()
+type OcbColumnFillBufferFixedBinaryWidthFn = Ptr CArcadiaTioOcbColumnFillBuffer -> IO Word32
+type OcbRowGroupFillRequestInitFn = Ptr CArcadiaTioOcbRowGroupFillRequest -> IO ()
+type OcbReadFillReportInitFn = Ptr CArcadiaTioOcbReadFillReport -> IO ()
+type OcbReadRowGroupIntoFn = Ptr COcbFile -> Ptr CArcadiaTioOcbRowGroupFillRequest -> Ptr CArcadiaTioOcbReadFillReport -> IO CInt
 type OcbReadBatchesFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr CArcadiaTioOcbReadOutcome -> IO CInt
 type OcbReadBatchesWithAttributionFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr CArcadiaTioOcbReadOutcome -> Ptr CArcadiaTioOcbReadAttribution -> IO CInt
 type OcbReadReportFreeFn = Ptr CArcadiaTioOcbReadReport -> IO ()
@@ -4013,6 +4207,17 @@ foreign import ccall safe "dynamic" mkOcbReadRequestInit :: FunPtr OcbReadReques
 foreign import ccall safe "dynamic" mkOcbReadReportInit :: FunPtr OcbReadReportInitFn -> OcbReadReportInitFn
 foreign import ccall safe "dynamic" mkOcbReadAttributionInit :: FunPtr OcbReadAttributionInitFn -> OcbReadAttributionInitFn
 foreign import ccall safe "dynamic" mkOcbReadOutcomeInit :: FunPtr OcbReadOutcomeInitFn -> OcbReadOutcomeInitFn
+foreign import ccall safe "dynamic" mkOcbReadCursorOptionsInit :: FunPtr OcbReadCursorOptionsInitFn -> OcbReadCursorOptionsInitFn
+foreign import ccall safe "dynamic" mkOcbReadCursorReportInit :: FunPtr OcbReadCursorReportInitFn -> OcbReadCursorReportInitFn
+foreign import ccall safe "dynamic" mkOcbReadCursorReportFree :: FunPtr OcbReadCursorReportFreeFn -> OcbReadCursorReportFreeFn
+foreign import ccall safe "dynamic" mkOcbVisitBatches :: FunPtr OcbVisitBatchesFn -> OcbVisitBatchesFn
+foreign import ccall safe "wrapper" mkOcbBatchVisitorCallback :: OcbBatchVisitorFn -> IO (FunPtr OcbBatchVisitorFn)
+foreign import ccall safe "dynamic" mkOcbColumnFillBufferInit :: FunPtr OcbColumnFillBufferInitFn -> OcbColumnFillBufferInitFn
+foreign import ccall safe "dynamic" mkOcbColumnFillBufferSetFixedBinaryWidth :: FunPtr OcbColumnFillBufferSetFixedBinaryWidthFn -> OcbColumnFillBufferSetFixedBinaryWidthFn
+foreign import ccall safe "dynamic" mkOcbColumnFillBufferFixedBinaryWidth :: FunPtr OcbColumnFillBufferFixedBinaryWidthFn -> OcbColumnFillBufferFixedBinaryWidthFn
+foreign import ccall safe "dynamic" mkOcbRowGroupFillRequestInit :: FunPtr OcbRowGroupFillRequestInitFn -> OcbRowGroupFillRequestInitFn
+foreign import ccall safe "dynamic" mkOcbReadFillReportInit :: FunPtr OcbReadFillReportInitFn -> OcbReadFillReportInitFn
+foreign import ccall safe "dynamic" mkOcbReadRowGroupInto :: FunPtr OcbReadRowGroupIntoFn -> OcbReadRowGroupIntoFn
 foreign import ccall safe "dynamic" mkOcbReadBatches :: FunPtr OcbReadBatchesFn -> OcbReadBatchesFn
 foreign import ccall safe "dynamic" mkOcbReadBatchesWithAttribution :: FunPtr OcbReadBatchesWithAttributionFn -> OcbReadBatchesWithAttributionFn
 foreign import ccall safe "dynamic" mkOcbReadReportFree :: FunPtr OcbReadReportFreeFn -> OcbReadReportFreeFn
@@ -4212,6 +4417,16 @@ data NativeLibrary = NativeLibrary
   , nativeOcbReadReportInit :: OcbReadReportInitFn
   , nativeOcbReadAttributionInit :: OcbReadAttributionInitFn
   , nativeOcbReadOutcomeInit :: OcbReadOutcomeInitFn
+  , nativeOcbReadCursorOptionsInit :: OcbReadCursorOptionsInitFn
+  , nativeOcbReadCursorReportInit :: OcbReadCursorReportInitFn
+  , nativeOcbReadCursorReportFree :: OcbReadCursorReportFreeFn
+  , nativeOcbVisitBatches :: OcbVisitBatchesFn
+  , nativeOcbColumnFillBufferInit :: OcbColumnFillBufferInitFn
+  , nativeOcbColumnFillBufferSetFixedBinaryWidth :: OcbColumnFillBufferSetFixedBinaryWidthFn
+  , nativeOcbColumnFillBufferFixedBinaryWidth :: OcbColumnFillBufferFixedBinaryWidthFn
+  , nativeOcbRowGroupFillRequestInit :: OcbRowGroupFillRequestInitFn
+  , nativeOcbReadFillReportInit :: OcbReadFillReportInitFn
+  , nativeOcbReadRowGroupInto :: OcbReadRowGroupIntoFn
   , nativeOcbReadBatches :: OcbReadBatchesFn
   , nativeOcbReadBatchesWithAttribution :: OcbReadBatchesWithAttributionFn
   , nativeOcbReadReportFree :: OcbReadReportFreeFn
@@ -4466,6 +4681,16 @@ loadUnchecked path = do
   nativeOcbReadReportInit <- mkOcbReadReportInit <$> dlsym dl "arcadia_tio_ocb_read_report_init"
   nativeOcbReadAttributionInit <- mkOcbReadAttributionInit <$> dlsym dl "arcadia_tio_ocb_read_attribution_init"
   nativeOcbReadOutcomeInit <- mkOcbReadOutcomeInit <$> dlsym dl "arcadia_tio_ocb_read_outcome_init"
+  nativeOcbReadCursorOptionsInit <- mkOcbReadCursorOptionsInit <$> dlsym dl "arcadia_tio_ocb_read_cursor_options_init"
+  nativeOcbReadCursorReportInit <- mkOcbReadCursorReportInit <$> dlsym dl "arcadia_tio_ocb_read_cursor_report_init"
+  nativeOcbReadCursorReportFree <- mkOcbReadCursorReportFree <$> dlsym dl "arcadia_tio_ocb_read_cursor_report_free"
+  nativeOcbVisitBatches <- mkOcbVisitBatches <$> dlsym dl "arcadia_tio_ocb_visit_batches"
+  nativeOcbColumnFillBufferInit <- mkOcbColumnFillBufferInit <$> dlsym dl "arcadia_tio_ocb_column_fill_buffer_init"
+  nativeOcbColumnFillBufferSetFixedBinaryWidth <- mkOcbColumnFillBufferSetFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_column_fill_buffer_set_fixed_binary_width"
+  nativeOcbColumnFillBufferFixedBinaryWidth <- mkOcbColumnFillBufferFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_column_fill_buffer_fixed_binary_width"
+  nativeOcbRowGroupFillRequestInit <- mkOcbRowGroupFillRequestInit <$> dlsym dl "arcadia_tio_ocb_row_group_fill_request_init"
+  nativeOcbReadFillReportInit <- mkOcbReadFillReportInit <$> dlsym dl "arcadia_tio_ocb_read_fill_report_init"
+  nativeOcbReadRowGroupInto <- mkOcbReadRowGroupInto <$> dlsym dl "arcadia_tio_ocb_read_row_group_into"
   nativeOcbReadBatches <- mkOcbReadBatches <$> dlsym dl "arcadia_tio_ocb_read_batches"
   nativeOcbReadBatchesWithAttribution <- mkOcbReadBatchesWithAttribution <$> dlsym dl "arcadia_tio_ocb_read_batches_with_attribution"
   nativeOcbReadReportFree <- mkOcbReadReportFree <$> dlsym dl "arcadia_tio_ocb_read_report_free"
@@ -4664,6 +4889,16 @@ loadUnchecked path = do
       , nativeOcbReadReportInit
       , nativeOcbReadAttributionInit
       , nativeOcbReadOutcomeInit
+      , nativeOcbReadCursorOptionsInit
+      , nativeOcbReadCursorReportInit
+      , nativeOcbReadCursorReportFree
+      , nativeOcbVisitBatches
+      , nativeOcbColumnFillBufferInit
+      , nativeOcbColumnFillBufferSetFixedBinaryWidth
+      , nativeOcbColumnFillBufferFixedBinaryWidth
+      , nativeOcbRowGroupFillRequestInit
+      , nativeOcbReadFillReportInit
+      , nativeOcbReadRowGroupInto
       , nativeOcbReadBatches
       , nativeOcbReadBatchesWithAttribution
       , nativeOcbReadReportFree
@@ -5224,6 +5459,36 @@ capiOcbReadAttributionInit NativeLibrary{nativeOcbReadAttributionInit} = nativeO
 
 capiOcbReadOutcomeInit :: NativeLibrary -> OcbReadOutcomeInitFn
 capiOcbReadOutcomeInit NativeLibrary{nativeOcbReadOutcomeInit} = nativeOcbReadOutcomeInit
+
+capiOcbReadCursorOptionsInit :: NativeLibrary -> OcbReadCursorOptionsInitFn
+capiOcbReadCursorOptionsInit NativeLibrary{nativeOcbReadCursorOptionsInit} = nativeOcbReadCursorOptionsInit
+
+capiOcbReadCursorReportInit :: NativeLibrary -> OcbReadCursorReportInitFn
+capiOcbReadCursorReportInit NativeLibrary{nativeOcbReadCursorReportInit} = nativeOcbReadCursorReportInit
+
+capiOcbReadCursorReportFree :: NativeLibrary -> OcbReadCursorReportFreeFn
+capiOcbReadCursorReportFree NativeLibrary{nativeOcbReadCursorReportFree} = nativeOcbReadCursorReportFree
+
+capiOcbVisitBatches :: NativeLibrary -> OcbVisitBatchesFn
+capiOcbVisitBatches NativeLibrary{nativeOcbVisitBatches} = nativeOcbVisitBatches
+
+capiOcbColumnFillBufferInit :: NativeLibrary -> OcbColumnFillBufferInitFn
+capiOcbColumnFillBufferInit NativeLibrary{nativeOcbColumnFillBufferInit} = nativeOcbColumnFillBufferInit
+
+capiOcbColumnFillBufferSetFixedBinaryWidth :: NativeLibrary -> OcbColumnFillBufferSetFixedBinaryWidthFn
+capiOcbColumnFillBufferSetFixedBinaryWidth NativeLibrary{nativeOcbColumnFillBufferSetFixedBinaryWidth} = nativeOcbColumnFillBufferSetFixedBinaryWidth
+
+capiOcbColumnFillBufferFixedBinaryWidth :: NativeLibrary -> OcbColumnFillBufferFixedBinaryWidthFn
+capiOcbColumnFillBufferFixedBinaryWidth NativeLibrary{nativeOcbColumnFillBufferFixedBinaryWidth} = nativeOcbColumnFillBufferFixedBinaryWidth
+
+capiOcbRowGroupFillRequestInit :: NativeLibrary -> OcbRowGroupFillRequestInitFn
+capiOcbRowGroupFillRequestInit NativeLibrary{nativeOcbRowGroupFillRequestInit} = nativeOcbRowGroupFillRequestInit
+
+capiOcbReadFillReportInit :: NativeLibrary -> OcbReadFillReportInitFn
+capiOcbReadFillReportInit NativeLibrary{nativeOcbReadFillReportInit} = nativeOcbReadFillReportInit
+
+capiOcbReadRowGroupInto :: NativeLibrary -> OcbReadRowGroupIntoFn
+capiOcbReadRowGroupInto NativeLibrary{nativeOcbReadRowGroupInto} = nativeOcbReadRowGroupInto
 
 capiOcbReadBatches :: NativeLibrary -> OcbReadBatchesFn
 capiOcbReadBatches NativeLibrary{nativeOcbReadBatches} = nativeOcbReadBatches

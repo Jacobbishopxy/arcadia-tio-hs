@@ -8,9 +8,9 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 364 |
+| wrapped | 380 |
 | not-applicable | 24 |
-| deferred-blocker | 16 |
+| deferred-blocker | 0 |
 | unknown-unmapped | 0 |
 | total | 404 |
 
@@ -109,6 +109,9 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_close` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_column_array_fixed_binary_width` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_column_descriptor_fixed_binary_width` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_column_fill_buffer_fixed_binary_width` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_column_fill_buffer_init` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_column_fill_buffer_set_fixed_binary_width` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_create` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_create_with_options` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_dictionary_entry_init` — resolved by Haskell dynamic-loader surface
@@ -129,6 +132,10 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_read_batches` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_batches_from_plan` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_batches_with_attribution` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_read_cursor_options_init` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_read_cursor_report_free` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_read_cursor_report_init` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_read_fill_report_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_outcome_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_outcome_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_plan_free` — resolved by Haskell dynamic-loader surface
@@ -139,12 +146,15 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_read_report_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_report_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_request_init` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_read_row_group_into` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_reader_clone` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_row_group_fill_request_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_predicate_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_validity_bitmap_init` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_visit_batches` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_write_column_chunk_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_write_column_fixed_binary_width` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_write_column_init` — resolved by Haskell dynamic-loader surface
@@ -296,6 +306,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioOcbColumnChunkSummary` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnChunkSummaryCodec` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnDescriptor` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbColumnFillBuffer` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnStatsSummary` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbDictionaryDescriptor` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbDictionaryEntry` — represented by Haskell public or raw C wrapper type
@@ -316,9 +327,14 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioOcbPrimitiveValues` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbProjectionKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadAttribution` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbReadCursorOptions` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbReadCursorReport` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbReadFillReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadOutcome` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbReadPlan` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadReport` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadRequest` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbRowGroupFillRequest` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbRowGroupPredicate` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbRowGroupSummaries` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbRowGroupSummary` — represented by Haskell public or raw C wrapper type
@@ -412,22 +428,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 
 ## deferred-blocker items
 
-- `function` `arcadia_tio_ocb_column_fill_buffer_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_column_fill_buffer_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_column_fill_buffer_set_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_read_cursor_options_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_read_cursor_report_free` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_read_cursor_report_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_read_fill_report_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_read_row_group_into` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_row_group_fill_request_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_visit_batches` — OCB read/write/dictionary/plan surface deferred
-- `type` `ArcadiaTioOcbColumnFillBuffer` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbReadCursorOptions` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbReadCursorReport` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbReadFillReport` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbReadPlan` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbRowGroupFillRequest` — OCB read/write/dictionary/plan type surface deferred
+None.
 
 ## unknown-unmapped items
 

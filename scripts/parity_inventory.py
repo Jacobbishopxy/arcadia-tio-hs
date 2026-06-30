@@ -98,8 +98,8 @@ NOT_APPLICABLE_FUNCTION_REASONS = {
 }
 
 NOT_APPLICABLE_TYPES = {
-    # Callback-only visitor shape is not a stable, safe Haskell wrapper boundary;
-    # batch reads remain deferred and will choose their own ownership model.
+    # Callback-only visitor shape remains internal; public Haskell exposes a
+    # scoped visitor that copies batches before invoking user code.
     "ArcadiaTioOcbBatchVisitor",
     "ArcadiaTioSparseRule",
     "ArcadiaTioSparseValuePredicate",
@@ -201,6 +201,7 @@ WRAPPED_OCB_TYPES = {
     "ArcadiaTioOcbOrderingDirection",
     "ArcadiaTioOcbPhysicalType",
     "ArcadiaTioOcbProjectionKind",
+    "ArcadiaTioOcbReadPlan",
     "ArcadiaTioOcbWriteChunkCodec",
 }
 

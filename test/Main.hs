@@ -4,6 +4,7 @@ import Control.Exception (finally)
 import Control.Monad (unless)
 import Data.Int (Int32, Int64)
 import Data.Bits ((.|.), shiftL)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Word (Word8, Word64)
 import qualified Data.Vector.Storable as VS
 import Foreign.Marshal.Alloc (alloca)
@@ -53,6 +54,8 @@ main = do
   testUniverseAuthoringAndReads native
   testOcbReadBatchesAndAttribution native
   testOcbCreateAppendSmoke native
+  testOcbRowGroupFill native
+  testOcbVisitBatches native
 
   putStrLn "PASS: dense .tio lifecycle/read parity smoke through libarcadia_tio_capi.so"
 
@@ -900,6 +903,11 @@ testOcbReadBatchesAndAttribution native = do
   assertEqual "OCB read report size" 96 (sizeOf C.emptyCArcadiaTioOcbReadReport)
   assertEqual "OCB read attribution size" 208 (sizeOf C.emptyCArcadiaTioOcbReadAttribution)
   assertEqual "OCB read outcome size" 160 (sizeOf C.emptyCArcadiaTioOcbReadOutcome)
+  assertEqual "OCB cursor options size" 96 (sizeOf C.emptyCArcadiaTioOcbReadCursorOptions)
+  assertEqual "OCB cursor report size" 168 (sizeOf C.emptyCArcadiaTioOcbReadCursorReport)
+  assertEqual "OCB fill buffer size" 160 (sizeOf C.emptyCArcadiaTioOcbColumnFillBuffer)
+  assertEqual "OCB row-group fill request size" 112 (sizeOf C.emptyCArcadiaTioOcbRowGroupFillRequest)
+  assertEqual "OCB read fill report size" 112 (sizeOf C.emptyCArcadiaTioOcbReadFillReport)
   let fixedBinaryColumn =
         C.CArcadiaTioOcbColumnArray
           1
@@ -959,6 +967,30 @@ testOcbReadBatchesAndAttribution native = do
     outcome <- peek outcomePtr
     assertEqual "OCB read outcome init struct size" 160 (fromIntegral (C.cOcbReadOutcomeStructSize outcome) :: Int)
     C.capiOcbReadOutcomeFree native outcomePtr
+  alloca $ \cursorOptionsPtr -> do
+    C.capiOcbReadCursorOptionsInit native cursorOptionsPtr
+    cursorOptions <- peek cursorOptionsPtr
+    assertEqual "OCB cursor options init struct size" 96 (fromIntegral (C.cOcbReadCursorOptionsStructSize cursorOptions) :: Int)
+  alloca $ \cursorReportPtr -> do
+    C.capiOcbReadCursorReportInit native cursorReportPtr
+    cursorReport <- peek cursorReportPtr
+    assertEqual "OCB cursor report init struct size" 168 (fromIntegral (C.cOcbReadCursorReportStructSize cursorReport) :: Int)
+    C.capiOcbReadCursorReportFree native cursorReportPtr
+  alloca $ \fillBufferPtr -> do
+    C.capiOcbColumnFillBufferInit native fillBufferPtr
+    C.capiOcbColumnFillBufferSetFixedBinaryWidth native fillBufferPtr 9
+    fillBuffer <- peek fillBufferPtr
+    fillWidth <- C.capiOcbColumnFillBufferFixedBinaryWidth native fillBufferPtr
+    assertEqual "OCB fill buffer init struct size" 160 (fromIntegral (C.cOcbColumnFillBufferStructSize fillBuffer) :: Int)
+    assertEqual "OCB fill buffer fixed width helper" 9 fillWidth
+  alloca $ \fillRequestPtr -> do
+    C.capiOcbRowGroupFillRequestInit native fillRequestPtr
+    fillRequest <- peek fillRequestPtr
+    assertEqual "OCB row-group fill request init struct size" 112 (fromIntegral (C.cOcbRowGroupFillRequestStructSize fillRequest) :: Int)
+  alloca $ \fillReportPtr -> do
+    C.capiOcbReadFillReportInit native fillReportPtr
+    fillReport <- peek fillReportPtr
+    assertEqual "OCB read fill report init struct size" 112 (fromIntegral (C.cOcbReadFillReportStructSize fillReport) :: Int)
   fixture <- discoverOcbFixture
   case fixture of
     Nothing -> putStrLn "SKIP: OCB projection-predicate fixture not found for read/attribution smoke"
@@ -1096,6 +1128,83 @@ testOcbCreateAppendSmoke native = do
     cleanNoop <- unwrap "OCB cleanup clean no-op" =<< Ocb.cleanupOrphanTail native plainPath
     assertEqual "OCB cleanup no-op" False (Ocb.ocbCleanupTruncated cleanNoop)
 
+testOcbRowGroupFill :: NativeLibrary -> IO ()
+testOcbRowGroupFill native = do
+  let fillPath = ".test-output" </> "ocb-row-group-fill-smoke.ocb"
+      fixedFillPath = ".test-output" </> "ocb-row-group-fill-fixed.ocb"
+      cleanupBoth = cleanup fillPath >> cleanup fixedFillPath
+  cleanupBoth
+  (`finally` cleanupBoth) $ do
+    unwrap "OCB fill create" =<< Ocb.create native fillPath (nullableI32WriteSpec [7, 8, 9] (Ocb.OcbValidityBitmap [0x05] 3))
+    fillFile <- unwrap "OCB fill open" =<< Ocb.open native fillPath
+    filled <- unwrap "OCB readRowGroupInto i32" =<< Ocb.readRowGroupInto fillFile (fillRequest (Ocb.OcbValuesI32 [0, 0, 0, 99]) (Just (Ocb.OcbValidityBitmap [0x00] 8)))
+    assertEqual "OCB fill report row count" 3 (Ocb.ocbFillReportRowCount (Ocb.ocbFillResultReport filled))
+    case Ocb.ocbFillResultColumns filled of
+      [column] -> do
+        assertEqual "OCB fill rows" 3 (Ocb.ocbFilledRows column)
+        assertEqual "OCB fill values" (Ocb.OcbValuesI32 [7, 8, 9]) (Ocb.ocbFilledColumnValues column)
+        assertEqual "OCB fill resolved id" 0 (Ocb.ocbFilledColumnId column)
+        assertEqual "OCB fill validity" (Just (Ocb.OcbValidityBitmap [0x05] 3)) (Ocb.ocbFilledColumnValidity column)
+      other -> error ("OCB fill expected one column, got " <> show (length other))
+    assertErrorCode "OCB fill capacity validation" ErrorInvalidArgument =<< Ocb.readRowGroupInto fillFile (fillRequest (Ocb.OcbValuesI32 [0, 0]) Nothing)
+    assertErrorCode "OCB fill validity capacity validation" ErrorInvalidArgument =<< Ocb.readRowGroupInto fillFile (fillRequest (Ocb.OcbValuesI32 [0, 0, 0]) (Just (Ocb.OcbValidityBitmap [] 0)))
+    assertErrorCode "OCB fill missing row group validation" ErrorInvalidArgument =<< Ocb.readRowGroupInto fillFile (fillRequest (Ocb.OcbValuesI32 [0, 0, 0]) Nothing){Ocb.ocbFillRowGroupId = 99}
+    Ocb.close fillFile
+
+    unwrap "OCB fixed fill create" =<< Ocb.create native fixedFillPath fixedBinaryWriteSpec
+    fixedFile <- unwrap "OCB fixed fill open" =<< Ocb.open native fixedFillPath
+    fixedFilled <- unwrap "OCB readRowGroupInto fixed" =<< Ocb.readRowGroupInto fixedFile (fixedFillRequest (Ocb.OcbValuesFixedBinary 3 [0,0,0,0,0,0,0,0,0]))
+    case Ocb.ocbFillResultColumns fixedFilled of
+      [column] -> assertEqual "OCB fixed fill bytes" (Ocb.OcbValuesFixedBinary 3 [1,2,3,4,5,6]) (Ocb.ocbFilledColumnValues column)
+      other -> error ("OCB fixed fill expected one column, got " <> show (length other))
+    assertErrorCode "OCB fixed fill width validation" ErrorInvalidArgument =<< Ocb.readRowGroupInto fixedFile (fixedFillRequest (Ocb.OcbValuesFixedBinary 2 [0,0,0,0,0,0]))
+    assertErrorCode "OCB fixed fill byte divisibility validation" ErrorInvalidArgument =<< Ocb.readRowGroupInto fixedFile (fixedFillRequest (Ocb.OcbValuesFixedBinary 3 [0,0,0,0]))
+    Ocb.close fixedFile
+ where
+  fillRequest values validity =
+    Ocb.OcbRowGroupFillRequest
+      { Ocb.ocbFillRowGroupId = 0
+      , Ocb.ocbFillColumns = [Ocb.OcbFillColumn (Just "value") Nothing values validity]
+      , Ocb.ocbFillValidateChecksums = True
+      }
+  fixedFillRequest values =
+    Ocb.OcbRowGroupFillRequest
+      { Ocb.ocbFillRowGroupId = 0
+      , Ocb.ocbFillColumns = [Ocb.OcbFillColumn (Just "blob") Nothing values Nothing]
+      , Ocb.ocbFillValidateChecksums = True
+      }
+
+testOcbVisitBatches :: NativeLibrary -> IO ()
+testOcbVisitBatches native = do
+  let visitPath = ".test-output" </> "ocb-visit-batches-smoke.ocb"
+  cleanup visitPath
+  (`finally` cleanup visitPath) $ do
+    unwrap "OCB visit create" =<< Ocb.create native visitPath multiRowI32WriteSpec
+    file <- unwrap "OCB visit open" =<< Ocb.open native visitPath
+
+    seenRef <- newIORef []
+    report <- unwrap "OCB visitBatches success" =<< Ocb.visitBatches file Ocb.defaultOcbReadRequest Ocb.defaultOcbReadCursorOptions (\batch -> do
+      modifyIORef' seenRef (batch :)
+      pure (Right Ocb.OcbVisitContinue))
+    seen <- readIORef seenRef
+    assertEqual "OCB visit success batches" 2 (length seen)
+    assertEqual "OCB visit report batches" 2 (Ocb.ocbCursorBatchesYielded report)
+    assertEqual "OCB visit report rows" 4 (Ocb.ocbCursorRowsYielded report)
+    assertEqual "OCB visit report cancelled" False (Ocb.ocbCursorCancelled report)
+
+    stopRef <- newIORef (0 :: Int)
+    stopReport <- unwrap "OCB visitBatches early stop" =<< Ocb.visitBatches file Ocb.defaultOcbReadRequest Ocb.defaultOcbReadCursorOptions (\_batch -> do
+      modifyIORef' stopRef (+ 1)
+      pure (Right Ocb.OcbVisitStop))
+    stopCount <- readIORef stopRef
+    assertEqual "OCB visit early stop count" 1 stopCount
+    assertEqual "OCB visit early stop batches" 1 (Ocb.ocbCursorBatchesYielded stopReport)
+
+    assertErrorCode "OCB visit callback error" ErrorInvalidArgument =<< Ocb.visitBatches file Ocb.defaultOcbReadRequest Ocb.defaultOcbReadCursorOptions (\_batch -> pure (Left (invalidArgument "visitor requested failure")))
+    retryReport <- unwrap "OCB visitBatches retry after error" =<< Ocb.visitBatches file Ocb.defaultOcbReadRequest Ocb.defaultOcbReadCursorOptions (\_batch -> pure (Right Ocb.OcbVisitContinue))
+    assertEqual "OCB visit retry batches" 2 (Ocb.ocbCursorBatchesYielded retryReport)
+    Ocb.close file
+
 fixedBinaryWriteSpec :: Ocb.OcbWriteSpec
 fixedBinaryWriteSpec =
   Ocb.OcbWriteSpec
@@ -1141,6 +1250,37 @@ dictionaryWriteSpec =
         ]
     , Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 [0, 0, 1]) Nothing]]
     , Ocb.ocbWriteOrderingKeys = [Ocb.OcbWriteOrderingKey 0 Ocb.OcbOrderingAscending Ocb.OcbNoNulls]
+    }
+
+multiRowI32WriteSpec :: Ocb.OcbWriteSpec
+multiRowI32WriteSpec =
+  Ocb.OcbWriteSpec
+    { Ocb.ocbWriteColumns = Ocb.ocbWriteColumns (i32WriteSpec [1, 2])
+    , Ocb.ocbWriteDictionaries = []
+    , Ocb.ocbWriteRowGroups =
+        [ Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 [1, 2]) Nothing]
+        , Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 [3, 4]) Nothing]
+        ]
+    , Ocb.ocbWriteOrderingKeys = []
+    }
+
+nullableI32WriteSpec :: [Int32] -> Ocb.OcbValidityBitmap -> Ocb.OcbWriteSpec
+nullableI32WriteSpec values validity =
+  Ocb.OcbWriteSpec
+    { Ocb.ocbWriteColumns =
+        [ Ocb.OcbWriteColumn
+            { Ocb.ocbWriteColumnName = "value"
+            , Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalI32
+            , Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalPlain
+            , Ocb.ocbWriteColumnDictionaryId = Nothing
+            , Ocb.ocbWriteColumnScale = 0
+            , Ocb.ocbWriteColumnNullable = True
+            , Ocb.ocbWriteColumnFixedBinaryWidth = Nothing
+            }
+        ]
+    , Ocb.ocbWriteDictionaries = []
+    , Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesI32 values) (Just validity)]]
+    , Ocb.ocbWriteOrderingKeys = []
     }
 
 i32WriteSpec :: [Int32] -> Ocb.OcbWriteSpec

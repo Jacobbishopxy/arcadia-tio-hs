@@ -70,6 +70,15 @@ module Arcadia.Tio.Ocb
   , OcbColumnBatch(..)
   , OcbReadOutcome(..)
   , OcbReadWithAttribution(..)
+  , OcbFillColumn(..)
+  , OcbRowGroupFillRequest(..)
+  , OcbReadFillReport(..)
+  , OcbFilledColumn(..)
+  , OcbReadFillResult(..)
+  , OcbReadCursorOptions(..)
+  , defaultOcbReadCursorOptions
+  , OcbReadCursorReport(..)
+  , OcbVisitDecision(..)
   , OcbReadPlan
   , OcbBodyKind(..)
   , ocbBodyKindToRaw
@@ -96,6 +105,8 @@ module Arcadia.Tio.Ocb
   , dictionaryValues
   , readBatches
   , readBatchesWithAttribution
+  , readRowGroupInto
+  , visitBatches
   , planRead
   , readPlanReport
   , readPlanProjectedColumnIds
@@ -106,8 +117,9 @@ module Arcadia.Tio.Ocb
   , readPlanRowGroupSummaries
   ) where
 
-import Control.Exception (finally)
+import Control.Exception (SomeException, displayException, finally, try)
 import Data.Int (Int32, Int64)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Word (Word8, Word16, Word32, Word64)
 import Foreign.C.String (CString, peekCString, withCString, withCStringLen)
 import Foreign.C.Types (CFloat(..), CInt(..), CSize(..))
@@ -115,10 +127,10 @@ import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, withForeignPtr)
 import qualified Foreign.Concurrent as FC
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Marshal.Array (allocaArray, peekArray, withArray)
-import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
+import Foreign.Ptr (Ptr, castPtr, freeHaskellFunPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable, peek, poke, sizeOf)
 
-import Arcadia.Tio.Error (Result, TioError, invalidArgument)
+import Arcadia.Tio.Error (ErrorCode(..), Result, TioError(..), invalidArgument)
 import Arcadia.Tio.Internal.CApi
   ( CArcadiaTioOcbBodyRefSummary(..)
   , CArcadiaTioOcbByteSlice(..)
@@ -136,6 +148,11 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioOcbPrimitiveValues(..)
   , CArcadiaTioOcbReadAttribution(..)
   , CArcadiaTioOcbReadOutcome(..)
+  , CArcadiaTioOcbReadCursorOptions(..)
+  , CArcadiaTioOcbReadCursorReport(..)
+  , CArcadiaTioOcbColumnFillBuffer(..)
+  , CArcadiaTioOcbRowGroupFillRequest(..)
+  , CArcadiaTioOcbReadFillReport(..)
   , CArcadiaTioOcbReadReport(..)
   , CArcadiaTioOcbReadRequest(..)
   , CArcadiaTioOcbRowGroupSummary(..)
@@ -154,6 +171,7 @@ import Arcadia.Tio.Internal.CApi
   , COcbFile
   , COcbReadPlan
   , NativeLibrary
+  , mkOcbBatchVisitorCallback
   , capiOcbClose
   , capiOcbDictionaryValues
   , capiOcbDictionaryValuesFree
@@ -175,6 +193,16 @@ import Arcadia.Tio.Internal.CApi
   , capiOcbReadBatchesWithAttribution
   , capiOcbReadOutcomeFree
   , capiOcbReadOutcomeInit
+  , capiOcbReadCursorOptionsInit
+  , capiOcbReadCursorReportInit
+  , capiOcbReadCursorReportFree
+  , capiOcbVisitBatches
+  , capiOcbColumnFillBufferInit
+  , capiOcbColumnFillBufferSetFixedBinaryWidth
+  , capiOcbColumnFillBufferFixedBinaryWidth
+  , capiOcbRowGroupFillRequestInit
+  , capiOcbReadFillReportInit
+  , capiOcbReadRowGroupInto
   , capiOcbReadBatchesFromPlan
   , capiOcbReadPlanFree
   , capiOcbReadPlanProjectedColumnIds
@@ -554,6 +582,69 @@ data OcbReadWithAttribution = OcbReadWithAttribution
   }
   deriving (Eq, Show)
 
+-- | Caller-owned buffer description for direct row-group fill. The Haskell
+-- wrapper allocates/copies the mutable native buffer for the duration of the
+-- call; no raw pointer escapes.
+data OcbFillColumn = OcbFillColumn
+  { ocbFillColumnName :: Maybe String
+  , ocbFillColumnId :: Maybe Word32
+  , ocbFillColumnValues :: OcbPrimitiveValues
+  , ocbFillColumnValidity :: Maybe OcbValidityBitmap
+  }
+  deriving (Eq, Show)
+
+data OcbRowGroupFillRequest = OcbRowGroupFillRequest
+  { ocbFillRowGroupId :: Word32
+  , ocbFillColumns :: [OcbFillColumn]
+  , ocbFillValidateChecksums :: Bool
+  }
+  deriving (Eq, Show)
+
+data OcbReadFillReport = OcbReadFillReport
+  { ocbFillReportRowGroupId :: Word32
+  , ocbFillReportBaseRow :: Word64
+  , ocbFillReportRowCount :: Word64
+  , ocbFillReportColumnsFilled :: Int
+  }
+  deriving (Eq, Show)
+
+data OcbFilledColumn = OcbFilledColumn
+  { ocbFilledColumnName :: Maybe String
+  , ocbFilledColumnId :: Word32
+  , ocbFilledColumnValues :: OcbPrimitiveValues
+  , ocbFilledColumnValidity :: Maybe OcbValidityBitmap
+  , ocbFilledRows :: Word64
+  }
+  deriving (Eq, Show)
+
+data OcbReadFillResult = OcbReadFillResult
+  { ocbFillResultReport :: OcbReadFillReport
+  , ocbFillResultColumns :: [OcbFilledColumn]
+  }
+  deriving (Eq, Show)
+
+data OcbReadCursorOptions = OcbReadCursorOptions
+  { ocbCursorMaxInFlightRowGroups :: Int
+  , ocbCursorOrdered :: Bool
+  }
+  deriving (Eq, Show)
+
+defaultOcbReadCursorOptions :: OcbReadCursorOptions
+defaultOcbReadCursorOptions = OcbReadCursorOptions 1 True
+
+data OcbReadCursorReport = OcbReadCursorReport
+  { ocbCursorBaseReport :: OcbReadReport
+  , ocbCursorBatchesYielded :: Int
+  , ocbCursorRowsYielded :: Word64
+  , ocbCursorCancelled :: Bool
+  }
+  deriving (Eq, Show)
+
+data OcbVisitDecision
+  = OcbVisitContinue
+  | OcbVisitStop
+  deriving (Eq, Show)
+
 
 -- | Owned OCB read plan handle. Close explicitly or allow the finalizer to free it.
 data OcbReadPlan = OcbReadPlan
@@ -827,6 +918,80 @@ readBatchesWithAttribution file@OcbFile{ocbNative} request =
                 capiOcbReadAttributionFree ocbNative attributionPtr
                 pure (Left err)
 
+-- | Read one row group into scoped Haskell-owned fill buffers, then copy the
+-- filled values before any native pointer can escape.
+readRowGroupInto :: OcbFile -> OcbRowGroupFillRequest -> IO (Result OcbReadFillResult)
+readRowGroupInto file@OcbFile{ocbNative} request = do
+  validationContext <- fillValidationContext file request
+  case validationContext of
+    Left err -> pure (Left err)
+    Right (rowCount, rowSummary) ->
+      case validateOcbRowGroupFillRequest rowCount rowSummary request of
+        Just err -> pure (Left err)
+        Nothing ->
+          withFillColumnBuffers ocbNative (ocbFillColumns request) $ \columnsPtr columnsLen ->
+            withOcbRowGroupFillRequest ocbNative request columnsPtr columnsLen $ \requestPtr ->
+              withForeignPtr (ocbHandle file) $ \handle ->
+                alloca $ \reportPtr -> do
+                  capiOcbReadFillReportInit ocbNative reportPtr
+                  status <- capiOcbReadRowGroupInto ocbNative handle requestPtr reportPtr
+                  if status == okStatus
+                    then do
+                      rawReport <- peek reportPtr
+                      rawColumns <- peekArray (fromIntegral columnsLen) columnsPtr
+                      columns <- traverse (copyOcbFilledColumn ocbNative) rawColumns
+                      pure (Right OcbReadFillResult{ocbFillResultReport = copyOcbReadFillReport rawReport, ocbFillResultColumns = columns})
+                    else Left <$> lastError ocbNative
+
+-- | Visit projected/pruned row-group batches incrementally. The native batch
+-- pointer is copied before invoking the Haskell visitor, and the callback
+-- function pointer is released when the call returns.
+visitBatches :: OcbFile -> OcbReadRequest -> OcbReadCursorOptions -> (OcbColumnBatch -> IO (Result OcbVisitDecision)) -> IO (Result OcbReadCursorReport)
+visitBatches file@OcbFile{ocbNative} request options visitor =
+  case validateOcbReadRequest request of
+    Just err -> pure (Left err)
+    Nothing -> do
+      callbackErrorRef <- newIORef Nothing
+      callbackFun <- mkOcbBatchVisitorCallback (cursorCallback callbackErrorRef)
+      let freeCallback = freeHaskellFunPtr callbackFun
+          runVisit =
+            withOcbReadRequest ocbNative request $ \requestPtr ->
+              withOcbReadCursorOptions ocbNative options $ \optionsPtr ->
+                withOcbReadCursorReport ocbNative $ \reportPtr ->
+                  withForeignPtr (ocbHandle file) $ \handle -> do
+                    status <- capiOcbVisitBatches ocbNative handle requestPtr optionsPtr callbackFun nullPtr reportPtr
+                    callbackError <- readIORef callbackErrorRef
+                    if status == okStatus
+                      then Right <$> (peek reportPtr >>= copyOcbReadCursorReport)
+                      else case callbackError of
+                        Just err -> pure (Left err)
+                        Nothing -> Left <$> lastError ocbNative
+      runVisit `finally` freeCallback
+ where
+  cursorCallback errorRef _user batchPtr outContinuePtr = do
+    callbackResult <- try $ do
+      if batchPtr == nullPtr
+        then pure (Left (invalidArgument "OCB visit_batches callback received a null batch"))
+        else do
+          batch <- peek batchPtr >>= copyOcbColumnBatch ocbNative
+          visitor batch
+    case callbackResult of
+      Left (ex :: SomeException) -> do
+        let err = invalidArgument ("OCB visit_batches callback failed: " <> displayException ex)
+        writeIORef errorRef (Just err)
+        poke outContinuePtr 0
+        pure (errorCodeStatus (tioErrorCode err))
+      Right (Left err) -> do
+        writeIORef errorRef (Just err)
+        poke outContinuePtr 0
+        pure (errorCodeStatus (tioErrorCode err))
+      Right (Right OcbVisitStop) -> do
+        poke outContinuePtr 0
+        pure okStatus
+      Right (Right OcbVisitContinue) -> do
+        poke outContinuePtr 1
+        pure okStatus
+
 -- | Build an owned read plan for later inspection or execution.
 planRead :: OcbFile -> OcbReadRequest -> IO (Result OcbReadPlan)
 planRead OcbFile{ocbNative, ocbHandle} request =
@@ -905,6 +1070,83 @@ withPlanIds :: [Word32] -> (Ptr Word32 -> CSize -> IO a) -> IO a
 withPlanIds [] action = action nullPtr 0
 withPlanIds ids action = withArray ids $ \idsPtr -> action idsPtr (fromIntegral (length ids))
 
+withOcbReadCursorOptions :: NativeLibrary -> OcbReadCursorOptions -> (Ptr CArcadiaTioOcbReadCursorOptions -> IO a) -> IO a
+withOcbReadCursorOptions native options action =
+  alloca $ \optionsPtr -> do
+    capiOcbReadCursorOptionsInit native optionsPtr
+    initialized <- peek optionsPtr
+    poke optionsPtr
+      initialized
+        { cOcbReadCursorOptionsMaxInFlightRowGroups = fromIntegral (max 1 (ocbCursorMaxInFlightRowGroups options))
+        , cOcbReadCursorOptionsOrdered = boolByte (ocbCursorOrdered options)
+        }
+    action optionsPtr
+
+withOcbReadCursorReport :: NativeLibrary -> (Ptr CArcadiaTioOcbReadCursorReport -> IO (Result a)) -> IO (Result a)
+withOcbReadCursorReport native action =
+  alloca $ \reportPtr -> do
+    capiOcbReadCursorReportInit native reportPtr
+    action reportPtr `finally` capiOcbReadCursorReportFree native reportPtr
+
+withOcbRowGroupFillRequest :: NativeLibrary -> OcbRowGroupFillRequest -> Ptr CArcadiaTioOcbColumnFillBuffer -> CSize -> (Ptr CArcadiaTioOcbRowGroupFillRequest -> IO a) -> IO a
+withOcbRowGroupFillRequest native request columnsPtr columnsLen action =
+  alloca $ \requestPtr -> do
+    capiOcbRowGroupFillRequestInit native requestPtr
+    initialized <- peek requestPtr
+    poke requestPtr
+      initialized
+        { cOcbRowGroupFillRequestRowGroupId = ocbFillRowGroupId request
+        , cOcbRowGroupFillRequestColumns = columnsPtr
+        , cOcbRowGroupFillRequestColumnsLen = columnsLen
+        , cOcbRowGroupFillRequestValidateChecksums = boolByte (ocbFillValidateChecksums request)
+        }
+    action requestPtr
+
+withFillColumnBuffers :: NativeLibrary -> [OcbFillColumn] -> (Ptr CArcadiaTioOcbColumnFillBuffer -> CSize -> IO a) -> IO a
+withFillColumnBuffers native columns action = go columns []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
+  go (column:rest) acc =
+    withFillColumnBuffer native column $ \raw -> go rest (raw : acc)
+
+withFillColumnBuffer :: NativeLibrary -> OcbFillColumn -> (CArcadiaTioOcbColumnFillBuffer -> IO a) -> IO a
+withFillColumnBuffer native column action =
+  withMaybeCString (ocbFillColumnName column) $ \namePtr ->
+    withPrimitiveValuesForFill (ocbFillColumnValues column) $ \physical valuesPtr valuesLen fixedWidth ->
+      withValidityBytesForFill (ocbFillColumnValidity column) $ \validityPtr validityLen ->
+        alloca $ \bufferPtr -> do
+          capiOcbColumnFillBufferInit native bufferPtr
+          initialized <- peek bufferPtr
+          poke bufferPtr
+            initialized
+              { cOcbColumnFillBufferColumnName = namePtr
+              , cOcbColumnFillBufferColumnId = maybe 0 id (ocbFillColumnId column)
+              , cOcbColumnFillBufferHasColumnId = maybe 0 (const 1) (ocbFillColumnId column)
+              , cOcbColumnFillBufferPhysicalType = physical
+              , cOcbColumnFillBufferValues = valuesPtr
+              , cOcbColumnFillBufferValuesLen = valuesLen
+              , cOcbColumnFillBufferValidityBytes = validityPtr
+              , cOcbColumnFillBufferValidityBytesLen = validityLen
+              , cOcbColumnFillBufferAllowNulls = maybe 0 (const 1) (ocbFillColumnValidity column)
+              }
+          case fixedWidth of
+            Nothing -> pure ()
+            Just width -> capiOcbColumnFillBufferSetFixedBinaryWidth native bufferPtr width
+          peek bufferPtr >>= action
+
+withPrimitiveValuesForFill :: OcbPrimitiveValues -> (CInt -> Ptr () -> CSize -> Maybe Word32 -> IO a) -> IO a
+withPrimitiveValuesForFill values action = case values of
+  OcbValuesI32 xs -> withArrayOrNull xs $ \ptr len -> action 0 (castPtr ptr) len Nothing
+  OcbValuesI64 xs -> withArrayOrNull xs $ \ptr len -> action 1 (castPtr ptr) len Nothing
+  OcbValuesF32 xs -> withArrayOrNull (map CFloat xs) $ \ptr len -> action 2 (castPtr ptr) len Nothing
+  OcbValuesF64 xs -> withArrayOrNull xs $ \ptr len -> action 3 (castPtr ptr) len Nothing
+  OcbValuesFixedBinary width bytes -> withWord8Array bytes $ \ptr len -> action 4 (castPtr ptr) len (Just width)
+  OcbValuesUnknown physical _ -> action (toOcbPhysicalType physical) nullPtr 0 Nothing
+
+withValidityBytesForFill :: Maybe OcbValidityBitmap -> (Ptr Word8 -> CSize -> IO a) -> IO a
+withValidityBytesForFill Nothing action = action nullPtr 0
+withValidityBytesForFill (Just validity) action = withWord8Array (ocbValidityBytes validity) action
+
 rowGroupSummaries :: OcbFile -> IO (Result OcbRowGroupSummaries)
 rowGroupSummaries OcbFile{ocbNative, ocbHandle} =
   withForeignPtr ocbHandle $ \handle ->
@@ -941,6 +1183,80 @@ validateOcbReadRequest :: OcbReadRequest -> Maybe TioError
 validateOcbReadRequest request
   | ocbReadMaxThreads request < 0 = Just (invalidArgument "OCB read max_threads must be non-negative")
   | otherwise = Nothing
+
+fillValidationContext :: OcbFile -> OcbRowGroupFillRequest -> IO (Either TioError (Word64, OcbRowGroupSummary))
+fillValidationContext file request = do
+  summariesResult <- rowGroupSummaries file
+  pure $ case summariesResult of
+    Left err -> Left err
+    Right OcbRowGroupSummaries{ocbRowGroupSummaries = summaries} ->
+      case filter ((== ocbFillRowGroupId request) . ocbSummaryRowGroupId) summaries of
+        [] -> Left (invalidArgument "OCB fill row_group_id was not found")
+        summary:_ -> Right (ocbSummaryRowCount summary, summary)
+
+validateOcbRowGroupFillRequest :: Word64 -> OcbRowGroupSummary -> OcbRowGroupFillRequest -> Maybe TioError
+validateOcbRowGroupFillRequest rowCount summary request
+  | null (ocbFillColumns request) = Just (invalidArgument "OCB row-group fill must contain at least one column")
+  | otherwise = firstJust (map validateColumn (ocbFillColumns request))
+ where
+  validateColumn column =
+    firstJust
+      [ require (ocbFillColumnName column /= Nothing || ocbFillColumnId column /= Nothing) "OCB fill column must have a name or column id"
+      , require (maybe True (not . null) (ocbFillColumnName column)) "OCB fill column name must not be empty"
+      , case ocbFillColumnValues column of
+          OcbValuesUnknown _ _ -> Just (invalidArgument "OCB fill column values must have a known physical type")
+          OcbValuesFixedBinary 0 _ -> Just (invalidArgument "OCB fixed-binary fill width must be non-zero")
+          OcbValuesFixedBinary width bytes ->
+            firstJust
+              [ require (length bytes `mod` fromIntegral width == 0) "OCB fixed-binary fill byte capacity must be divisible by width"
+              , require (valueCapacityRows (ocbFillColumnValues column) >= rowCount) "OCB fill value capacity is smaller than the target row group"
+              ]
+          _ -> require (valueCapacityRows (ocbFillColumnValues column) >= rowCount) "OCB fill value capacity is smaller than the target row group"
+      , case resolveFillColumnSummary column summary of
+          Nothing -> Just (invalidArgument "OCB fill column was not found in the target row group summary")
+          Just chunk ->
+            firstJust
+              [ require (ocbChunkPhysicalType chunk == primitiveValuesPhysicalType (ocbFillColumnValues column)) "OCB fill column physical type does not match the row group summary"
+              , case (ocbFillColumnValues column, ocbChunkPhysicalType chunk) of
+                  (OcbValuesFixedBinary width _, OcbPhysicalFixedBinary) -> require (ocbChunkFixedBinaryWidth chunk == width) "OCB fixed-binary fill width does not match the row group summary"
+                  _ -> Nothing
+              ]
+      , case ocbFillColumnValidity column of
+          Nothing -> Nothing
+          Just validity ->
+            firstJust
+              [ require (ocbValidityRowCount validity >= rowCount) "OCB fill validity row capacity is smaller than the target row group"
+              , require (fromIntegral (length (ocbValidityBytes validity)) >= exactValidityBytes rowCount) "OCB fill validity byte capacity is smaller than the target row group"
+              ]
+      ]
+
+resolveFillColumnSummary :: OcbFillColumn -> OcbRowGroupSummary -> Maybe OcbColumnChunkSummary
+resolveFillColumnSummary column summary =
+  case ocbFillColumnId column of
+    Just columnId -> findFirst ((== columnId) . ocbChunkColumnId) chunks
+    Nothing -> case ocbFillColumnName column of
+      Just name -> findFirst ((== name) . ocbChunkColumnName) chunks
+      Nothing -> Nothing
+ where
+  chunks = ocbSummaryChunks summary
+
+valueCapacityRows :: OcbPrimitiveValues -> Word64
+valueCapacityRows = \case
+  OcbValuesI32 xs -> fromIntegral (length xs)
+  OcbValuesI64 xs -> fromIntegral (length xs)
+  OcbValuesF32 xs -> fromIntegral (length xs)
+  OcbValuesF64 xs -> fromIntegral (length xs)
+  OcbValuesFixedBinary width bytes -> fromIntegral (fixedBinaryRows width bytes)
+  OcbValuesUnknown _ rows -> rows
+
+primitiveValuesPhysicalType :: OcbPrimitiveValues -> OcbPhysicalType
+primitiveValuesPhysicalType = \case
+  OcbValuesI32 _ -> OcbPhysicalI32
+  OcbValuesI64 _ -> OcbPhysicalI64
+  OcbValuesF32 _ -> OcbPhysicalF32
+  OcbValuesF64 _ -> OcbPhysicalF64
+  OcbValuesFixedBinary _ _ -> OcbPhysicalFixedBinary
+  OcbValuesUnknown physical _ -> physical
 
 withOcbReadRequest :: NativeLibrary -> OcbReadRequest -> (Ptr CArcadiaTioOcbReadRequest -> IO a) -> IO a
 withOcbReadRequest native request action =
@@ -1283,12 +1599,22 @@ withWord8Array :: [Word8] -> (Ptr Word8 -> CSize -> IO a) -> IO a
 withWord8Array [] action = action nullPtr 0
 withWord8Array xs action = withArray xs $ \ptr -> action ptr (fromIntegral (length xs))
 
+withMaybeCString :: Maybe String -> (CString -> IO a) -> IO a
+withMaybeCString Nothing action = action nullPtr
+withMaybeCString (Just value) action = withCString value action
+
 withArrayOrNull :: Storable a => [a] -> (Ptr a -> CSize -> IO b) -> IO b
 withArrayOrNull [] action = action nullPtr 0
 withArrayOrNull xs action = withArray xs $ \ptr -> action ptr (fromIntegral (length xs))
 
 firstJust :: [Maybe a] -> Maybe a
 firstJust = foldr (<|>) Nothing
+
+findFirst :: (a -> Bool) -> [a] -> Maybe a
+findFirst _ [] = Nothing
+findFirst predicate (x:xs)
+  | predicate x = Just x
+  | otherwise = findFirst predicate xs
 
 (<|>) :: Maybe a -> Maybe a -> Maybe a
 Nothing <|> rhs = rhs
@@ -1529,6 +1855,69 @@ copyOcbReadReport raw = do
       , ocbReadFallbackReason = fallback
       }
 
+copyOcbReadCursorReport :: CArcadiaTioOcbReadCursorReport -> IO OcbReadCursorReport
+copyOcbReadCursorReport raw = do
+  base <- copyOcbReadReport (cOcbReadCursorReportBaseReport raw)
+  pure
+    OcbReadCursorReport
+      { ocbCursorBaseReport = base
+      , ocbCursorBatchesYielded = fromIntegral (cOcbReadCursorReportBatchesYielded raw)
+      , ocbCursorRowsYielded = cOcbReadCursorReportRowsYielded raw
+      , ocbCursorCancelled = cOcbReadCursorReportCancelled raw /= 0
+      }
+
+copyOcbReadFillReport :: CArcadiaTioOcbReadFillReport -> OcbReadFillReport
+copyOcbReadFillReport raw =
+  OcbReadFillReport
+    { ocbFillReportRowGroupId = cOcbReadFillReportRowGroupId raw
+    , ocbFillReportBaseRow = cOcbReadFillReportBaseRow raw
+    , ocbFillReportRowCount = cOcbReadFillReportRowCount raw
+    , ocbFillReportColumnsFilled = fromIntegral (cOcbReadFillReportColumnsFilled raw)
+    }
+
+copyOcbFilledColumn :: NativeLibrary -> CArcadiaTioOcbColumnFillBuffer -> IO OcbFilledColumn
+copyOcbFilledColumn native raw = do
+  name <- peekMaybeCString (cOcbColumnFillBufferColumnName raw)
+  values <- copyFilledPrimitiveValues native raw
+  validity <- copyFilledValidity raw
+  pure
+    OcbFilledColumn
+      { ocbFilledColumnName = name
+      , ocbFilledColumnId = cOcbColumnFillBufferColumnId raw
+      , ocbFilledColumnValues = values
+      , ocbFilledColumnValidity = validity
+      , ocbFilledRows = fromIntegral (cOcbColumnFillBufferRowsFilled raw)
+      }
+
+copyFilledPrimitiveValues :: NativeLibrary -> CArcadiaTioOcbColumnFillBuffer -> IO OcbPrimitiveValues
+copyFilledPrimitiveValues native raw = do
+  let rows = fromIntegral (cOcbColumnFillBufferRowsFilled raw)
+      dataPtr = cOcbColumnFillBufferValues raw
+      physical = fromOcbPhysicalType (cOcbColumnFillBufferPhysicalType raw)
+  if dataPtr == nullPtr && rows /= (0 :: Int)
+    then pure (OcbValuesUnknown physical (fromIntegral rows))
+    else case physical of
+      OcbPhysicalI32 -> OcbValuesI32 <$> peekArray rows (castPtr dataPtr)
+      OcbPhysicalI64 -> OcbValuesI64 <$> peekArray rows (castPtr dataPtr)
+      OcbPhysicalF32 -> do
+        floats <- peekArray rows (castPtr dataPtr) :: IO [CFloat]
+        pure (OcbValuesF32 (map realToFrac floats))
+      OcbPhysicalF64 -> OcbValuesF64 <$> peekArray rows (castPtr dataPtr)
+      OcbPhysicalFixedBinary -> do
+        width <- withArray [raw] $ \bufferPtr -> capiOcbColumnFillBufferFixedBinaryWidth native bufferPtr
+        bytes <- peekArray (rows * fromIntegral width) (castPtr dataPtr)
+        pure (OcbValuesFixedBinary width bytes)
+      OcbPhysicalUnknown _ -> pure (OcbValuesUnknown physical (fromIntegral rows))
+
+copyFilledValidity :: CArcadiaTioOcbColumnFillBuffer -> IO (Maybe OcbValidityBitmap)
+copyFilledValidity raw
+  | cOcbColumnFillBufferValidityFilled raw == 0 = pure Nothing
+  | otherwise = do
+      let rows = fromIntegral (cOcbColumnFillBufferRowsFilled raw)
+          byteLen = fromIntegral (exactValidityBytes rows)
+      bytes <- peekArray byteLen (cOcbColumnFillBufferValidityBytes raw)
+      pure (Just OcbValidityBitmap{ocbValidityBytes = bytes, ocbValidityRowCount = rows})
+
 copyOcbReadAttribution :: CArcadiaTioOcbReadAttribution -> IO OcbReadAttribution
 copyOcbReadAttribution raw = do
   fallback <- peekMaybeCString (cOcbReadAttributionFallbackReason raw)
@@ -1674,6 +2063,15 @@ peekMaybeCString ptr
 boolByte :: Bool -> Word8
 boolByte True = 1
 boolByte False = 0
+
+errorCodeStatus :: ErrorCode -> CInt
+errorCodeStatus ErrorOk = 0
+errorCodeStatus ErrorInvalidArgument = 1
+errorCodeStatus ErrorUnimplemented = 2
+errorCodeStatus ErrorIo = 3
+errorCodeStatus ErrorFlatbuffers = 4
+errorCodeStatus ErrorLibraryLoad = 1
+errorCodeStatus (ErrorUnknown value) = fromIntegral value
 
 toCOpenOptions :: CArcadiaTioOcbOpenOptions -> OcbOpenOptions -> CArcadiaTioOcbOpenOptions
 toCOpenOptions initialized OcbOpenOptions{ocbOpenValidation} =

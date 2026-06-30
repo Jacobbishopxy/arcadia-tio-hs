@@ -39,12 +39,12 @@ The checked-in generated item list is [parity-inventory.generated.md](parity-inv
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 364
+- wrapped: 380
 - intentionally not applicable: 24
-- deferred blockers: 16
+- deferred blockers: 0
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 16 remaining deferred blockers are OCB fill/cursor/follow-up surfaces and mean the wrapper must not claim broad 100% C ABI/public-surface parity.
+These counts are an inventory baseline for the frozen C ABI header snapshot, not a packaging, support, deployment, release, performance, or production-readiness statement. Zero deferred blockers in the machine inventory means the currently audited C ABI items are either wrapped or intentionally not applicable to the Haskell wrapper boundary; it does not by itself make a broader product-readiness claim.
 
 Legend:
 
@@ -88,7 +88,7 @@ Legend:
 | Reform | ✅ | ✅ | `reformTo` and `reformToEx` expose target-layout options, regular-chunked block-shape validation, copied report reason metadata, and native report cleanup. |
 | Diagnostics / precise accounting | ✅ | ✅ | `v4Diagnostics` and `v4DiagnosticsPrecise` expose status-aware report ADTs, byte families, precise-accounting validity/omitted-field details, owned strings, and matching native report frees. |
 | Arrow C Data export | ✅ via C ABI/C++ | ✅ | `readValuesArrow` returns an explicit owned `ArrowCData`; callbacks are released by `releaseArrowCData`/finalizers without exposing raw release functions. |
-| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/options/clone/errors, exact raw enum/type conversions, native init-helper-backed open/read predicate defaults, full copied metadata including fixed-binary descriptor widths, dictionary values, read requests/outcomes/attribution, read plans, plan inspection/read-from-plan, generic row-group summaries, validated write-spec ADTs, create/create-with-options, append/append-with-options, fixed-binary width helper coverage, and cleanup-orphan-tail results. OCB cursor callbacks remain blocked until callback/user-data lifetime can be made safe; row-group fill remains blocked until caller-owned buffer shape, fixed-binary byte capacity, and validity ownership validation are represented safely. |
+| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ✅ | `Arcadia.Tio.Ocb` exposes selected-snapshot open/options/clone/errors, exact raw enum/type conversions, native init-helper-backed open/read predicate defaults, full copied metadata including fixed-binary descriptor widths, dictionary values, read requests/outcomes/attribution, read plans, plan inspection/read-from-plan, generic row-group summaries, validated write-spec ADTs, create/create-with-options, append/append-with-options, fixed-binary width helper coverage, cleanup-orphan-tail results, row-group fill into scoped Haskell-owned buffers, and cursor traversal through a scoped callback wrapper that copies batches before invoking user code. |
 | OCB direct Rust-core reader path | ✅ public Rust `arcadia-tio-ocb-core` | ❌ | Haskell should still use C ABI unless a separate pure Haskell/Rust-core bridge is approved. |
 | Tests without native library | N/A | ✅ skips gracefully | `cabal test all` skips when env vars are absent. |
 | Native `.tio` roundtrip test | ✅ Rust tests | ✅ f32/f64/i32/i64 + sparse + metadata/selectors/dense-mask | Still a focused smoke, not exhaustive parity evidence. |
@@ -98,13 +98,11 @@ Legend:
 ## Recommended next slices
 
 Before closing a later parity slice, regenerate `docs/parity-inventory.generated.md`, then run the machine inventory with
-`--fail-on-deferred` against the same C ABI headers and resolve any remaining
-deferred blockers by either adding wrappers or documenting why they are truly
-not applicable to the Haskell C-ABI wrapper boundary.
+`--fail-on-deferred` against the same C ABI headers and resolve any new blockers
+by either adding wrappers or documenting why they are truly not applicable to the
+Haskell C-ABI wrapper boundary.
 
 1. Expand coordinate parity beyond the current partial surface: fixed-text/dictionary append authoring ergonomics and any higher-level index policy helpers beyond the exact raw status/type surfaces.
-2. Expand remaining blocked OCB read-side paths: safe cursor callback lifetime
-   handling and safe row-group fill buffer APIs.
-3. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
+2. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
    `cabal test all` without native env, and an optional native-library job gated
    by secrets/artifacts.
