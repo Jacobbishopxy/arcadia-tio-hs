@@ -12,6 +12,7 @@ module Arcadia.Tio.Internal.CApi
   , lastError
   , CHandle
   , COcbFile
+  , COcbReadPlan
   , CArcadiaTioAxisCoordinateInput(..)
   , CArcadiaTioAxisCoordinateMeta(..)
   , CArcadiaTioAxisCoordinateMetaV2(..)
@@ -119,8 +120,40 @@ module Arcadia.Tio.Internal.CApi
   , sparseRuleV2StructSize
   , CArcadiaTioSparseAppendAnalysis(..)
   , emptyCArcadiaTioSparseAppendAnalysis
+  , CArcadiaTioOcbOpenOptions(..)
+  , CArcadiaTioOcbColumnDescriptor(..)
+  , CArcadiaTioOcbDictionaryDescriptor(..)
+  , CArcadiaTioOcbOrderingKey(..)
   , CArcadiaTioOcbMetadata(..)
+  , CArcadiaTioOcbByteSlice(..)
+  , CArcadiaTioOcbDictionaryValues(..)
+  , CArcadiaTioOcbPrimitiveValues(..)
+  , CArcadiaTioOcbValidityBitmap(..)
+  , CArcadiaTioOcbPredicateValue(..)
+  , CArcadiaTioOcbRowGroupPredicate(..)
+  , CArcadiaTioOcbReadRequest(..)
+  , CArcadiaTioOcbReadReport(..)
+  , CArcadiaTioOcbReadAttribution(..)
+  , CArcadiaTioOcbColumnArray(..)
+  , CArcadiaTioOcbColumnBatch(..)
+  , CArcadiaTioOcbReadOutcome(..)
+  , CArcadiaTioOcbBodyRefSummary(..)
+  , CArcadiaTioOcbColumnChunkSummary(..)
+  , CArcadiaTioOcbColumnStatsSummary(..)
+  , CArcadiaTioOcbRowGroupSummary(..)
+  , CArcadiaTioOcbRowGroupSummaries(..)
+  , emptyCArcadiaTioOcbOpenOptions
   , emptyCArcadiaTioOcbMetadata
+  , emptyCArcadiaTioOcbDictionaryValues
+  , emptyCArcadiaTioOcbPrimitiveValues
+  , emptyCArcadiaTioOcbValidityBitmap
+  , emptyCArcadiaTioOcbPredicateValue
+  , emptyCArcadiaTioOcbRowGroupPredicate
+  , emptyCArcadiaTioOcbReadRequest
+  , emptyCArcadiaTioOcbReadReport
+  , emptyCArcadiaTioOcbReadAttribution
+  , emptyCArcadiaTioOcbReadOutcome
+  , emptyCArcadiaTioOcbRowGroupSummaries
   , capiCreateStreaming
   , capiCreateStreamingEx
   , capiCreateRandomAccess
@@ -253,10 +286,36 @@ module Arcadia.Tio.Internal.CApi
   , capiAppendSparseI32WithRangeV2
   , capiAppendSparseI64WithRangeV2
   , capiSparseAppendAnalysisFree
+  , capiOcbLastErrorKind
+  , capiOcbLastErrorCause
   , capiOcbOpen
+  , capiOcbOpenWithOptions
+  , capiOcbReaderClone
   , capiOcbClose
   , capiOcbMetadata
   , capiOcbMetadataFree
+  , capiOcbDictionaryValues
+  , capiOcbDictionaryValuesFree
+  , capiOcbReadRequestInit
+  , capiOcbReadReportInit
+  , capiOcbReadAttributionInit
+  , capiOcbReadOutcomeInit
+  , capiOcbReadBatches
+  , capiOcbReadBatchesWithAttribution
+  , capiOcbReadReportFree
+  , capiOcbReadAttributionFree
+  , capiOcbReadOutcomeFree
+  , capiOcbColumnArrayFixedBinaryWidth
+  , capiOcbPlanRead
+  , capiOcbReadPlanReport
+  , capiOcbReadPlanProjectedColumnIds
+  , capiOcbReadPlanRowGroupIds
+  , capiOcbReadBatchesFromPlan
+  , capiOcbReadPlanFree
+  , capiOcbRowGroupSummariesInit
+  , capiOcbRowGroupSummaries
+  , capiOcbReadPlanRowGroupSummaries
+  , capiOcbRowGroupSummariesFree
   , capiTensorFree
   , capiMaskFree
   , capiFileMetaFree
@@ -265,7 +324,7 @@ module Arcadia.Tio.Internal.CApi
 
 import Control.Exception (SomeException, displayException, try)
 import Data.Int (Int32, Int64)
-import Data.Word (Word8, Word32, Word64)
+import Data.Word (Word8, Word16, Word32, Word64)
 import Foreign.C.String (CString, peekCString)
 import Foreign.C.Types (CFloat, CInt(..), CSize(..))
 import Foreign.Ptr (FunPtr, Ptr, nullFunPtr, nullPtr, plusPtr)
@@ -295,6 +354,9 @@ data CHandle
 
 -- | Opaque C OCB selected-snapshot handle.
 data COcbFile
+
+-- | Opaque C OCB read plan handle.
+data COcbReadPlan
 
 
 -- | Raw Coordinate v1 create input.
@@ -2459,6 +2521,145 @@ emptyCArcadiaTioSparseAppendAnalysis =
     , cSparseAnalysisReasonsLen = 0
     }
 
+
+-- | Raw OCB open options matching @ArcadiaTioOcbOpenOptions@.
+data CArcadiaTioOcbOpenOptions = CArcadiaTioOcbOpenOptions
+  { cOcbOpenOptionsVersion :: Word32
+  , cOcbOpenOptionsStructSize :: CSize
+  , cOcbOpenOptionsValidation :: CInt
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbOpenOptions where
+  sizeOf _ = 56
+  alignment _ = 8
+  peek ptr =
+    CArcadiaTioOcbOpenOptions
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+  poke ptr CArcadiaTioOcbOpenOptions{cOcbOpenOptionsVersion, cOcbOpenOptionsStructSize, cOcbOpenOptionsValidation} = do
+    fillBytes ptr 0 56
+    pokeByteOff ptr 0 cOcbOpenOptionsVersion
+    pokeByteOff ptr 8 cOcbOpenOptionsStructSize
+    pokeByteOff ptr 16 cOcbOpenOptionsValidation
+
+emptyCArcadiaTioOcbOpenOptions :: CArcadiaTioOcbOpenOptions
+emptyCArcadiaTioOcbOpenOptions =
+  CArcadiaTioOcbOpenOptions
+    { cOcbOpenOptionsVersion = 1
+    , cOcbOpenOptionsStructSize = 56
+    , cOcbOpenOptionsValidation = 0
+    }
+
+-- | Raw OCB column descriptor matching @ArcadiaTioOcbColumnDescriptor@.
+data CArcadiaTioOcbColumnDescriptor = CArcadiaTioOcbColumnDescriptor
+  { cOcbColumnDescriptorVersion :: Word32
+  , cOcbColumnDescriptorStructSize :: CSize
+  , cOcbColumnDescriptorId :: Word32
+  , cOcbColumnDescriptorName :: CString
+  , cOcbColumnDescriptorPhysicalType :: CInt
+  , cOcbColumnDescriptorLogicalKind :: CInt
+  , cOcbColumnDescriptorHasDictionaryId :: Word8
+  , cOcbColumnDescriptorDictionaryId :: Word32
+  , cOcbColumnDescriptorScale :: Int32
+  , cOcbColumnDescriptorNullable :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnDescriptor where
+  sizeOf _ = 80
+  alignment _ = 8
+  peek ptr =
+    CArcadiaTioOcbColumnDescriptor
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 36
+      <*> peekByteOff ptr 40
+      <*> peekByteOff ptr 44
+      <*> peekByteOff ptr 48
+      <*> peekByteOff ptr 52
+  poke ptr CArcadiaTioOcbColumnDescriptor{cOcbColumnDescriptorVersion, cOcbColumnDescriptorStructSize, cOcbColumnDescriptorId, cOcbColumnDescriptorName, cOcbColumnDescriptorPhysicalType, cOcbColumnDescriptorLogicalKind, cOcbColumnDescriptorHasDictionaryId, cOcbColumnDescriptorDictionaryId, cOcbColumnDescriptorScale, cOcbColumnDescriptorNullable} = do
+    fillBytes ptr 0 80
+    pokeByteOff ptr 0 cOcbColumnDescriptorVersion
+    pokeByteOff ptr 8 cOcbColumnDescriptorStructSize
+    pokeByteOff ptr 16 cOcbColumnDescriptorId
+    pokeByteOff ptr 24 cOcbColumnDescriptorName
+    pokeByteOff ptr 32 cOcbColumnDescriptorPhysicalType
+    pokeByteOff ptr 36 cOcbColumnDescriptorLogicalKind
+    pokeByteOff ptr 40 cOcbColumnDescriptorHasDictionaryId
+    pokeByteOff ptr 44 cOcbColumnDescriptorDictionaryId
+    pokeByteOff ptr 48 cOcbColumnDescriptorScale
+    pokeByteOff ptr 52 cOcbColumnDescriptorNullable
+
+-- | Raw OCB dictionary descriptor matching @ArcadiaTioOcbDictionaryDescriptor@.
+data CArcadiaTioOcbDictionaryDescriptor = CArcadiaTioOcbDictionaryDescriptor
+  { cOcbDictionaryDescriptorVersion :: Word32
+  , cOcbDictionaryDescriptorStructSize :: CSize
+  , cOcbDictionaryDescriptorDictionaryId :: Word32
+  , cOcbDictionaryDescriptorName :: CString
+  , cOcbDictionaryDescriptorCodePhysicalType :: CInt
+  , cOcbDictionaryDescriptorValueKind :: CInt
+  , cOcbDictionaryDescriptorEntryCount :: Word32
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbDictionaryDescriptor where
+  sizeOf _ = 72
+  alignment _ = 8
+  peek ptr =
+    CArcadiaTioOcbDictionaryDescriptor
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 36
+      <*> peekByteOff ptr 40
+  poke ptr CArcadiaTioOcbDictionaryDescriptor{cOcbDictionaryDescriptorVersion, cOcbDictionaryDescriptorStructSize, cOcbDictionaryDescriptorDictionaryId, cOcbDictionaryDescriptorName, cOcbDictionaryDescriptorCodePhysicalType, cOcbDictionaryDescriptorValueKind, cOcbDictionaryDescriptorEntryCount} = do
+    fillBytes ptr 0 72
+    pokeByteOff ptr 0 cOcbDictionaryDescriptorVersion
+    pokeByteOff ptr 8 cOcbDictionaryDescriptorStructSize
+    pokeByteOff ptr 16 cOcbDictionaryDescriptorDictionaryId
+    pokeByteOff ptr 24 cOcbDictionaryDescriptorName
+    pokeByteOff ptr 32 cOcbDictionaryDescriptorCodePhysicalType
+    pokeByteOff ptr 36 cOcbDictionaryDescriptorValueKind
+    pokeByteOff ptr 40 cOcbDictionaryDescriptorEntryCount
+
+-- | Raw OCB ordering key matching @ArcadiaTioOcbOrderingKey@.
+data CArcadiaTioOcbOrderingKey = CArcadiaTioOcbOrderingKey
+  { cOcbOrderingKeyVersion :: Word32
+  , cOcbOrderingKeyStructSize :: CSize
+  , cOcbOrderingKeyColumnId :: Word32
+  , cOcbOrderingKeyColumnName :: CString
+  , cOcbOrderingKeyDirection :: CInt
+  , cOcbOrderingKeyNullOrder :: CInt
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbOrderingKey where
+  sizeOf _ = 64
+  alignment _ = 8
+  peek ptr =
+    CArcadiaTioOcbOrderingKey
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 36
+  poke ptr CArcadiaTioOcbOrderingKey{cOcbOrderingKeyVersion, cOcbOrderingKeyStructSize, cOcbOrderingKeyColumnId, cOcbOrderingKeyColumnName, cOcbOrderingKeyDirection, cOcbOrderingKeyNullOrder} = do
+    fillBytes ptr 0 64
+    pokeByteOff ptr 0 cOcbOrderingKeyVersion
+    pokeByteOff ptr 8 cOcbOrderingKeyStructSize
+    pokeByteOff ptr 16 cOcbOrderingKeyColumnId
+    pokeByteOff ptr 24 cOcbOrderingKeyColumnName
+    pokeByteOff ptr 32 cOcbOrderingKeyDirection
+    pokeByteOff ptr 36 cOcbOrderingKeyNullOrder
+
 -- | Minimal raw OCB metadata header matching @ArcadiaTioOcbMetadata@.
 data CArcadiaTioOcbMetadata = CArcadiaTioOcbMetadata
   { cOcbMetadataVersion :: Word32
@@ -2471,11 +2672,11 @@ data CArcadiaTioOcbMetadata = CArcadiaTioOcbMetadata
   , cOcbMetadataRowCount :: Word64
   , cOcbMetadataRowGroupCount :: Word32
   , cOcbMetadataColumnChunkCount :: Word32
-  , cOcbMetadataColumns :: Ptr ()
+  , cOcbMetadataColumns :: Ptr CArcadiaTioOcbColumnDescriptor
   , cOcbMetadataColumnsLen :: CSize
-  , cOcbMetadataDictionaries :: Ptr ()
+  , cOcbMetadataDictionaries :: Ptr CArcadiaTioOcbDictionaryDescriptor
   , cOcbMetadataDictionariesLen :: CSize
-  , cOcbMetadataOrderingKeys :: Ptr ()
+  , cOcbMetadataOrderingKeys :: Ptr CArcadiaTioOcbOrderingKey
   , cOcbMetadataOrderingKeysLen :: CSize
   }
   deriving (Eq, Show)
@@ -2539,6 +2740,569 @@ emptyCArcadiaTioOcbMetadata =
     , cOcbMetadataOrderingKeys = nullPtr
     , cOcbMetadataOrderingKeysLen = 0
     }
+
+
+-- | Raw OCB byte slice matching @ArcadiaTioOcbByteSlice@.
+data CArcadiaTioOcbByteSlice = CArcadiaTioOcbByteSlice
+  { cOcbByteSliceData :: Ptr Word8
+  , cOcbByteSliceLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbByteSlice where
+  sizeOf _ = 16
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbByteSlice <$> peekByteOff ptr 0 <*> peekByteOff ptr 8
+  poke ptr CArcadiaTioOcbByteSlice{cOcbByteSliceData, cOcbByteSliceLen} = do
+    pokeByteOff ptr 0 cOcbByteSliceData
+    pokeByteOff ptr 8 cOcbByteSliceLen
+
+-- | Raw OCB dictionary values matching @ArcadiaTioOcbDictionaryValues@.
+data CArcadiaTioOcbDictionaryValues = CArcadiaTioOcbDictionaryValues
+  { cOcbDictionaryValuesVersion :: Word32
+  , cOcbDictionaryValuesStructSize :: CSize
+  , cOcbDictionaryValuesDictionaryId :: Word32
+  , cOcbDictionaryValuesName :: CString
+  , cOcbDictionaryValuesValueKind :: CInt
+  , cOcbDictionaryValuesFixedWidth :: Word32
+  , cOcbDictionaryValuesStringValues :: Ptr CString
+  , cOcbDictionaryValuesStringValuesLen :: CSize
+  , cOcbDictionaryValuesByteValues :: Ptr CArcadiaTioOcbByteSlice
+  , cOcbDictionaryValuesByteValuesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbDictionaryValues where
+  sizeOf _ = 104
+  alignment _ = 8
+  peek ptr =
+    CArcadiaTioOcbDictionaryValues
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 36
+      <*> peekByteOff ptr 40
+      <*> peekByteOff ptr 48
+      <*> peekByteOff ptr 56
+      <*> peekByteOff ptr 64
+  poke ptr CArcadiaTioOcbDictionaryValues{cOcbDictionaryValuesVersion, cOcbDictionaryValuesStructSize, cOcbDictionaryValuesDictionaryId, cOcbDictionaryValuesName, cOcbDictionaryValuesValueKind, cOcbDictionaryValuesFixedWidth, cOcbDictionaryValuesStringValues, cOcbDictionaryValuesStringValuesLen, cOcbDictionaryValuesByteValues, cOcbDictionaryValuesByteValuesLen} = do
+    fillBytes ptr 0 104
+    pokeByteOff ptr 0 cOcbDictionaryValuesVersion
+    pokeByteOff ptr 8 cOcbDictionaryValuesStructSize
+    pokeByteOff ptr 16 cOcbDictionaryValuesDictionaryId
+    pokeByteOff ptr 24 cOcbDictionaryValuesName
+    pokeByteOff ptr 32 cOcbDictionaryValuesValueKind
+    pokeByteOff ptr 36 cOcbDictionaryValuesFixedWidth
+    pokeByteOff ptr 40 cOcbDictionaryValuesStringValues
+    pokeByteOff ptr 48 cOcbDictionaryValuesStringValuesLen
+    pokeByteOff ptr 56 cOcbDictionaryValuesByteValues
+    pokeByteOff ptr 64 cOcbDictionaryValuesByteValuesLen
+
+emptyCArcadiaTioOcbDictionaryValues :: CArcadiaTioOcbDictionaryValues
+emptyCArcadiaTioOcbDictionaryValues =
+  CArcadiaTioOcbDictionaryValues
+    { cOcbDictionaryValuesVersion = 1
+    , cOcbDictionaryValuesStructSize = 104
+    , cOcbDictionaryValuesDictionaryId = 0
+    , cOcbDictionaryValuesName = nullPtr
+    , cOcbDictionaryValuesValueKind = 0
+    , cOcbDictionaryValuesFixedWidth = 0
+    , cOcbDictionaryValuesStringValues = nullPtr
+    , cOcbDictionaryValuesStringValuesLen = 0
+    , cOcbDictionaryValuesByteValues = nullPtr
+    , cOcbDictionaryValuesByteValuesLen = 0
+    }
+
+
+-- | Raw OCB primitive values matching @ArcadiaTioOcbPrimitiveValues@.
+data CArcadiaTioOcbPrimitiveValues = CArcadiaTioOcbPrimitiveValues
+  { cOcbPrimitiveValuesVersion :: Word32
+  , cOcbPrimitiveValuesStructSize :: CSize
+  , cOcbPrimitiveValuesPhysicalType :: CInt
+  , cOcbPrimitiveValuesData :: Ptr ()
+  , cOcbPrimitiveValuesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbPrimitiveValues where
+  sizeOf _ = 64
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbPrimitiveValues <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioOcbPrimitiveValues{cOcbPrimitiveValuesVersion, cOcbPrimitiveValuesStructSize, cOcbPrimitiveValuesPhysicalType, cOcbPrimitiveValuesData, cOcbPrimitiveValuesLen} = do
+    fillBytes ptr 0 64
+    pokeByteOff ptr 0 cOcbPrimitiveValuesVersion
+    pokeByteOff ptr 8 cOcbPrimitiveValuesStructSize
+    pokeByteOff ptr 16 cOcbPrimitiveValuesPhysicalType
+    pokeByteOff ptr 24 cOcbPrimitiveValuesData
+    pokeByteOff ptr 32 cOcbPrimitiveValuesLen
+
+emptyCArcadiaTioOcbPrimitiveValues :: CArcadiaTioOcbPrimitiveValues
+emptyCArcadiaTioOcbPrimitiveValues = CArcadiaTioOcbPrimitiveValues 1 64 0 nullPtr 0
+
+-- | Raw OCB validity bitmap matching @ArcadiaTioOcbValidityBitmap@.
+data CArcadiaTioOcbValidityBitmap = CArcadiaTioOcbValidityBitmap
+  { cOcbValidityBitmapVersion :: Word32
+  , cOcbValidityBitmapStructSize :: CSize
+  , cOcbValidityBitmapData :: Ptr Word8
+  , cOcbValidityBitmapLen :: CSize
+  , cOcbValidityBitmapRowCount :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbValidityBitmap where
+  sizeOf _ = 64
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbValidityBitmap <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioOcbValidityBitmap{cOcbValidityBitmapVersion, cOcbValidityBitmapStructSize, cOcbValidityBitmapData, cOcbValidityBitmapLen, cOcbValidityBitmapRowCount} = do
+    fillBytes ptr 0 64
+    pokeByteOff ptr 0 cOcbValidityBitmapVersion
+    pokeByteOff ptr 8 cOcbValidityBitmapStructSize
+    pokeByteOff ptr 16 cOcbValidityBitmapData
+    pokeByteOff ptr 24 cOcbValidityBitmapLen
+    pokeByteOff ptr 32 cOcbValidityBitmapRowCount
+
+emptyCArcadiaTioOcbValidityBitmap :: CArcadiaTioOcbValidityBitmap
+emptyCArcadiaTioOcbValidityBitmap = CArcadiaTioOcbValidityBitmap 1 64 nullPtr 0 0
+
+-- | Raw OCB predicate value matching @ArcadiaTioOcbPredicateValue@.
+data CArcadiaTioOcbPredicateValue = CArcadiaTioOcbPredicateValue
+  { cOcbPredicateValueVersion :: Word32
+  , cOcbPredicateValueStructSize :: CSize
+  , cOcbPredicateValuePhysicalType :: CInt
+  , cOcbPredicateValueI32 :: Int32
+  , cOcbPredicateValueI64 :: Int64
+  , cOcbPredicateValueF32 :: CFloat
+  , cOcbPredicateValueF64 :: Double
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbPredicateValue where
+  sizeOf _ = 72
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbPredicateValue <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40
+  poke ptr CArcadiaTioOcbPredicateValue{cOcbPredicateValueVersion, cOcbPredicateValueStructSize, cOcbPredicateValuePhysicalType, cOcbPredicateValueI32, cOcbPredicateValueI64, cOcbPredicateValueF32, cOcbPredicateValueF64} = do
+    fillBytes ptr 0 72
+    pokeByteOff ptr 0 cOcbPredicateValueVersion
+    pokeByteOff ptr 8 cOcbPredicateValueStructSize
+    pokeByteOff ptr 16 cOcbPredicateValuePhysicalType
+    pokeByteOff ptr 20 cOcbPredicateValueI32
+    pokeByteOff ptr 24 cOcbPredicateValueI64
+    pokeByteOff ptr 32 cOcbPredicateValueF32
+    pokeByteOff ptr 40 cOcbPredicateValueF64
+
+emptyCArcadiaTioOcbPredicateValue :: CArcadiaTioOcbPredicateValue
+emptyCArcadiaTioOcbPredicateValue = CArcadiaTioOcbPredicateValue 1 72 0 0 0 0 0
+
+-- | Raw OCB row-group predicate matching @ArcadiaTioOcbRowGroupPredicate@.
+data CArcadiaTioOcbRowGroupPredicate = CArcadiaTioOcbRowGroupPredicate
+  { cOcbRowGroupPredicateVersion :: Word32
+  , cOcbRowGroupPredicateStructSize :: CSize
+  , cOcbRowGroupPredicateColumn :: CString
+  , cOcbRowGroupPredicateHasLower :: Word8
+  , cOcbRowGroupPredicateLower :: CArcadiaTioOcbPredicateValue
+  , cOcbRowGroupPredicateHasUpper :: Word8
+  , cOcbRowGroupPredicateUpper :: CArcadiaTioOcbPredicateValue
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbRowGroupPredicate where
+  sizeOf _ = 208
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbRowGroupPredicate <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112
+  poke ptr CArcadiaTioOcbRowGroupPredicate{cOcbRowGroupPredicateVersion, cOcbRowGroupPredicateStructSize, cOcbRowGroupPredicateColumn, cOcbRowGroupPredicateHasLower, cOcbRowGroupPredicateLower, cOcbRowGroupPredicateHasUpper, cOcbRowGroupPredicateUpper} = do
+    fillBytes ptr 0 208
+    pokeByteOff ptr 0 cOcbRowGroupPredicateVersion
+    pokeByteOff ptr 8 cOcbRowGroupPredicateStructSize
+    pokeByteOff ptr 16 cOcbRowGroupPredicateColumn
+    pokeByteOff ptr 24 cOcbRowGroupPredicateHasLower
+    pokeByteOff ptr 32 cOcbRowGroupPredicateLower
+    pokeByteOff ptr 104 cOcbRowGroupPredicateHasUpper
+    pokeByteOff ptr 112 cOcbRowGroupPredicateUpper
+
+emptyCArcadiaTioOcbRowGroupPredicate :: CArcadiaTioOcbRowGroupPredicate
+emptyCArcadiaTioOcbRowGroupPredicate = CArcadiaTioOcbRowGroupPredicate 1 208 nullPtr 0 emptyCArcadiaTioOcbPredicateValue 0 emptyCArcadiaTioOcbPredicateValue
+
+-- | Raw OCB read request matching @ArcadiaTioOcbReadRequest@.
+data CArcadiaTioOcbReadRequest = CArcadiaTioOcbReadRequest
+  { cOcbReadRequestVersion :: Word32
+  , cOcbReadRequestStructSize :: CSize
+  , cOcbReadRequestProjectionKind :: CInt
+  , cOcbReadRequestColumnNames :: Ptr CString
+  , cOcbReadRequestColumnNamesLen :: CSize
+  , cOcbReadRequestPredicates :: Ptr CArcadiaTioOcbRowGroupPredicate
+  , cOcbReadRequestPredicatesLen :: CSize
+  , cOcbReadRequestMaxThreads :: CSize
+  , cOcbReadRequestValidateChecksums :: Word8
+  , cOcbReadRequestDecodeDictionaries :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadRequest where
+  sizeOf _ = 104
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadRequest <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 65
+  poke ptr CArcadiaTioOcbReadRequest{cOcbReadRequestVersion, cOcbReadRequestStructSize, cOcbReadRequestProjectionKind, cOcbReadRequestColumnNames, cOcbReadRequestColumnNamesLen, cOcbReadRequestPredicates, cOcbReadRequestPredicatesLen, cOcbReadRequestMaxThreads, cOcbReadRequestValidateChecksums, cOcbReadRequestDecodeDictionaries} = do
+    fillBytes ptr 0 104
+    pokeByteOff ptr 0 cOcbReadRequestVersion
+    pokeByteOff ptr 8 cOcbReadRequestStructSize
+    pokeByteOff ptr 16 cOcbReadRequestProjectionKind
+    pokeByteOff ptr 24 cOcbReadRequestColumnNames
+    pokeByteOff ptr 32 cOcbReadRequestColumnNamesLen
+    pokeByteOff ptr 40 cOcbReadRequestPredicates
+    pokeByteOff ptr 48 cOcbReadRequestPredicatesLen
+    pokeByteOff ptr 56 cOcbReadRequestMaxThreads
+    pokeByteOff ptr 64 cOcbReadRequestValidateChecksums
+    pokeByteOff ptr 65 cOcbReadRequestDecodeDictionaries
+
+emptyCArcadiaTioOcbReadRequest :: CArcadiaTioOcbReadRequest
+emptyCArcadiaTioOcbReadRequest = CArcadiaTioOcbReadRequest 1 104 0 nullPtr 0 nullPtr 0 1 1 0
+
+-- | Raw OCB read report matching @ArcadiaTioOcbReadReport@.
+data CArcadiaTioOcbReadReport = CArcadiaTioOcbReadReport
+  { cOcbReadReportVersion :: Word32
+  , cOcbReadReportStructSize :: CSize
+  , cOcbReadReportRequestedThreads :: CSize
+  , cOcbReadReportEffectiveThreads :: CSize
+  , cOcbReadReportSelectedRowGroups :: CSize
+  , cOcbReadReportPrunedRowGroups :: CSize
+  , cOcbReadReportSelectedColumnChunks :: CSize
+  , cOcbReadReportFallbackReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadReport where
+  sizeOf _ = 96
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56
+  poke ptr CArcadiaTioOcbReadReport{cOcbReadReportVersion, cOcbReadReportStructSize, cOcbReadReportRequestedThreads, cOcbReadReportEffectiveThreads, cOcbReadReportSelectedRowGroups, cOcbReadReportPrunedRowGroups, cOcbReadReportSelectedColumnChunks, cOcbReadReportFallbackReason} = do
+    fillBytes ptr 0 96
+    pokeByteOff ptr 0 cOcbReadReportVersion
+    pokeByteOff ptr 8 cOcbReadReportStructSize
+    pokeByteOff ptr 16 cOcbReadReportRequestedThreads
+    pokeByteOff ptr 24 cOcbReadReportEffectiveThreads
+    pokeByteOff ptr 32 cOcbReadReportSelectedRowGroups
+    pokeByteOff ptr 40 cOcbReadReportPrunedRowGroups
+    pokeByteOff ptr 48 cOcbReadReportSelectedColumnChunks
+    pokeByteOff ptr 56 cOcbReadReportFallbackReason
+
+emptyCArcadiaTioOcbReadReport :: CArcadiaTioOcbReadReport
+emptyCArcadiaTioOcbReadReport = CArcadiaTioOcbReadReport 1 96 0 0 0 0 0 nullPtr
+
+-- | Raw OCB read attribution matching @ArcadiaTioOcbReadAttribution@.
+data CArcadiaTioOcbReadAttribution = CArcadiaTioOcbReadAttribution
+  { cOcbReadAttributionVersion :: Word32
+  , cOcbReadAttributionStructSize :: CSize
+  , cOcbReadAttributionPlanNs :: Word64
+  , cOcbReadAttributionExecuteWallNs :: Word64
+  , cOcbReadAttributionRowGroupReadNs :: Word64
+  , cOcbReadAttributionReadIoNs :: Word64
+  , cOcbReadAttributionChecksumNs :: Word64
+  , cOcbReadAttributionDecompressionNs :: Word64
+  , cOcbReadAttributionPrimitiveDecodeNs :: Word64
+  , cOcbReadAttributionHasNativeToCCopyNs :: Word8
+  , cOcbReadAttributionNativeToCCopyNs :: Word64
+  , cOcbReadAttributionHasWrapperCopyNs :: Word8
+  , cOcbReadAttributionWrapperCopyNs :: Word64
+  , cOcbReadAttributionBytesRead :: Word64
+  , cOcbReadAttributionCompressedBytes :: Word64
+  , cOcbReadAttributionUncompressedBytes :: Word64
+  , cOcbReadAttributionRequestedThreads :: CSize
+  , cOcbReadAttributionEffectiveThreads :: CSize
+  , cOcbReadAttributionSelectedRowGroups :: CSize
+  , cOcbReadAttributionPrunedRowGroups :: CSize
+  , cOcbReadAttributionSelectedColumnChunks :: CSize
+  , cOcbReadAttributionFallbackReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadAttribution where
+  sizeOf _ = 208
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadAttribution <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 128 <*> peekByteOff ptr 136 <*> peekByteOff ptr 144 <*> peekByteOff ptr 152 <*> peekByteOff ptr 160 <*> peekByteOff ptr 168
+  poke ptr CArcadiaTioOcbReadAttribution{cOcbReadAttributionVersion, cOcbReadAttributionStructSize, cOcbReadAttributionPlanNs, cOcbReadAttributionExecuteWallNs, cOcbReadAttributionRowGroupReadNs, cOcbReadAttributionReadIoNs, cOcbReadAttributionChecksumNs, cOcbReadAttributionDecompressionNs, cOcbReadAttributionPrimitiveDecodeNs, cOcbReadAttributionHasNativeToCCopyNs, cOcbReadAttributionNativeToCCopyNs, cOcbReadAttributionHasWrapperCopyNs, cOcbReadAttributionWrapperCopyNs, cOcbReadAttributionBytesRead, cOcbReadAttributionCompressedBytes, cOcbReadAttributionUncompressedBytes, cOcbReadAttributionRequestedThreads, cOcbReadAttributionEffectiveThreads, cOcbReadAttributionSelectedRowGroups, cOcbReadAttributionPrunedRowGroups, cOcbReadAttributionSelectedColumnChunks, cOcbReadAttributionFallbackReason} = do
+    fillBytes ptr 0 208
+    pokeByteOff ptr 0 cOcbReadAttributionVersion
+    pokeByteOff ptr 8 cOcbReadAttributionStructSize
+    pokeByteOff ptr 16 cOcbReadAttributionPlanNs
+    pokeByteOff ptr 24 cOcbReadAttributionExecuteWallNs
+    pokeByteOff ptr 32 cOcbReadAttributionRowGroupReadNs
+    pokeByteOff ptr 40 cOcbReadAttributionReadIoNs
+    pokeByteOff ptr 48 cOcbReadAttributionChecksumNs
+    pokeByteOff ptr 56 cOcbReadAttributionDecompressionNs
+    pokeByteOff ptr 64 cOcbReadAttributionPrimitiveDecodeNs
+    pokeByteOff ptr 72 cOcbReadAttributionHasNativeToCCopyNs
+    pokeByteOff ptr 80 cOcbReadAttributionNativeToCCopyNs
+    pokeByteOff ptr 88 cOcbReadAttributionHasWrapperCopyNs
+    pokeByteOff ptr 96 cOcbReadAttributionWrapperCopyNs
+    pokeByteOff ptr 104 cOcbReadAttributionBytesRead
+    pokeByteOff ptr 112 cOcbReadAttributionCompressedBytes
+    pokeByteOff ptr 120 cOcbReadAttributionUncompressedBytes
+    pokeByteOff ptr 128 cOcbReadAttributionRequestedThreads
+    pokeByteOff ptr 136 cOcbReadAttributionEffectiveThreads
+    pokeByteOff ptr 144 cOcbReadAttributionSelectedRowGroups
+    pokeByteOff ptr 152 cOcbReadAttributionPrunedRowGroups
+    pokeByteOff ptr 160 cOcbReadAttributionSelectedColumnChunks
+    pokeByteOff ptr 168 cOcbReadAttributionFallbackReason
+
+emptyCArcadiaTioOcbReadAttribution :: CArcadiaTioOcbReadAttribution
+emptyCArcadiaTioOcbReadAttribution = CArcadiaTioOcbReadAttribution 1 208 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 nullPtr
+
+-- | Raw OCB column array matching @ArcadiaTioOcbColumnArray@.
+data CArcadiaTioOcbColumnArray = CArcadiaTioOcbColumnArray
+  { cOcbColumnArrayVersion :: Word32
+  , cOcbColumnArrayStructSize :: CSize
+  , cOcbColumnArrayColumnId :: Word32
+  , cOcbColumnArrayName :: CString
+  , cOcbColumnArrayPhysicalType :: CInt
+  , cOcbColumnArrayLogicalKind :: CInt
+  , cOcbColumnArrayHasDictionaryId :: Word8
+  , cOcbColumnArrayDictionaryId :: Word32
+  , cOcbColumnArrayValues :: CArcadiaTioOcbPrimitiveValues
+  , cOcbColumnArrayHasValidity :: Word8
+  , cOcbColumnArrayValidity :: CArcadiaTioOcbValidityBitmap
+  , cOcbColumnArrayReserved0 :: Word64
+  , cOcbColumnArrayReserved1 :: Word64
+  , cOcbColumnArrayReserved2 :: Word64
+  , cOcbColumnArrayReserved3 :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnArray where
+  sizeOf _ = 216
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbColumnArray <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44 <*> peekByteOff ptr 48 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 184 <*> peekByteOff ptr 192 <*> peekByteOff ptr 200 <*> peekByteOff ptr 208
+  poke ptr CArcadiaTioOcbColumnArray{cOcbColumnArrayVersion, cOcbColumnArrayStructSize, cOcbColumnArrayColumnId, cOcbColumnArrayName, cOcbColumnArrayPhysicalType, cOcbColumnArrayLogicalKind, cOcbColumnArrayHasDictionaryId, cOcbColumnArrayDictionaryId, cOcbColumnArrayValues, cOcbColumnArrayHasValidity, cOcbColumnArrayValidity, cOcbColumnArrayReserved0, cOcbColumnArrayReserved1, cOcbColumnArrayReserved2, cOcbColumnArrayReserved3} = do
+    fillBytes ptr 0 216
+    pokeByteOff ptr 0 cOcbColumnArrayVersion
+    pokeByteOff ptr 8 cOcbColumnArrayStructSize
+    pokeByteOff ptr 16 cOcbColumnArrayColumnId
+    pokeByteOff ptr 24 cOcbColumnArrayName
+    pokeByteOff ptr 32 cOcbColumnArrayPhysicalType
+    pokeByteOff ptr 36 cOcbColumnArrayLogicalKind
+    pokeByteOff ptr 40 cOcbColumnArrayHasDictionaryId
+    pokeByteOff ptr 44 cOcbColumnArrayDictionaryId
+    pokeByteOff ptr 48 cOcbColumnArrayValues
+    pokeByteOff ptr 112 cOcbColumnArrayHasValidity
+    pokeByteOff ptr 120 cOcbColumnArrayValidity
+    pokeByteOff ptr 184 cOcbColumnArrayReserved0
+    pokeByteOff ptr 192 cOcbColumnArrayReserved1
+    pokeByteOff ptr 200 cOcbColumnArrayReserved2
+    pokeByteOff ptr 208 cOcbColumnArrayReserved3
+
+-- | Raw OCB column batch matching @ArcadiaTioOcbColumnBatch@.
+data CArcadiaTioOcbColumnBatch = CArcadiaTioOcbColumnBatch
+  { cOcbColumnBatchVersion :: Word32
+  , cOcbColumnBatchStructSize :: CSize
+  , cOcbColumnBatchRowGroupId :: Word32
+  , cOcbColumnBatchBaseRow :: Word64
+  , cOcbColumnBatchRowCount :: Word64
+  , cOcbColumnBatchColumns :: Ptr CArcadiaTioOcbColumnArray
+  , cOcbColumnBatchColumnsLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnBatch where
+  sizeOf _ = 88
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbColumnBatch <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48
+  poke ptr CArcadiaTioOcbColumnBatch{cOcbColumnBatchVersion, cOcbColumnBatchStructSize, cOcbColumnBatchRowGroupId, cOcbColumnBatchBaseRow, cOcbColumnBatchRowCount, cOcbColumnBatchColumns, cOcbColumnBatchColumnsLen} = do
+    fillBytes ptr 0 88
+    pokeByteOff ptr 0 cOcbColumnBatchVersion
+    pokeByteOff ptr 8 cOcbColumnBatchStructSize
+    pokeByteOff ptr 16 cOcbColumnBatchRowGroupId
+    pokeByteOff ptr 24 cOcbColumnBatchBaseRow
+    pokeByteOff ptr 32 cOcbColumnBatchRowCount
+    pokeByteOff ptr 40 cOcbColumnBatchColumns
+    pokeByteOff ptr 48 cOcbColumnBatchColumnsLen
+
+-- | Raw OCB read outcome matching @ArcadiaTioOcbReadOutcome@.
+data CArcadiaTioOcbReadOutcome = CArcadiaTioOcbReadOutcome
+  { cOcbReadOutcomeVersion :: Word32
+  , cOcbReadOutcomeStructSize :: CSize
+  , cOcbReadOutcomeBatches :: Ptr CArcadiaTioOcbColumnBatch
+  , cOcbReadOutcomeBatchesLen :: CSize
+  , cOcbReadOutcomeReport :: CArcadiaTioOcbReadReport
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbReadOutcome where
+  sizeOf _ = 160
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbReadOutcome <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioOcbReadOutcome{cOcbReadOutcomeVersion, cOcbReadOutcomeStructSize, cOcbReadOutcomeBatches, cOcbReadOutcomeBatchesLen, cOcbReadOutcomeReport} = do
+    fillBytes ptr 0 160
+    pokeByteOff ptr 0 cOcbReadOutcomeVersion
+    pokeByteOff ptr 8 cOcbReadOutcomeStructSize
+    pokeByteOff ptr 16 cOcbReadOutcomeBatches
+    pokeByteOff ptr 24 cOcbReadOutcomeBatchesLen
+    pokeByteOff ptr 32 cOcbReadOutcomeReport
+
+emptyCArcadiaTioOcbReadOutcome :: CArcadiaTioOcbReadOutcome
+emptyCArcadiaTioOcbReadOutcome = CArcadiaTioOcbReadOutcome 1 160 nullPtr 0 emptyCArcadiaTioOcbReadReport
+
+
+-- | Raw OCB body-reference summary matching @ArcadiaTioOcbBodyRefSummary@.
+data CArcadiaTioOcbBodyRefSummary = CArcadiaTioOcbBodyRefSummary
+  { cOcbBodyRefSummaryVersion :: Word32
+  , cOcbBodyRefSummaryStructSize :: CSize
+  , cOcbBodyRefSummaryOffset :: Word64
+  , cOcbBodyRefSummaryLength :: Word64
+  , cOcbBodyRefSummaryKind :: CInt
+  , cOcbBodyRefSummaryFlags :: Word16
+  , cOcbBodyRefSummaryChecksumKind :: CInt
+  , cOcbBodyRefSummaryChecksum :: Word32
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbBodyRefSummary where
+  sizeOf _ = 80
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbBodyRefSummary <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44
+  poke ptr CArcadiaTioOcbBodyRefSummary{cOcbBodyRefSummaryVersion, cOcbBodyRefSummaryStructSize, cOcbBodyRefSummaryOffset, cOcbBodyRefSummaryLength, cOcbBodyRefSummaryKind, cOcbBodyRefSummaryFlags, cOcbBodyRefSummaryChecksumKind, cOcbBodyRefSummaryChecksum} = do
+    fillBytes ptr 0 80
+    pokeByteOff ptr 0 cOcbBodyRefSummaryVersion
+    pokeByteOff ptr 8 cOcbBodyRefSummaryStructSize
+    pokeByteOff ptr 16 cOcbBodyRefSummaryOffset
+    pokeByteOff ptr 24 cOcbBodyRefSummaryLength
+    pokeByteOff ptr 32 cOcbBodyRefSummaryKind
+    pokeByteOff ptr 36 cOcbBodyRefSummaryFlags
+    pokeByteOff ptr 40 cOcbBodyRefSummaryChecksumKind
+    pokeByteOff ptr 44 cOcbBodyRefSummaryChecksum
+
+-- | Raw OCB column-chunk summary matching @ArcadiaTioOcbColumnChunkSummary@.
+data CArcadiaTioOcbColumnChunkSummary = CArcadiaTioOcbColumnChunkSummary
+  { cOcbColumnChunkSummaryVersion :: Word32
+  , cOcbColumnChunkSummaryStructSize :: CSize
+  , cOcbColumnChunkSummaryRowGroupId :: Word32
+  , cOcbColumnChunkSummaryColumnId :: Word32
+  , cOcbColumnChunkSummaryColumnName :: CString
+  , cOcbColumnChunkSummaryPhysicalType :: CInt
+  , cOcbColumnChunkSummaryLogicalKind :: CInt
+  , cOcbColumnChunkSummaryFixedBinaryWidth :: Word32
+  , cOcbColumnChunkSummaryCodec :: CInt
+  , cOcbColumnChunkSummaryRowCount :: Word64
+  , cOcbColumnChunkSummaryCompressedBytes :: Word64
+  , cOcbColumnChunkSummaryUncompressedBytes :: Word64
+  , cOcbColumnChunkSummaryValueRef :: CArcadiaTioOcbBodyRefSummary
+  , cOcbColumnChunkSummaryHasValidityRef :: Word8
+  , cOcbColumnChunkSummaryValidityRef :: CArcadiaTioOcbBodyRefSummary
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnChunkSummary where
+  sizeOf _ = 272
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbColumnChunkSummary <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 152 <*> peekByteOff ptr 160
+  poke ptr CArcadiaTioOcbColumnChunkSummary{cOcbColumnChunkSummaryVersion, cOcbColumnChunkSummaryStructSize, cOcbColumnChunkSummaryRowGroupId, cOcbColumnChunkSummaryColumnId, cOcbColumnChunkSummaryColumnName, cOcbColumnChunkSummaryPhysicalType, cOcbColumnChunkSummaryLogicalKind, cOcbColumnChunkSummaryFixedBinaryWidth, cOcbColumnChunkSummaryCodec, cOcbColumnChunkSummaryRowCount, cOcbColumnChunkSummaryCompressedBytes, cOcbColumnChunkSummaryUncompressedBytes, cOcbColumnChunkSummaryValueRef, cOcbColumnChunkSummaryHasValidityRef, cOcbColumnChunkSummaryValidityRef} = do
+    fillBytes ptr 0 272
+    pokeByteOff ptr 0 cOcbColumnChunkSummaryVersion
+    pokeByteOff ptr 8 cOcbColumnChunkSummaryStructSize
+    pokeByteOff ptr 16 cOcbColumnChunkSummaryRowGroupId
+    pokeByteOff ptr 20 cOcbColumnChunkSummaryColumnId
+    pokeByteOff ptr 24 cOcbColumnChunkSummaryColumnName
+    pokeByteOff ptr 32 cOcbColumnChunkSummaryPhysicalType
+    pokeByteOff ptr 36 cOcbColumnChunkSummaryLogicalKind
+    pokeByteOff ptr 40 cOcbColumnChunkSummaryFixedBinaryWidth
+    pokeByteOff ptr 44 cOcbColumnChunkSummaryCodec
+    pokeByteOff ptr 48 cOcbColumnChunkSummaryRowCount
+    pokeByteOff ptr 56 cOcbColumnChunkSummaryCompressedBytes
+    pokeByteOff ptr 64 cOcbColumnChunkSummaryUncompressedBytes
+    pokeByteOff ptr 72 cOcbColumnChunkSummaryValueRef
+    pokeByteOff ptr 152 cOcbColumnChunkSummaryHasValidityRef
+    pokeByteOff ptr 160 cOcbColumnChunkSummaryValidityRef
+
+-- | Raw OCB column-stats summary matching @ArcadiaTioOcbColumnStatsSummary@.
+data CArcadiaTioOcbColumnStatsSummary = CArcadiaTioOcbColumnStatsSummary
+  { cOcbColumnStatsSummaryVersion :: Word32
+  , cOcbColumnStatsSummaryStructSize :: CSize
+  , cOcbColumnStatsSummaryRowGroupId :: Word32
+  , cOcbColumnStatsSummaryColumnId :: Word32
+  , cOcbColumnStatsSummaryColumnName :: CString
+  , cOcbColumnStatsSummaryPhysicalType :: CInt
+  , cOcbColumnStatsSummaryNullCount :: Word32
+  , cOcbColumnStatsSummaryMin :: CArcadiaTioOcbPredicateValue
+  , cOcbColumnStatsSummaryMax :: CArcadiaTioOcbPredicateValue
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbColumnStatsSummary where
+  sizeOf _ = 216
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbColumnStatsSummary <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 112
+  poke ptr CArcadiaTioOcbColumnStatsSummary{cOcbColumnStatsSummaryVersion, cOcbColumnStatsSummaryStructSize, cOcbColumnStatsSummaryRowGroupId, cOcbColumnStatsSummaryColumnId, cOcbColumnStatsSummaryColumnName, cOcbColumnStatsSummaryPhysicalType, cOcbColumnStatsSummaryNullCount, cOcbColumnStatsSummaryMin, cOcbColumnStatsSummaryMax} = do
+    fillBytes ptr 0 216
+    pokeByteOff ptr 0 cOcbColumnStatsSummaryVersion
+    pokeByteOff ptr 8 cOcbColumnStatsSummaryStructSize
+    pokeByteOff ptr 16 cOcbColumnStatsSummaryRowGroupId
+    pokeByteOff ptr 20 cOcbColumnStatsSummaryColumnId
+    pokeByteOff ptr 24 cOcbColumnStatsSummaryColumnName
+    pokeByteOff ptr 32 cOcbColumnStatsSummaryPhysicalType
+    pokeByteOff ptr 36 cOcbColumnStatsSummaryNullCount
+    pokeByteOff ptr 40 cOcbColumnStatsSummaryMin
+    pokeByteOff ptr 112 cOcbColumnStatsSummaryMax
+
+-- | Raw OCB row-group summary matching @ArcadiaTioOcbRowGroupSummary@.
+data CArcadiaTioOcbRowGroupSummary = CArcadiaTioOcbRowGroupSummary
+  { cOcbRowGroupSummaryVersion :: Word32
+  , cOcbRowGroupSummaryStructSize :: CSize
+  , cOcbRowGroupSummaryRowGroupId :: Word32
+  , cOcbRowGroupSummaryBaseRow :: Word64
+  , cOcbRowGroupSummaryRowCount :: Word64
+  , cOcbRowGroupSummaryHasFirstKeyTupleRef :: Word8
+  , cOcbRowGroupSummaryFirstKeyTupleRef :: CArcadiaTioOcbBodyRefSummary
+  , cOcbRowGroupSummaryHasLastKeyTupleRef :: Word8
+  , cOcbRowGroupSummaryLastKeyTupleRef :: CArcadiaTioOcbBodyRefSummary
+  , cOcbRowGroupSummaryChunks :: Ptr CArcadiaTioOcbColumnChunkSummary
+  , cOcbRowGroupSummaryChunksLen :: CSize
+  , cOcbRowGroupSummaryStats :: Ptr CArcadiaTioOcbColumnStatsSummary
+  , cOcbRowGroupSummaryStatsLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbRowGroupSummary where
+  sizeOf _ = 280
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbRowGroupSummary <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 128 <*> peekByteOff ptr 136 <*> peekByteOff ptr 216 <*> peekByteOff ptr 224 <*> peekByteOff ptr 232 <*> peekByteOff ptr 240
+  poke ptr CArcadiaTioOcbRowGroupSummary{cOcbRowGroupSummaryVersion, cOcbRowGroupSummaryStructSize, cOcbRowGroupSummaryRowGroupId, cOcbRowGroupSummaryBaseRow, cOcbRowGroupSummaryRowCount, cOcbRowGroupSummaryHasFirstKeyTupleRef, cOcbRowGroupSummaryFirstKeyTupleRef, cOcbRowGroupSummaryHasLastKeyTupleRef, cOcbRowGroupSummaryLastKeyTupleRef, cOcbRowGroupSummaryChunks, cOcbRowGroupSummaryChunksLen, cOcbRowGroupSummaryStats, cOcbRowGroupSummaryStatsLen} = do
+    fillBytes ptr 0 280
+    pokeByteOff ptr 0 cOcbRowGroupSummaryVersion
+    pokeByteOff ptr 8 cOcbRowGroupSummaryStructSize
+    pokeByteOff ptr 16 cOcbRowGroupSummaryRowGroupId
+    pokeByteOff ptr 24 cOcbRowGroupSummaryBaseRow
+    pokeByteOff ptr 32 cOcbRowGroupSummaryRowCount
+    pokeByteOff ptr 40 cOcbRowGroupSummaryHasFirstKeyTupleRef
+    pokeByteOff ptr 48 cOcbRowGroupSummaryFirstKeyTupleRef
+    pokeByteOff ptr 128 cOcbRowGroupSummaryHasLastKeyTupleRef
+    pokeByteOff ptr 136 cOcbRowGroupSummaryLastKeyTupleRef
+    pokeByteOff ptr 216 cOcbRowGroupSummaryChunks
+    pokeByteOff ptr 224 cOcbRowGroupSummaryChunksLen
+    pokeByteOff ptr 232 cOcbRowGroupSummaryStats
+    pokeByteOff ptr 240 cOcbRowGroupSummaryStatsLen
+
+-- | Raw OCB row-group summaries matching @ArcadiaTioOcbRowGroupSummaries@.
+data CArcadiaTioOcbRowGroupSummaries = CArcadiaTioOcbRowGroupSummaries
+  { cOcbRowGroupSummariesVersion :: Word32
+  , cOcbRowGroupSummariesStructSize :: CSize
+  , cOcbRowGroupSummariesRowGroups :: Ptr CArcadiaTioOcbRowGroupSummary
+  , cOcbRowGroupSummariesRowGroupsLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioOcbRowGroupSummaries where
+  sizeOf _ = 64
+  alignment _ = 8
+  peek ptr = CArcadiaTioOcbRowGroupSummaries <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioOcbRowGroupSummaries{cOcbRowGroupSummariesVersion, cOcbRowGroupSummariesStructSize, cOcbRowGroupSummariesRowGroups, cOcbRowGroupSummariesRowGroupsLen} = do
+    fillBytes ptr 0 64
+    pokeByteOff ptr 0 cOcbRowGroupSummariesVersion
+    pokeByteOff ptr 8 cOcbRowGroupSummariesStructSize
+    pokeByteOff ptr 16 cOcbRowGroupSummariesRowGroups
+    pokeByteOff ptr 24 cOcbRowGroupSummariesRowGroupsLen
+
+emptyCArcadiaTioOcbRowGroupSummaries :: CArcadiaTioOcbRowGroupSummaries
+emptyCArcadiaTioOcbRowGroupSummaries = CArcadiaTioOcbRowGroupSummaries 1 64 nullPtr 0
 
 type LastErrorMessageFn = IO CString
 type LastErrorCodeFn = IO CInt
@@ -2661,10 +3425,35 @@ type ReformReportFreeFn = Ptr CArcadiaTioReformReport -> IO ()
 type AnalyzeSparseAppendV2Fn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioSparseRuleV2 -> Ptr CArcadiaTioSparseAppendAnalysis -> IO CInt
 type AppendSparseWithRangeV2Fn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioSparseRuleV2 -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type SparseAppendAnalysisFreeFn = Ptr CArcadiaTioSparseAppendAnalysis -> IO ()
+type OcbLastErrorKindFn = IO CInt
+type OcbLastErrorCauseFn = IO CInt
 type OcbOpenFn = CString -> IO (Ptr COcbFile)
+type OcbOpenWithOptionsFn = CString -> Ptr CArcadiaTioOcbOpenOptions -> IO (Ptr COcbFile)
+type OcbReaderCloneFn = Ptr COcbFile -> Ptr (Ptr COcbFile) -> IO CInt
 type OcbCloseFn = Ptr COcbFile -> IO ()
 type OcbMetadataFn = Ptr COcbFile -> Ptr CArcadiaTioOcbMetadata -> IO CInt
 type OcbMetadataFreeFn = Ptr CArcadiaTioOcbMetadata -> IO ()
+type OcbDictionaryValuesFn = Ptr COcbFile -> Word32 -> Ptr CArcadiaTioOcbDictionaryValues -> IO CInt
+type OcbDictionaryValuesFreeFn = Ptr CArcadiaTioOcbDictionaryValues -> IO ()
+type OcbReadRequestInitFn = Ptr CArcadiaTioOcbReadRequest -> IO ()
+type OcbReadReportInitFn = Ptr CArcadiaTioOcbReadReport -> IO ()
+type OcbReadAttributionInitFn = Ptr CArcadiaTioOcbReadAttribution -> IO ()
+type OcbReadOutcomeInitFn = Ptr CArcadiaTioOcbReadOutcome -> IO ()
+type OcbReadBatchesFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr CArcadiaTioOcbReadOutcome -> IO CInt
+type OcbReadBatchesWithAttributionFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr CArcadiaTioOcbReadOutcome -> Ptr CArcadiaTioOcbReadAttribution -> IO CInt
+type OcbReadReportFreeFn = Ptr CArcadiaTioOcbReadReport -> IO ()
+type OcbReadAttributionFreeFn = Ptr CArcadiaTioOcbReadAttribution -> IO ()
+type OcbReadOutcomeFreeFn = Ptr CArcadiaTioOcbReadOutcome -> IO ()
+type OcbColumnArrayFixedBinaryWidthFn = Ptr CArcadiaTioOcbColumnArray -> IO Word32
+type OcbPlanReadFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr (Ptr COcbReadPlan) -> IO CInt
+type OcbReadPlanReportFn = Ptr COcbReadPlan -> Ptr CArcadiaTioOcbReadReport -> IO CInt
+type OcbReadPlanIdsFn = Ptr COcbReadPlan -> Ptr Word32 -> CSize -> Ptr CSize -> IO CInt
+type OcbReadBatchesFromPlanFn = Ptr COcbFile -> Ptr COcbReadPlan -> Ptr Word32 -> CSize -> Ptr CArcadiaTioOcbReadOutcome -> IO CInt
+type OcbReadPlanFreeFn = Ptr COcbReadPlan -> IO ()
+type OcbRowGroupSummariesInitFn = Ptr CArcadiaTioOcbRowGroupSummaries -> IO ()
+type OcbRowGroupSummariesFn = Ptr COcbFile -> Ptr CArcadiaTioOcbRowGroupSummaries -> IO CInt
+type OcbReadPlanRowGroupSummariesFn = Ptr COcbFile -> Ptr COcbReadPlan -> Ptr CArcadiaTioOcbRowGroupSummaries -> IO CInt
+type OcbRowGroupSummariesFreeFn = Ptr CArcadiaTioOcbRowGroupSummaries -> IO ()
 type TensorFreeFn = Ptr CArcadiaTioTensor -> IO ()
 type MaskFreeFn = Ptr CArcadiaTioMask -> IO ()
 type FileMetaFreeFn = Ptr CArcadiaTioFileMeta -> IO ()
@@ -2802,10 +3591,36 @@ foreign import ccall safe "dynamic" mkAppendSparseF64WithRangeV2 :: FunPtr (Appe
 foreign import ccall safe "dynamic" mkAppendSparseI32WithRangeV2 :: FunPtr (AppendSparseWithRangeV2Fn Int32) -> AppendSparseWithRangeV2Fn Int32
 foreign import ccall safe "dynamic" mkAppendSparseI64WithRangeV2 :: FunPtr (AppendSparseWithRangeV2Fn Int64) -> AppendSparseWithRangeV2Fn Int64
 foreign import ccall safe "dynamic" mkSparseAppendAnalysisFree :: FunPtr SparseAppendAnalysisFreeFn -> SparseAppendAnalysisFreeFn
+foreign import ccall safe "dynamic" mkOcbLastErrorKind :: FunPtr OcbLastErrorKindFn -> OcbLastErrorKindFn
+foreign import ccall safe "dynamic" mkOcbLastErrorCause :: FunPtr OcbLastErrorCauseFn -> OcbLastErrorCauseFn
 foreign import ccall safe "dynamic" mkOcbOpen :: FunPtr OcbOpenFn -> OcbOpenFn
+foreign import ccall safe "dynamic" mkOcbOpenWithOptions :: FunPtr OcbOpenWithOptionsFn -> OcbOpenWithOptionsFn
+foreign import ccall safe "dynamic" mkOcbReaderClone :: FunPtr OcbReaderCloneFn -> OcbReaderCloneFn
 foreign import ccall safe "dynamic" mkOcbClose :: FunPtr OcbCloseFn -> OcbCloseFn
 foreign import ccall safe "dynamic" mkOcbMetadata :: FunPtr OcbMetadataFn -> OcbMetadataFn
 foreign import ccall safe "dynamic" mkOcbMetadataFree :: FunPtr OcbMetadataFreeFn -> OcbMetadataFreeFn
+foreign import ccall safe "dynamic" mkOcbDictionaryValues :: FunPtr OcbDictionaryValuesFn -> OcbDictionaryValuesFn
+foreign import ccall safe "dynamic" mkOcbDictionaryValuesFree :: FunPtr OcbDictionaryValuesFreeFn -> OcbDictionaryValuesFreeFn
+foreign import ccall safe "dynamic" mkOcbReadRequestInit :: FunPtr OcbReadRequestInitFn -> OcbReadRequestInitFn
+foreign import ccall safe "dynamic" mkOcbReadReportInit :: FunPtr OcbReadReportInitFn -> OcbReadReportInitFn
+foreign import ccall safe "dynamic" mkOcbReadAttributionInit :: FunPtr OcbReadAttributionInitFn -> OcbReadAttributionInitFn
+foreign import ccall safe "dynamic" mkOcbReadOutcomeInit :: FunPtr OcbReadOutcomeInitFn -> OcbReadOutcomeInitFn
+foreign import ccall safe "dynamic" mkOcbReadBatches :: FunPtr OcbReadBatchesFn -> OcbReadBatchesFn
+foreign import ccall safe "dynamic" mkOcbReadBatchesWithAttribution :: FunPtr OcbReadBatchesWithAttributionFn -> OcbReadBatchesWithAttributionFn
+foreign import ccall safe "dynamic" mkOcbReadReportFree :: FunPtr OcbReadReportFreeFn -> OcbReadReportFreeFn
+foreign import ccall safe "dynamic" mkOcbReadAttributionFree :: FunPtr OcbReadAttributionFreeFn -> OcbReadAttributionFreeFn
+foreign import ccall safe "dynamic" mkOcbReadOutcomeFree :: FunPtr OcbReadOutcomeFreeFn -> OcbReadOutcomeFreeFn
+foreign import ccall safe "dynamic" mkOcbColumnArrayFixedBinaryWidth :: FunPtr OcbColumnArrayFixedBinaryWidthFn -> OcbColumnArrayFixedBinaryWidthFn
+foreign import ccall safe "dynamic" mkOcbPlanRead :: FunPtr OcbPlanReadFn -> OcbPlanReadFn
+foreign import ccall safe "dynamic" mkOcbReadPlanReport :: FunPtr OcbReadPlanReportFn -> OcbReadPlanReportFn
+foreign import ccall safe "dynamic" mkOcbReadPlanProjectedColumnIds :: FunPtr OcbReadPlanIdsFn -> OcbReadPlanIdsFn
+foreign import ccall safe "dynamic" mkOcbReadPlanRowGroupIds :: FunPtr OcbReadPlanIdsFn -> OcbReadPlanIdsFn
+foreign import ccall safe "dynamic" mkOcbReadBatchesFromPlan :: FunPtr OcbReadBatchesFromPlanFn -> OcbReadBatchesFromPlanFn
+foreign import ccall safe "dynamic" mkOcbReadPlanFree :: FunPtr OcbReadPlanFreeFn -> OcbReadPlanFreeFn
+foreign import ccall safe "dynamic" mkOcbRowGroupSummariesInit :: FunPtr OcbRowGroupSummariesInitFn -> OcbRowGroupSummariesInitFn
+foreign import ccall safe "dynamic" mkOcbRowGroupSummaries :: FunPtr OcbRowGroupSummariesFn -> OcbRowGroupSummariesFn
+foreign import ccall safe "dynamic" mkOcbReadPlanRowGroupSummaries :: FunPtr OcbReadPlanRowGroupSummariesFn -> OcbReadPlanRowGroupSummariesFn
+foreign import ccall safe "dynamic" mkOcbRowGroupSummariesFree :: FunPtr OcbRowGroupSummariesFreeFn -> OcbRowGroupSummariesFreeFn
 foreign import ccall safe "dynamic" mkTensorFree :: FunPtr TensorFreeFn -> TensorFreeFn
 foreign import ccall safe "dynamic" mkMaskFree :: FunPtr MaskFreeFn -> MaskFreeFn
 foreign import ccall safe "dynamic" mkFileMetaFree :: FunPtr FileMetaFreeFn -> FileMetaFreeFn
@@ -2949,10 +3764,36 @@ data NativeLibrary = NativeLibrary
   , nativeAppendSparseI32WithRangeV2 :: AppendSparseWithRangeV2Fn Int32
   , nativeAppendSparseI64WithRangeV2 :: AppendSparseWithRangeV2Fn Int64
   , nativeSparseAppendAnalysisFree :: SparseAppendAnalysisFreeFn
+  , nativeOcbLastErrorKind :: OcbLastErrorKindFn
+  , nativeOcbLastErrorCause :: OcbLastErrorCauseFn
   , nativeOcbOpen :: OcbOpenFn
+  , nativeOcbOpenWithOptions :: OcbOpenWithOptionsFn
+  , nativeOcbReaderClone :: OcbReaderCloneFn
   , nativeOcbClose :: OcbCloseFn
   , nativeOcbMetadata :: OcbMetadataFn
   , nativeOcbMetadataFree :: OcbMetadataFreeFn
+  , nativeOcbDictionaryValues :: OcbDictionaryValuesFn
+  , nativeOcbDictionaryValuesFree :: OcbDictionaryValuesFreeFn
+  , nativeOcbReadRequestInit :: OcbReadRequestInitFn
+  , nativeOcbReadReportInit :: OcbReadReportInitFn
+  , nativeOcbReadAttributionInit :: OcbReadAttributionInitFn
+  , nativeOcbReadOutcomeInit :: OcbReadOutcomeInitFn
+  , nativeOcbReadBatches :: OcbReadBatchesFn
+  , nativeOcbReadBatchesWithAttribution :: OcbReadBatchesWithAttributionFn
+  , nativeOcbReadReportFree :: OcbReadReportFreeFn
+  , nativeOcbReadAttributionFree :: OcbReadAttributionFreeFn
+  , nativeOcbReadOutcomeFree :: OcbReadOutcomeFreeFn
+  , nativeOcbColumnArrayFixedBinaryWidth :: OcbColumnArrayFixedBinaryWidthFn
+  , nativeOcbPlanRead :: OcbPlanReadFn
+  , nativeOcbReadPlanReport :: OcbReadPlanReportFn
+  , nativeOcbReadPlanProjectedColumnIds :: OcbReadPlanIdsFn
+  , nativeOcbReadPlanRowGroupIds :: OcbReadPlanIdsFn
+  , nativeOcbReadBatchesFromPlan :: OcbReadBatchesFromPlanFn
+  , nativeOcbReadPlanFree :: OcbReadPlanFreeFn
+  , nativeOcbRowGroupSummariesInit :: OcbRowGroupSummariesInitFn
+  , nativeOcbRowGroupSummaries :: OcbRowGroupSummariesFn
+  , nativeOcbReadPlanRowGroupSummaries :: OcbReadPlanRowGroupSummariesFn
+  , nativeOcbRowGroupSummariesFree :: OcbRowGroupSummariesFreeFn
   , nativeTensorFree :: TensorFreeFn
   , nativeMaskFree :: MaskFreeFn
   , nativeFileMetaFree :: FileMetaFreeFn
@@ -3151,10 +3992,36 @@ loadUnchecked path = do
   nativeAppendSparseI32WithRangeV2 <- mkAppendSparseI32WithRangeV2 <$> dlsym dl "arcadia_tio_append_sparse_i32_with_range_v2"
   nativeAppendSparseI64WithRangeV2 <- mkAppendSparseI64WithRangeV2 <$> dlsym dl "arcadia_tio_append_sparse_i64_with_range_v2"
   nativeSparseAppendAnalysisFree <- mkSparseAppendAnalysisFree <$> dlsym dl "arcadia_tio_sparse_append_analysis_free"
+  nativeOcbLastErrorKind <- mkOcbLastErrorKind <$> dlsym dl "arcadia_tio_ocb_last_error_kind"
+  nativeOcbLastErrorCause <- mkOcbLastErrorCause <$> dlsym dl "arcadia_tio_ocb_last_error_cause"
   nativeOcbOpen <- mkOcbOpen <$> dlsym dl "arcadia_tio_ocb_open"
+  nativeOcbOpenWithOptions <- mkOcbOpenWithOptions <$> dlsym dl "arcadia_tio_ocb_open_with_options"
+  nativeOcbReaderClone <- mkOcbReaderClone <$> dlsym dl "arcadia_tio_ocb_reader_clone"
   nativeOcbClose <- mkOcbClose <$> dlsym dl "arcadia_tio_ocb_close"
   nativeOcbMetadata <- mkOcbMetadata <$> dlsym dl "arcadia_tio_ocb_metadata"
   nativeOcbMetadataFree <- mkOcbMetadataFree <$> dlsym dl "arcadia_tio_ocb_metadata_free"
+  nativeOcbDictionaryValues <- mkOcbDictionaryValues <$> dlsym dl "arcadia_tio_ocb_dictionary_values"
+  nativeOcbDictionaryValuesFree <- mkOcbDictionaryValuesFree <$> dlsym dl "arcadia_tio_ocb_dictionary_values_free"
+  nativeOcbReadRequestInit <- mkOcbReadRequestInit <$> dlsym dl "arcadia_tio_ocb_read_request_init"
+  nativeOcbReadReportInit <- mkOcbReadReportInit <$> dlsym dl "arcadia_tio_ocb_read_report_init"
+  nativeOcbReadAttributionInit <- mkOcbReadAttributionInit <$> dlsym dl "arcadia_tio_ocb_read_attribution_init"
+  nativeOcbReadOutcomeInit <- mkOcbReadOutcomeInit <$> dlsym dl "arcadia_tio_ocb_read_outcome_init"
+  nativeOcbReadBatches <- mkOcbReadBatches <$> dlsym dl "arcadia_tio_ocb_read_batches"
+  nativeOcbReadBatchesWithAttribution <- mkOcbReadBatchesWithAttribution <$> dlsym dl "arcadia_tio_ocb_read_batches_with_attribution"
+  nativeOcbReadReportFree <- mkOcbReadReportFree <$> dlsym dl "arcadia_tio_ocb_read_report_free"
+  nativeOcbReadAttributionFree <- mkOcbReadAttributionFree <$> dlsym dl "arcadia_tio_ocb_read_attribution_free"
+  nativeOcbReadOutcomeFree <- mkOcbReadOutcomeFree <$> dlsym dl "arcadia_tio_ocb_read_outcome_free"
+  nativeOcbColumnArrayFixedBinaryWidth <- mkOcbColumnArrayFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_column_array_fixed_binary_width"
+  nativeOcbPlanRead <- mkOcbPlanRead <$> dlsym dl "arcadia_tio_ocb_plan_read"
+  nativeOcbReadPlanReport <- mkOcbReadPlanReport <$> dlsym dl "arcadia_tio_ocb_read_plan_report"
+  nativeOcbReadPlanProjectedColumnIds <- mkOcbReadPlanProjectedColumnIds <$> dlsym dl "arcadia_tio_ocb_read_plan_projected_column_ids"
+  nativeOcbReadPlanRowGroupIds <- mkOcbReadPlanRowGroupIds <$> dlsym dl "arcadia_tio_ocb_read_plan_row_group_ids"
+  nativeOcbReadBatchesFromPlan <- mkOcbReadBatchesFromPlan <$> dlsym dl "arcadia_tio_ocb_read_batches_from_plan"
+  nativeOcbReadPlanFree <- mkOcbReadPlanFree <$> dlsym dl "arcadia_tio_ocb_read_plan_free"
+  nativeOcbRowGroupSummariesInit <- mkOcbRowGroupSummariesInit <$> dlsym dl "arcadia_tio_ocb_row_group_summaries_init"
+  nativeOcbRowGroupSummaries <- mkOcbRowGroupSummaries <$> dlsym dl "arcadia_tio_ocb_row_group_summaries"
+  nativeOcbReadPlanRowGroupSummaries <- mkOcbReadPlanRowGroupSummaries <$> dlsym dl "arcadia_tio_ocb_read_plan_row_group_summaries"
+  nativeOcbRowGroupSummariesFree <- mkOcbRowGroupSummariesFree <$> dlsym dl "arcadia_tio_ocb_row_group_summaries_free"
   nativeTensorFree <- mkTensorFree <$> dlsym dl "arcadia_tio_tensor_free"
   nativeMaskFree <- mkMaskFree <$> dlsym dl "arcadia_tio_mask_free"
   nativeFileMetaFree <- mkFileMetaFree <$> dlsym dl "arcadia_tio_file_meta_free"
@@ -3297,10 +4164,36 @@ loadUnchecked path = do
       , nativeAppendSparseI32WithRangeV2
       , nativeAppendSparseI64WithRangeV2
       , nativeSparseAppendAnalysisFree
+      , nativeOcbLastErrorKind
+      , nativeOcbLastErrorCause
       , nativeOcbOpen
+      , nativeOcbOpenWithOptions
+      , nativeOcbReaderClone
       , nativeOcbClose
       , nativeOcbMetadata
       , nativeOcbMetadataFree
+      , nativeOcbDictionaryValues
+      , nativeOcbDictionaryValuesFree
+      , nativeOcbReadRequestInit
+      , nativeOcbReadReportInit
+      , nativeOcbReadAttributionInit
+      , nativeOcbReadOutcomeInit
+      , nativeOcbReadBatches
+      , nativeOcbReadBatchesWithAttribution
+      , nativeOcbReadReportFree
+      , nativeOcbReadAttributionFree
+      , nativeOcbReadOutcomeFree
+      , nativeOcbColumnArrayFixedBinaryWidth
+      , nativeOcbPlanRead
+      , nativeOcbReadPlanReport
+      , nativeOcbReadPlanProjectedColumnIds
+      , nativeOcbReadPlanRowGroupIds
+      , nativeOcbReadBatchesFromPlan
+      , nativeOcbReadPlanFree
+      , nativeOcbRowGroupSummariesInit
+      , nativeOcbRowGroupSummaries
+      , nativeOcbReadPlanRowGroupSummaries
+      , nativeOcbRowGroupSummariesFree
       , nativeTensorFree
       , nativeMaskFree
       , nativeFileMetaFree
@@ -3728,8 +4621,20 @@ capiAppendSparseI64WithRangeV2 NativeLibrary{nativeAppendSparseI64WithRangeV2} =
 capiSparseAppendAnalysisFree :: NativeLibrary -> SparseAppendAnalysisFreeFn
 capiSparseAppendAnalysisFree NativeLibrary{nativeSparseAppendAnalysisFree} = nativeSparseAppendAnalysisFree
 
+capiOcbLastErrorKind :: NativeLibrary -> OcbLastErrorKindFn
+capiOcbLastErrorKind NativeLibrary{nativeOcbLastErrorKind} = nativeOcbLastErrorKind
+
+capiOcbLastErrorCause :: NativeLibrary -> OcbLastErrorCauseFn
+capiOcbLastErrorCause NativeLibrary{nativeOcbLastErrorCause} = nativeOcbLastErrorCause
+
 capiOcbOpen :: NativeLibrary -> OcbOpenFn
 capiOcbOpen NativeLibrary{nativeOcbOpen} = nativeOcbOpen
+
+capiOcbOpenWithOptions :: NativeLibrary -> OcbOpenWithOptionsFn
+capiOcbOpenWithOptions NativeLibrary{nativeOcbOpenWithOptions} = nativeOcbOpenWithOptions
+
+capiOcbReaderClone :: NativeLibrary -> OcbReaderCloneFn
+capiOcbReaderClone NativeLibrary{nativeOcbReaderClone} = nativeOcbReaderClone
 
 capiOcbClose :: NativeLibrary -> OcbCloseFn
 capiOcbClose NativeLibrary{nativeOcbClose} = nativeOcbClose
@@ -3739,6 +4644,72 @@ capiOcbMetadata NativeLibrary{nativeOcbMetadata} = nativeOcbMetadata
 
 capiOcbMetadataFree :: NativeLibrary -> OcbMetadataFreeFn
 capiOcbMetadataFree NativeLibrary{nativeOcbMetadataFree} = nativeOcbMetadataFree
+
+capiOcbDictionaryValues :: NativeLibrary -> OcbDictionaryValuesFn
+capiOcbDictionaryValues NativeLibrary{nativeOcbDictionaryValues} = nativeOcbDictionaryValues
+
+capiOcbDictionaryValuesFree :: NativeLibrary -> OcbDictionaryValuesFreeFn
+capiOcbDictionaryValuesFree NativeLibrary{nativeOcbDictionaryValuesFree} = nativeOcbDictionaryValuesFree
+
+capiOcbReadRequestInit :: NativeLibrary -> OcbReadRequestInitFn
+capiOcbReadRequestInit NativeLibrary{nativeOcbReadRequestInit} = nativeOcbReadRequestInit
+
+capiOcbReadReportInit :: NativeLibrary -> OcbReadReportInitFn
+capiOcbReadReportInit NativeLibrary{nativeOcbReadReportInit} = nativeOcbReadReportInit
+
+capiOcbReadAttributionInit :: NativeLibrary -> OcbReadAttributionInitFn
+capiOcbReadAttributionInit NativeLibrary{nativeOcbReadAttributionInit} = nativeOcbReadAttributionInit
+
+capiOcbReadOutcomeInit :: NativeLibrary -> OcbReadOutcomeInitFn
+capiOcbReadOutcomeInit NativeLibrary{nativeOcbReadOutcomeInit} = nativeOcbReadOutcomeInit
+
+capiOcbReadBatches :: NativeLibrary -> OcbReadBatchesFn
+capiOcbReadBatches NativeLibrary{nativeOcbReadBatches} = nativeOcbReadBatches
+
+capiOcbReadBatchesWithAttribution :: NativeLibrary -> OcbReadBatchesWithAttributionFn
+capiOcbReadBatchesWithAttribution NativeLibrary{nativeOcbReadBatchesWithAttribution} = nativeOcbReadBatchesWithAttribution
+
+capiOcbReadReportFree :: NativeLibrary -> OcbReadReportFreeFn
+capiOcbReadReportFree NativeLibrary{nativeOcbReadReportFree} = nativeOcbReadReportFree
+
+capiOcbReadAttributionFree :: NativeLibrary -> OcbReadAttributionFreeFn
+capiOcbReadAttributionFree NativeLibrary{nativeOcbReadAttributionFree} = nativeOcbReadAttributionFree
+
+capiOcbReadOutcomeFree :: NativeLibrary -> OcbReadOutcomeFreeFn
+capiOcbReadOutcomeFree NativeLibrary{nativeOcbReadOutcomeFree} = nativeOcbReadOutcomeFree
+
+capiOcbColumnArrayFixedBinaryWidth :: NativeLibrary -> OcbColumnArrayFixedBinaryWidthFn
+capiOcbColumnArrayFixedBinaryWidth NativeLibrary{nativeOcbColumnArrayFixedBinaryWidth} = nativeOcbColumnArrayFixedBinaryWidth
+
+capiOcbPlanRead :: NativeLibrary -> OcbPlanReadFn
+capiOcbPlanRead NativeLibrary{nativeOcbPlanRead} = nativeOcbPlanRead
+
+capiOcbReadPlanReport :: NativeLibrary -> OcbReadPlanReportFn
+capiOcbReadPlanReport NativeLibrary{nativeOcbReadPlanReport} = nativeOcbReadPlanReport
+
+capiOcbReadPlanProjectedColumnIds :: NativeLibrary -> OcbReadPlanIdsFn
+capiOcbReadPlanProjectedColumnIds NativeLibrary{nativeOcbReadPlanProjectedColumnIds} = nativeOcbReadPlanProjectedColumnIds
+
+capiOcbReadPlanRowGroupIds :: NativeLibrary -> OcbReadPlanIdsFn
+capiOcbReadPlanRowGroupIds NativeLibrary{nativeOcbReadPlanRowGroupIds} = nativeOcbReadPlanRowGroupIds
+
+capiOcbReadBatchesFromPlan :: NativeLibrary -> OcbReadBatchesFromPlanFn
+capiOcbReadBatchesFromPlan NativeLibrary{nativeOcbReadBatchesFromPlan} = nativeOcbReadBatchesFromPlan
+
+capiOcbReadPlanFree :: NativeLibrary -> OcbReadPlanFreeFn
+capiOcbReadPlanFree NativeLibrary{nativeOcbReadPlanFree} = nativeOcbReadPlanFree
+
+capiOcbRowGroupSummariesInit :: NativeLibrary -> OcbRowGroupSummariesInitFn
+capiOcbRowGroupSummariesInit NativeLibrary{nativeOcbRowGroupSummariesInit} = nativeOcbRowGroupSummariesInit
+
+capiOcbRowGroupSummaries :: NativeLibrary -> OcbRowGroupSummariesFn
+capiOcbRowGroupSummaries NativeLibrary{nativeOcbRowGroupSummaries} = nativeOcbRowGroupSummaries
+
+capiOcbReadPlanRowGroupSummaries :: NativeLibrary -> OcbReadPlanRowGroupSummariesFn
+capiOcbReadPlanRowGroupSummaries NativeLibrary{nativeOcbReadPlanRowGroupSummaries} = nativeOcbReadPlanRowGroupSummaries
+
+capiOcbRowGroupSummariesFree :: NativeLibrary -> OcbRowGroupSummariesFreeFn
+capiOcbRowGroupSummariesFree NativeLibrary{nativeOcbRowGroupSummariesFree} = nativeOcbRowGroupSummariesFree
 
 capiTensorFree :: NativeLibrary -> TensorFreeFn
 capiTensorFree NativeLibrary{nativeTensorFree} = nativeTensorFree

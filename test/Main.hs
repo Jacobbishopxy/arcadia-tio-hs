@@ -5,12 +5,18 @@ import Data.Int (Int32, Int64)
 import Data.Bits ((.|.), shiftL)
 import Data.Word (Word8, Word64)
 import qualified Data.Vector.Storable as VS
-import System.Directory (createDirectoryIfMissing, doesFileExist, removeFile)
+import Foreign.Marshal.Alloc (alloca)
+import Foreign.Marshal.Array (withArray)
+import Foreign.Ptr (nullPtr)
+import Foreign.Storable (peek, sizeOf)
+import System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory, removeFile)
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeDirectory)
 
 import Arcadia.Tio
+import qualified Arcadia.Tio.Internal.CApi as C
+import qualified Arcadia.Tio.Ocb as Ocb
 
 main :: IO ()
 main = do
@@ -39,6 +45,7 @@ main = do
   testCoordinateCreateValidationAndVariants native
   testAppendAxisCoordinateBatches native
   testUniverseAuthoringAndReads native
+  testOcbReadBatchesAndAttribution native
 
   putStrLn "PASS: dense .tio lifecycle/read parity smoke through libarcadia_tio_capi.so"
 
@@ -702,6 +709,134 @@ testUniverseAuthoringAndReads native = do
   close policyFile
 
   assertErrorCode "universe uuid validation" ErrorInvalidArgument =<< createStreamingWithUniverse native (".test-output" </> "universe-invalid.tio") F32 [dim AxisTime 0] 0 emptyCreateMetadata (CreateWithUniverseOptions [AxisIdentityInput 1 AxisIdentityUniverseAware])
+
+testOcbReadBatchesAndAttribution :: NativeLibrary -> IO ()
+testOcbReadBatchesAndAttribution native = do
+  assertEqual "OCB read request size" 104 (sizeOf C.emptyCArcadiaTioOcbReadRequest)
+  assertEqual "OCB row-group predicate size" 208 (sizeOf C.emptyCArcadiaTioOcbRowGroupPredicate)
+  assertEqual "OCB read report size" 96 (sizeOf C.emptyCArcadiaTioOcbReadReport)
+  assertEqual "OCB read attribution size" 208 (sizeOf C.emptyCArcadiaTioOcbReadAttribution)
+  assertEqual "OCB read outcome size" 160 (sizeOf C.emptyCArcadiaTioOcbReadOutcome)
+  let fixedBinaryColumn =
+        C.CArcadiaTioOcbColumnArray
+          1
+          216
+          0
+          nullPtr
+          4
+          0
+          0
+          0
+          C.emptyCArcadiaTioOcbPrimitiveValues
+          0
+          C.emptyCArcadiaTioOcbValidityBitmap
+          7
+          0
+          0
+          0
+  fixedWidth <- withArray [fixedBinaryColumn] $ \columnPtr -> C.capiOcbColumnArrayFixedBinaryWidth native columnPtr
+  assertEqual "OCB fixed-binary column array width preservation" 7 fixedWidth
+  alloca $ \requestPtr -> do
+    C.capiOcbReadRequestInit native requestPtr
+    request <- peek requestPtr
+    assertEqual "OCB read request init struct size" 104 (fromIntegral (C.cOcbReadRequestStructSize request) :: Int)
+    assertEqual "OCB read request init max threads" 1 (fromIntegral (C.cOcbReadRequestMaxThreads request) :: Int)
+  alloca $ \reportPtr -> do
+    C.capiOcbReadReportInit native reportPtr
+    report <- peek reportPtr
+    assertEqual "OCB read report init struct size" 96 (fromIntegral (C.cOcbReadReportStructSize report) :: Int)
+    C.capiOcbReadReportFree native reportPtr
+  alloca $ \attributionPtr -> do
+    C.capiOcbReadAttributionInit native attributionPtr
+    attribution <- peek attributionPtr
+    assertEqual "OCB read attribution init struct size" 208 (fromIntegral (C.cOcbReadAttributionStructSize attribution) :: Int)
+    C.capiOcbReadAttributionFree native attributionPtr
+  alloca $ \outcomePtr -> do
+    C.capiOcbReadOutcomeInit native outcomePtr
+    outcome <- peek outcomePtr
+    assertEqual "OCB read outcome init struct size" 160 (fromIntegral (C.cOcbReadOutcomeStructSize outcome) :: Int)
+    C.capiOcbReadOutcomeFree native outcomePtr
+  fixture <- discoverOcbFixture
+  case fixture of
+    Nothing -> putStrLn "SKIP: OCB projection-predicate fixture not found for read/attribution smoke"
+    Just path -> do
+      file <- unwrap "OCB open projection-predicate fixture" =<< Ocb.openWithOptions native path Ocb.defaultOcbOpenOptions
+      cloned <- unwrap "OCB reader clone" =<< Ocb.clone file
+      Ocb.close cloned
+      let request =
+            Ocb.defaultOcbReadRequest
+              { Ocb.ocbReadProjection = Ocb.OcbProjectionNames ["metric"]
+              , Ocb.ocbReadPredicates =
+                  [ Ocb.OcbRowGroupPredicate
+                      { Ocb.ocbPredicateColumn = "partition_key"
+                      , Ocb.ocbPredicateLower = Just (Ocb.OcbPredicateI32 32)
+                      , Ocb.ocbPredicateUpper = Just (Ocb.OcbPredicateI32 32)
+                      }
+                  ]
+              , Ocb.ocbReadMaxThreads = 2
+              }
+      assertErrorCode "OCB readBatches negative maxThreads" ErrorInvalidArgument =<< Ocb.readBatches file request{Ocb.ocbReadMaxThreads = -1}
+      assertErrorCode "OCB readBatchesWithAttribution negative maxThreads" ErrorInvalidArgument =<< Ocb.readBatchesWithAttribution file request{Ocb.ocbReadMaxThreads = -1}
+      outcome <- unwrap "OCB readBatches" =<< Ocb.readBatches file request
+      assertOcbProjectionPredicateOutcome "OCB readBatches" outcome
+      attributed <- unwrap "OCB readBatchesWithAttribution" =<< Ocb.readBatchesWithAttribution file request
+      assertOcbProjectionPredicateOutcome "OCB attributed outcome" (Ocb.ocbAttributedOutcome attributed)
+      let attribution = Ocb.ocbReadAttribution attributed
+      assertEqual "OCB attribution selected row groups" 1 (Ocb.ocbAttributionSelectedRowGroups attribution)
+      assertEqual "OCB attribution pruned row groups" 2 (Ocb.ocbAttributionPrunedRowGroups attribution)
+      assertEqual "OCB attribution selected chunks" 1 (Ocb.ocbAttributionSelectedColumnChunks attribution)
+      assertEqual "OCB attribution fallback" (Just "too_few_row_groups") (Ocb.ocbAttributionFallbackReason attribution)
+      plan <- unwrap "OCB planRead" =<< Ocb.planRead file request
+      planReport <- unwrap "OCB readPlanReport" =<< Ocb.readPlanReport plan
+      assertEqual "OCB plan report selected row groups" 1 (Ocb.ocbReadSelectedRowGroups planReport)
+      projectedIds <- unwrap "OCB readPlanProjectedColumnIds" =<< Ocb.readPlanProjectedColumnIds plan
+      assertEqual "OCB plan projected column count" 1 (length projectedIds)
+      rowGroupIds <- unwrap "OCB readPlanRowGroupIds" =<< Ocb.readPlanRowGroupIds plan
+      assertEqual "OCB plan row-group count" 1 (length rowGroupIds)
+      plannedOutcome <- unwrap "OCB readBatchesFromPlan" =<< Ocb.readBatchesFromPlan file plan []
+      assertOcbProjectionPredicateOutcome "OCB readBatchesFromPlan" plannedOutcome
+      summaries <- unwrap "OCB rowGroupSummaries" =<< Ocb.rowGroupSummaries file
+      assertEqual "OCB row-group summaries non-empty" True (not (null (Ocb.ocbRowGroupSummaries summaries)))
+      planSummaries <- unwrap "OCB readPlanRowGroupSummaries" =<< Ocb.readPlanRowGroupSummaries file plan
+      assertEqual "OCB plan summaries selected count" 1 (length (Ocb.ocbRowGroupSummaries planSummaries))
+      Ocb.closeReadPlan plan
+      Ocb.close file
+
+assertOcbProjectionPredicateOutcome :: String -> Ocb.OcbReadOutcome -> IO ()
+assertOcbProjectionPredicateOutcome label outcome = do
+  let report = Ocb.ocbOutcomeReport outcome
+  assertEqual (label <> " selected row groups") 1 (Ocb.ocbReadSelectedRowGroups report)
+  assertEqual (label <> " pruned row groups") 2 (Ocb.ocbReadPrunedRowGroups report)
+  assertEqual (label <> " selected chunks") 1 (Ocb.ocbReadSelectedColumnChunks report)
+  assertEqual (label <> " fallback") (Just "too_few_row_groups") (Ocb.ocbReadFallbackReason report)
+  case Ocb.ocbOutcomeBatches outcome of
+    [batch] -> do
+      assertEqual (label <> " row count") 2 (Ocb.ocbBatchRowCount batch)
+      case Ocb.ocbBatchColumns batch of
+        [column] -> do
+          assertEqual (label <> " column name") "metric" (Ocb.ocbArrayName column)
+          assertEqual (label <> " values") (Ocb.OcbValuesI64 [5100, 5101]) (Ocb.ocbArrayValues column)
+        other -> failTest (label <> ": expected one projected column, got " <> show (length other))
+    other -> failTest (label <> ": expected one selected row group, got " <> show (length other))
+
+discoverOcbFixture :: IO (Maybe FilePath)
+discoverOcbFixture = do
+  envFixture <- lookupEnv "ARCADIA_TIO_OCB_FIXTURE"
+  case envFixture of
+    Just path -> do
+      exists <- doesFileExist path
+      if exists then pure (Just path) else searchFromCwd
+    Nothing -> searchFromCwd
+  where
+    searchFromCwd = getCurrentDirectory >>= go
+    go dir = do
+      let candidate = dir </> "crates" </> "arcadia-tio" </> "tests" </> "fixtures" </> "ocb" </> "projection-predicate.ocb"
+      exists <- doesFileExist candidate
+      if exists
+        then pure (Just candidate)
+        else do
+          let parent = takeDirectory dir
+          if parent == dir then pure Nothing else go parent
 
 decodeI32LE :: [Word8] -> [Int32]
 decodeI32LE [] = []

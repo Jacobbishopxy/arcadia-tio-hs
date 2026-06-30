@@ -87,7 +87,7 @@ Legend:
 | Reform | ✅ | ✅ | `reformTo` and `reformToEx` expose target-layout options, regular-chunked block-shape validation, copied report reason metadata, and native report cleanup. |
 | Diagnostics / precise accounting | ✅ | ✅ | `v4Diagnostics` and `v4DiagnosticsPrecise` expose status-aware report ADTs, byte families, precise-accounting validity/omitted-field details, owned strings, and matching native report frees. |
 | Arrow C Data export | ✅ via C ABI/C++ | ✅ | `readValuesArrow` returns an explicit owned `ArrowCData`; callbacks are released by `releaseArrowCData`/finalizers without exposing raw release functions. |
-| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/close and minimal metadata row/root counts. OCB create/append/dictionary/read/summary APIs remain missing. |
+| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/options/clone/errors, full copied metadata, dictionary values, read requests/outcomes/attribution, read plans, plan inspection/read-from-plan, and generic row-group summaries. OCB cursor callbacks remain blocked until callback/user-data lifetime can be made safe; row-group fill remains blocked until caller-owned buffer shape, fixed-binary byte capacity, and validity ownership validation are represented safely. OCB create/append/cleanup remain future write-plane work. |
 | OCB direct Rust-core reader path | ✅ public Rust `arcadia-tio-ocb-core` | ❌ | Haskell should still use C ABI unless a separate pure Haskell/Rust-core bridge is approved. |
 | Tests without native library | N/A | ✅ skips gracefully | `cabal test all` skips when env vars are absent. |
 | Native `.tio` roundtrip test | ✅ Rust tests | ✅ f32/f64/i32/i64 + sparse + metadata/selectors/dense-mask | Still a focused smoke, not exhaustive parity evidence. |
@@ -102,8 +102,8 @@ deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.
 
 1. Expand coordinate parity beyond the current partial surface: legacy coordinate index/range helpers, fixed-text/dictionary append authoring ergonomics, and richer index status typing.
-2. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
-   row-group summaries, read requests/outcomes, cleanup, and structured OCB errors.
+2. Expand OCB write/cleanup and blocked read-side paths: create/append/cleanup,
+   safe cursor callback lifetime handling, and safe row-group fill buffer APIs.
 3. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
    `cabal test all` without native env, and an optional native-library job gated
    by secrets/artifacts.

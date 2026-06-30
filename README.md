@@ -86,14 +86,20 @@ Implemented:
   copied reform diagnostic metadata;
 - export values through an explicit Arrow C Data ownership wrapper that releases
   Arrow callbacks without exposing raw release functions;
-- open OCB selected-snapshot handles and read minimal row/root metadata;
+- open OCB selected-snapshot handles with validation options, clone readers,
+  inspect structured OCB errors, copy full metadata/dictionaries, read batches
+  with reports/attribution, inspect/execute read plans, and copy generic
+  row-group summaries;
 - free C-owned tensors, masks, strings, chunk plans, commit lists, OCB metadata,
-  and file metadata with the matching C ABI free functions after copying.
+  OCB read outcomes/reports/attribution/plans/summaries, and file metadata with
+  the matching C ABI free functions after copying.
 
 Not yet supported:
 
 - parsing `.tio` or `.ocb` in Haskell;
-- OCB write/read-batch/dictionary/summary APIs beyond minimal open/metadata/close;
+- OCB write/create/append/cleanup APIs, plus read cursor callbacks and row-group
+  fill APIs until safe Haskell callback and caller-owned buffer lifetimes are
+  represented;
 - legacy coordinate index/range helpers, richer coordinate fixed-text/dictionary
   authoring ergonomics, Python/NumPy interop, or C++ helpers;
 - macOS/Windows native-library lookup;
