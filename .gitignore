@@ -1,4 +1,6 @@
 dist
+.pi/
+target/
 .tmp/
 tmp/
 .test-output/

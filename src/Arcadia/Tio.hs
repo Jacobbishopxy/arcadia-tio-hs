@@ -12,6 +12,10 @@ module Arcadia.Tio
   , lastError
   , TensorFile
   , AppendRange(..)
+  , ArrowCData
+  , arrowArrayLength
+  , arrowSchemaFormat
+  , releaseArrowCData
   , createStreaming
   , createStreamingWithMetadata
   , createRandomAccess
@@ -44,6 +48,19 @@ module Arcadia.Tio
   , readAtCommitSelected
   , readAtCommitDense
   , readAtCommitDenseSelected
+  , readWithOptions
+  , readWithOptionsDense
+  , readWithShapePolicy
+  , readWithShapePolicyDense
+  , readWithOptionsAttributed
+  , readWithOptionsDenseAttributed
+  , readAtCommitWithOptions
+  , readAtCommitWithOptionsDense
+  , readAtCommitWithShapePolicy
+  , readAtCommitWithShapePolicyDense
+  , readIndex
+  , getIndexCheckpointEveryCommits
+  , setIndexCheckpointEveryCommits
   , analyzeCompaction
   , compactTo
   , maybeCompact
@@ -84,6 +101,12 @@ module Arcadia.Tio
   , readEntryRange
   , takeEntries
   , readScalar
+  , rewriteF32
+  , rewriteF64
+  , rewriteSliceF32
+  , rewriteSliceF64
+  , clearBlocks
+  , readValuesArrow
   ) where
 
 import Arcadia.Tio.Error

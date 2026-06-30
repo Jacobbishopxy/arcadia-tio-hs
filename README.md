@@ -64,10 +64,19 @@ Implemented:
 - read axis ranges/takes/one-index slices, append-entry ranges/takes, and scalar values;
 - read full and selector-bearing retained commit snapshots, including dense
   materialization with mask;
+- read with execution options, shape policies, copied read execution reports,
+  attributed query-trace JSON, historical option reports, and Python-style
+  read-index lowering reports;
+- query/set index-checkpoint cadence, surfacing native unsupported status where
+  the V4 runtime does not implement it;
 - inspect head/list commits and shallow compaction stats;
 - run copy-live compaction helpers (`compactTo`, `maybeCompact`) and query
   auto-compaction config/state;
 - call pop/revert helpers and surface the native status;
+- call rewrite/rewrite-slice/clear-block helpers for supported native dtypes and
+  surface native unsupported/invalid status for current runtime/layout gaps;
+- export values through an explicit Arrow C Data ownership wrapper that releases
+  Arrow callbacks without exposing raw release functions;
 - open OCB selected-snapshot handles and read minimal row/root metadata;
 - free C-owned tensors, masks, strings, chunk plans, commit lists, OCB metadata,
   and file metadata with the matching C ABI free functions after copying.
@@ -76,9 +85,8 @@ Not yet supported:
 
 - parsing `.tio` or `.ocb` in Haskell;
 - OCB write/read-batch/dictionary/summary APIs beyond minimal open/metadata/close;
-- coordinate APIs, advanced index reads, retained-history/detailed
-  compaction/reform/diagnostic report families, Arrow,
-  Python/NumPy interop, or C++ helpers;
+- coordinate APIs, retained-history/detailed compaction/reform/diagnostic report
+  families, Python/NumPy interop, or C++ helpers;
 - macOS/Windows native-library lookup;
 - native library vendoring, publishing, signing, or release assets.
 
@@ -125,7 +133,8 @@ The test suite skips when neither `ARCADIA_TIO_CAPI_LIB` nor
 `ARCADIA_TIO_CAPI_LIB_DIR` is set. With the native library configured, it creates
 project-local `.test-output/*.tio` files, checks dense `f32`/`f64`/`i32`/`i64`
 roundtrips, random-access create, sparse-intent append, compaction helpers,
-metadata queries, selector reads, dense-mask reads, and removes generated files:
+metadata queries, selector reads, option/report reads, read-index, mutation and
+Arrow ownership wrappers, dense-mask reads, and removes generated files:
 
 ```sh
 cabal test all
@@ -163,9 +172,10 @@ A compilable version lives at `examples/Roundtrip.hs` and is built by
 
 - `TensorFile` wraps the opaque `ArcadiaTioHandle*` in a `ForeignPtr`.
 - The finalizer calls `arcadia_tio_close`; `close` can be used for eager cleanup.
-- `readAll` and selector reads copy native `ArcadiaTioTensor` data and shape
-  into Haskell-owned vectors/lists before freeing the native tensor.
-- `readAllDense` also copies `ArcadiaTioMask` before freeing the native mask.
+- `readAll`, selector, option/report, read-index, historical, and mutation test
+  reads copy native `ArcadiaTioTensor` data and shape into Haskell-owned
+  vectors/lists before freeing the native tensor.
+- Dense reads also copy `ArcadiaTioMask` before freeing the native mask.
 - Raw C-owned tensor buffers are never exposed from the public safe API.
 - Append calls borrow Haskell vector memory only for the duration of one FFI
   call.

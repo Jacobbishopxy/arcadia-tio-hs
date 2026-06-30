@@ -43,6 +43,18 @@ module Arcadia.Tio.Types
   , SparseAppendReason(..)
   , SparseAppendAnalysis(..)
   , EntrySelector(..)
+  , ReadExecutionMode(..)
+  , ReadOptions(..)
+  , defaultReadOptions
+  , ReadShapePolicy(..)
+  , ReadExecutionReport(..)
+  , QueryTraceContext(..)
+  , QueryTraceJson(..)
+  , ReadIndexItem(..)
+  , ReadIndexLoweringKind(..)
+  , ReadIndexReport(..)
+  , HistoricalQuerySourceKind(..)
+  , HistoricalReadExecutionReport(..)
   , CommitInfo(..)
   , CompactionMode(..)
   , CompactionStats(..)
@@ -427,6 +439,101 @@ data EntrySelector
   = SelectAll
   | SelectRange Word32 Word32
   | SelectTake [Word32]
+  deriving (Eq, Show)
+
+-- | Native read execution mode requested by option-bearing reads.
+data ReadExecutionMode
+  = ReadSerial
+  | ReadParallelThreads
+  deriving (Eq, Ord, Show)
+
+-- | Read execution options shared by current and historical option reads.
+data ReadOptions = ReadOptions
+  { readOptionMode :: ReadExecutionMode
+  , readOptionMaxThreads :: Int
+  }
+  deriving (Eq, Show)
+
+-- | Default serial read options.
+defaultReadOptions :: ReadOptions
+defaultReadOptions = ReadOptions{readOptionMode = ReadSerial, readOptionMaxThreads = 0}
+
+-- | Shape policy for option-bearing reads. Explicit extent-axis and explicit
+-- universe-axis payloads are intentionally deferred until the Haskell wrapper
+-- has typed UUID inputs for them.
+data ReadShapePolicy
+  = ReadShapeFileEnvelope
+  | ReadShapeCurrentHead
+  | ReadShapeUnion
+  | ReadShapeIntersection
+  | ReadShapeInitialRegistered
+  | ReadShapeExplicitExtents [Word64]
+  deriving (Eq, Show)
+
+-- | Copied native read execution report. String fields are diagnostic only.
+data ReadExecutionReport = ReadExecutionReport
+  { readReportRequestedMode :: ReadExecutionMode
+  , readReportQueryMaxThreads :: Int
+  , readReportQueryEffectiveMode :: ReadExecutionMode
+  , readReportQueryEffectiveThreads :: Int
+  , readReportQueryParallelRuntime :: Maybe String
+  , readReportQueryParallelFallbackReason :: Maybe String
+  , readReportQueryParallelReasonCode :: Maybe String
+  , readReportQueryParallelReasonCodeTaxonomy :: Maybe String
+  }
+  deriving (Eq, Show)
+
+-- | Query trace attribution context borrowed by attributed read calls.
+data QueryTraceContext = QueryTraceContext
+  { queryTraceRunId :: String
+  , queryTraceRowId :: String
+  , queryTraceRepeatIndex :: Word32
+  , queryTracePhase :: String
+  , queryTraceLanguage :: String
+  , queryTraceApiSurface :: String
+  , queryTraceOperation :: String
+  , queryTraceClock :: String
+  }
+  deriving (Eq, Show)
+
+-- | Owned JSON copied from the native query trace result.
+newtype QueryTraceJson = QueryTraceJson { queryTraceJson :: String }
+  deriving (Eq, Show)
+
+-- | Python-style index item for @read_index@ lowering.
+data ReadIndexItem
+  = ReadIndexAll
+  | ReadIndexSlice (Maybe Int64) (Maybe Int64) Int64
+  | ReadIndexIndex Int64
+  | ReadIndexNewAxis
+  | ReadIndexEllipsis
+  deriving (Eq, Show)
+
+-- | Native read-index lowering selected by the runtime.
+data ReadIndexLoweringKind
+  = ReadIndexLoweringUnknown
+  | ReadIndexLoweringSelectorRead
+  | ReadIndexLoweringSelectorReadWithShapePostprocess
+  deriving (Eq, Ord, Show)
+
+-- | Copied native read-index report.
+data ReadIndexReport = ReadIndexReport
+  { readIndexLoweringKind :: ReadIndexLoweringKind
+  , readIndexUsedFullTensorFallback :: Bool
+  }
+  deriving (Eq, Show)
+
+-- | Native historical read source kind.
+data HistoricalQuerySourceKind
+  = HistoricalQueryRetainedVisibleCommit
+  deriving (Eq, Ord, Show)
+
+-- | Copied native historical read execution report.
+data HistoricalReadExecutionReport = HistoricalReadExecutionReport
+  { historicalReadExecutionReport :: ReadExecutionReport
+  , historicalReadQuerySourceKind :: HistoricalQuerySourceKind
+  , historicalReadQueryCommitSeq :: Word64
+  }
   deriving (Eq, Show)
 
 -- | Commit metadata copied from the C ABI visible-commit list.

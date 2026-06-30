@@ -22,6 +22,8 @@ main = do
   createDirectoryIfMissing True ".test-output"
 
   testStreamingF64MetadataSelectorsDense native
+  testReadOptionsReportsIndex native
+  testMutationAndArrow native
   testStreamingF32 native
   testStreamingI32 native
   testStreamingI64 native
@@ -95,6 +97,114 @@ testStreamingF64MetadataSelectorsDense native = do
   assertEqual "meta dim lens" [0, 3] (map dimMetaLength (fileMetaDims meta))
   assertEqual "meta profile" HeaderStreaming (fileMetaEffectiveProfile meta)
 
+  cleanup path
+
+testReadOptionsReportsIndex :: NativeLibrary -> IO ()
+testReadOptionsReportsIndex native = do
+  let path = ".test-output" </> "read-options-index.tio"
+  cleanup path
+  file <- unwrap "createStreaming read options" =<< createStreaming native path F64 [dim AxisTime 0, dim AxisChannel 3] 0
+  _ <- unwrap "appendDenseF64 read options" =<< appendDenseF64 file [2, 3] (VS.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+
+  (selected, serialReport) <- unwrap "readWithOptions" =<< readWithOptions file [SelectAll, SelectRange 1 3] defaultReadOptions
+  selectedF64 <- expectSomeF64 "readWithOptions tensor" selected
+  assertTensor "readWithOptions selected" [2, 2] [2.0, 3.0, 5.0, 6.0] selectedF64
+  assertEqual "readWithOptions requested mode" ReadSerial (readReportRequestedMode serialReport)
+
+  let parallelOptions = ReadOptions{readOptionMode = ReadParallelThreads, readOptionMaxThreads = 2}
+  (denseSelected, parallelReport) <- unwrap "readWithOptionsDense" =<< readWithOptionsDense file [SelectTake [1, 0], SelectAll] parallelOptions (-1.0)
+  denseF64 <- expectSomeDenseF64 "readWithOptionsDense tensor" denseSelected
+  assertEqual "readWithOptionsDense shape" [2, 3] (tensorShape (denseReadTensor denseF64))
+  assertEqual "readWithOptionsDense values" (VS.fromList [4.0, 5.0, 6.0, 1.0, 2.0, 3.0]) (tensorValues (denseReadTensor denseF64))
+  assertEqual "readWithOptionsDense validity" (VS.fromList [1, 1, 1, 1, 1, 1]) (denseReadValidity denseF64)
+  assertEqual "readWithOptionsDense requested mode" ReadParallelThreads (readReportRequestedMode parallelReport)
+
+  (shapePolicyTensor, _) <- unwrap "readWithShapePolicy" =<< readWithShapePolicy file [SelectRange 0 1, SelectAll] defaultReadOptions ReadShapeCurrentHead
+  shapePolicyF64 <- expectSomeF64 "readWithShapePolicy tensor" shapePolicyTensor
+  assertTensor "readWithShapePolicy selected" [1, 3] [1.0, 2.0, 3.0] shapePolicyF64
+
+  headInfo <- unwrap "headCommit read options" =<< headCommit file
+  (historicalTensor, historicalReport) <- unwrap "readAtCommitWithOptions" =<< readAtCommitWithOptions file (commitSeq headInfo) [SelectRange 1 2, SelectAll] defaultReadOptions
+  historicalF64 <- expectSomeF64 "readAtCommitWithOptions tensor" historicalTensor
+  assertTensor "readAtCommitWithOptions selected" [1, 3] [4.0, 5.0, 6.0] historicalF64
+  assertEqual "historical commit seq" (commitSeq headInfo) (historicalReadQueryCommitSeq historicalReport)
+
+  (historicalDense, _) <- unwrap "readAtCommitWithShapePolicyDense" =<< readAtCommitWithShapePolicyDense file (commitSeq headInfo) [SelectAll, SelectRange 0 2] defaultReadOptions ReadShapeCurrentHead (-1.0)
+  historicalDenseF64 <- expectSomeDenseF64 "readAtCommitWithShapePolicyDense tensor" historicalDense
+  assertEqual "historical shape policy dense shape" [2, 2] (tensorShape (denseReadTensor historicalDenseF64))
+  assertEqual "historical shape policy dense values" (VS.fromList [1.0, 2.0, 4.0, 5.0]) (tensorValues (denseReadTensor historicalDenseF64))
+
+  let traceContext =
+        QueryTraceContext
+          { queryTraceRunId = "tp467-read-options"
+          , queryTraceRowId = "row-1"
+          , queryTraceRepeatIndex = 0
+          , queryTracePhase = "test"
+          , queryTraceLanguage = "haskell"
+          , queryTraceApiSurface = "arcadia-tio-hs"
+          , queryTraceOperation = "readWithOptionsAttributed"
+          , queryTraceClock = "monotonic"
+          }
+  (tracedTensor, _, traceJson) <- unwrap "readWithOptionsAttributed" =<< readWithOptionsAttributed file [SelectAll, SelectAll] defaultReadOptions traceContext
+  tracedF64 <- expectSomeF64 "readWithOptionsAttributed tensor" tracedTensor
+  assertTensor "readWithOptionsAttributed tensor" [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] tracedF64
+  assertEqual "query trace JSON non-empty" True (not (null (queryTraceJson traceJson)))
+
+  (indexedTensor, indexReport) <- unwrap "readIndex" =<< readIndex file [ReadIndexSlice (Just 1) (Just 2) 1, ReadIndexAll]
+  indexedF64 <- expectSomeF64 "readIndex tensor" indexedTensor
+  assertTensor "readIndex selected" [1, 3] [4.0, 5.0, 6.0] indexedF64
+  assertEqual "readIndex lowering known" True (readIndexLoweringKind indexReport /= ReadIndexLoweringUnknown)
+
+  setCheckpoint <- setIndexCheckpointEveryCommits file 3
+  case setCheckpoint of
+    Left err -> assertEqual "setIndexCheckpointEveryCommits native status" ErrorUnimplemented (tioErrorCode err)
+    Right () -> do
+      checkpointEvery <- unwrap "getIndexCheckpointEveryCommits" =<< getIndexCheckpointEveryCommits file
+      assertEqual "index checkpoint every" 3 checkpointEvery
+
+  close file
+  cleanup path
+
+testMutationAndArrow :: NativeLibrary -> IO ()
+testMutationAndArrow native = do
+  let path = ".test-output" </> "mutation-arrow.tio"
+  cleanup path
+  file <- unwrap "createRandomAccess mutation" =<< createRandomAccess native path F64 [dim AxisTime 0, dim AxisChannel 2] 0
+  _ <- unwrap "appendDenseF64 mutation" =<< appendDenseF64 file [2, 2] (VS.fromList [1.0, 2.0, 3.0, 4.0])
+
+  replacement <- unwrap "rewrite tensor" (tensorFromVector [1, 2] (VS.fromList [9.0, 10.0]))
+  rewriteResult <- rewriteF64 file (SelectRange 0 1) replacement
+  case rewriteResult of
+    Left _err -> pure ()
+    Right () -> do
+      rewritten <- unwrap "read after rewriteF64" =<< readAllF64 file
+      assertTensor "rewriteF64 effect" [2, 2] [9.0, 10.0, 3.0, 4.0] rewritten
+
+  sliceReplacement <- unwrap "rewrite slice tensor" (tensorFromVector [1, 2] (VS.fromList [11.0, 12.0]))
+  sliceResult <- rewriteSliceF64 file [SelectRange 1 2, SelectAll] sliceReplacement
+  case sliceResult of
+    Left _err -> pure ()
+    Right () -> do
+      rewritten <- unwrap "read after rewriteSliceF64" =<< readAllF64 file
+      assertEqual "rewriteSliceF64 shape" [2, 2] (tensorShape rewritten)
+
+  clearResult <- clearBlocks file [[0, 0]]
+  case clearResult of
+    Left _err -> pure ()
+    Right () -> pure ()
+
+  arrowResult <- readValuesArrow file
+  case arrowResult of
+    Left err -> assertEqual "readValuesArrow native status" ErrorUnimplemented (tioErrorCode err)
+    Right arrow -> do
+      len <- arrowArrayLength arrow
+      assertEqual "arrow length non-negative" True (len >= 0)
+      fmt <- arrowSchemaFormat arrow
+      assertEqual "arrow schema format present" True (maybe False (not . null) fmt)
+      releaseArrowCData arrow
+      releaseArrowCData arrow
+
+  close file
   cleanup path
 
 testStreamingF32 :: NativeLibrary -> IO ()
@@ -270,18 +380,20 @@ testMetadataRichCreateSettersAndScalar native = do
   cleanup path
 
 unwrapSomeF64 :: String -> Result SomeTensor -> IO (Tensor Double)
-unwrapSomeF64 label result = do
-  tensor <- unwrap label result
-  case tensor of
-    SomeTensorF64 value -> pure value
-    other -> failTest (label <> ": expected f64 tensor, got " <> show (someTensorDType other))
+unwrapSomeF64 label result = unwrap label result >>= expectSomeF64 label
+
+expectSomeF64 :: String -> SomeTensor -> IO (Tensor Double)
+expectSomeF64 label tensor = case tensor of
+  SomeTensorF64 value -> pure value
+  other -> failTest (label <> ": expected f64 tensor, got " <> show (someTensorDType other))
 
 unwrapSomeDenseF64 :: String -> Result SomeDenseRead -> IO (DenseRead Double)
-unwrapSomeDenseF64 label result = do
-  dense <- unwrap label result
-  case dense of
-    SomeDenseReadF64 value -> pure value
-    other -> failTest (label <> ": expected f64 dense read, got " <> show (someDenseReadDType other))
+unwrapSomeDenseF64 label result = unwrap label result >>= expectSomeDenseF64 label
+
+expectSomeDenseF64 :: String -> SomeDenseRead -> IO (DenseRead Double)
+expectSomeDenseF64 label dense = case dense of
+  SomeDenseReadF64 value -> pure value
+  other -> failTest (label <> ": expected f64 dense read, got " <> show (someDenseReadDType other))
 
 assertTensor :: String -> [Word64] -> [Double] -> Tensor Double -> IO ()
 assertTensor label expectedShape expectedValues tensor = do

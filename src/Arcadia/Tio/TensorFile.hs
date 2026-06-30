@@ -4,6 +4,10 @@
 module Arcadia.Tio.TensorFile
   ( TensorFile
   , AppendRange(..)
+  , ArrowCData
+  , arrowArrayLength
+  , arrowSchemaFormat
+  , releaseArrowCData
   , createStreaming
   , createStreamingWithMetadata
   , createRandomAccess
@@ -36,6 +40,19 @@ module Arcadia.Tio.TensorFile
   , readAtCommitSelected
   , readAtCommitDense
   , readAtCommitDenseSelected
+  , readWithOptions
+  , readWithOptionsDense
+  , readWithShapePolicy
+  , readWithShapePolicyDense
+  , readWithOptionsAttributed
+  , readWithOptionsDenseAttributed
+  , readAtCommitWithOptions
+  , readAtCommitWithOptionsDense
+  , readAtCommitWithShapePolicy
+  , readAtCommitWithShapePolicyDense
+  , readIndex
+  , getIndexCheckpointEveryCommits
+  , setIndexCheckpointEveryCommits
   , analyzeCompaction
   , compactTo
   , maybeCompact
@@ -76,6 +93,12 @@ module Arcadia.Tio.TensorFile
   , readEntryRange
   , takeEntries
   , readScalar
+  , rewriteF32
+  , rewriteF64
+  , rewriteSliceF32
+  , rewriteSliceF64
+  , clearBlocks
+  , readValuesArrow
   ) where
 
 import Control.Exception (finally)
@@ -84,12 +107,12 @@ import Data.Int (Int32, Int64)
 import Data.Proxy (Proxy(..))
 import Data.Word (Word8, Word32, Word64)
 import Foreign.C.String (CString, peekCString, withCString)
-import Foreign.C.Types (CInt, CSize(..))
+import Foreign.C.Types (CInt(..), CSize(..))
 import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, withForeignPtr)
 import qualified Foreign.Concurrent as FC
-import Foreign.Marshal.Alloc (alloca)
+import Foreign.Marshal.Alloc (alloca, free, malloc)
 import Foreign.Marshal.Array (allocaArray, copyArray, peekArray, withArray)
-import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Foreign.Ptr (Ptr, castPtr, nullFunPtr, nullPtr)
 import Foreign.Storable (Storable, peek, poke)
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
@@ -100,6 +123,7 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioCommitInfo(..)
   , CArcadiaTioCommitList(..)
   , CArcadiaTioAutoCompactionConfig(..)
+  , CArcadiaTioChunkKey(..)
   , CArcadiaTioChunkPlan(..)
   , CArcadiaTioCompactionMode(..)
   , CArcadiaTioCompactionState(..)
@@ -107,6 +131,15 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompressionConfig(..)
   , CArcadiaTioDimSpec(..)
   , CArcadiaTioEntrySelector(..)
+  , CArcadiaTioReadShapePolicyOptions(..)
+  , CArcadiaTioReadWithShapePolicyOptions(..)
+  , CArcadiaTioReadWithOptionsOptions(..)
+  , CArcadiaTioReadExecutionReport(..)
+  , CArcadiaTioQueryTraceContext(..)
+  , CArcadiaTioQueryTraceJson(..)
+  , CArcadiaTioReadIndexItem(..)
+  , CArcadiaTioReadIndexReport(..)
+  , CArcadiaTioHistoricalReadExecutionReport(..)
   , CArcadiaTioFileMeta(..)
   , CArcadiaTioMask(..)
   , CArcadiaTioScalar(..)
@@ -115,6 +148,8 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioSparseValuePredicateV2(..)
   , CArcadiaTioTensor(..)
   , CArcadiaTioUserKv(..)
+  , CArrowArray(..)
+  , CArrowSchema(..)
   , CHandle
   , NativeLibrary
   , capiAnalyzeCompaction
@@ -165,6 +200,29 @@ import Arcadia.Tio.Internal.CApi
   , capiReadAllDense
   , capiReadAtCommit
   , capiReadAtCommitDense
+  , capiReadAtCommitWithOptions
+  , capiReadAtCommitWithOptionsDense
+  , capiReadAtCommitWithShapePolicy
+  , capiReadAtCommitWithShapePolicyDense
+  , capiReadExecutionReportFree
+  , capiQueryTraceJsonFree
+  , capiHistoricalReadExecutionReportFree
+  , capiReadIndexReportFree
+  , capiReadIndex
+  , capiReadWithOptions
+  , capiReadWithOptionsDense
+  , capiReadWithOptionsAttributed
+  , capiReadWithOptionsDenseAttributed
+  , capiReadWithShapePolicy
+  , capiReadWithShapePolicyDense
+  , capiRewriteF32
+  , capiRewriteF64
+  , capiRewriteSliceF32
+  , capiRewriteSliceF64
+  , capiClearBlocks
+  , capiReadValuesArrow
+  , capiGetIndexCheckpointEveryCommits
+  , capiSetIndexCheckpointEveryCommits
   , capiReadAxisOne
   , capiReadAxisRange
   , capiReadAxisTake
@@ -186,6 +244,15 @@ import Arcadia.Tio.Internal.CApi
   , emptyCArcadiaTioCommitList
   , emptyCArcadiaTioFileMeta
   , emptyCArcadiaTioMask
+  , emptyCArcadiaTioReadExecutionReport
+  , emptyCArcadiaTioQueryTraceJson
+  , emptyCArcadiaTioReadIndexReport
+  , emptyCArcadiaTioHistoricalReadExecutionReport
+  , emptyCArcadiaTioReadShapePolicyOptions
+  , emptyCArrowArray
+  , emptyCArrowSchema
+  , arrowArrayRelease
+  , arrowSchemaRelease
   , emptyCArcadiaTioSparseAppendAnalysis
   , emptyCArcadiaTioTensor
   , lastError
@@ -207,6 +274,17 @@ import Arcadia.Tio.Types
   , DType(..)
   , DimMeta(..)
   , EntrySelector(..)
+  , ReadExecutionMode(..)
+  , ReadOptions(..)
+  , ReadShapePolicy(..)
+  , ReadExecutionReport(..)
+  , QueryTraceContext(..)
+  , QueryTraceJson(..)
+  , ReadIndexItem(..)
+  , ReadIndexLoweringKind(..)
+  , ReadIndexReport(..)
+  , HistoricalQuerySourceKind(..)
+  , HistoricalReadExecutionReport(..)
   , DimSpec(..)
   , CompressionCodec(..)
   , AutoCompactionConfig(..)
@@ -255,6 +333,27 @@ data AppendRange = AppendRange
   , appendEnd :: Word32
   }
   deriving (Eq, Show)
+
+-- | Owned Arrow C Data export. The release callbacks remain encapsulated and
+-- are invoked by 'releaseArrowCData' or by the Haskell finalizer.
+data ArrowCData = ArrowCData
+  { arrowArrayForeignPtr :: ForeignPtr CArrowArray
+  , arrowSchemaForeignPtr :: ForeignPtr CArrowSchema
+  }
+
+-- | Copy the exported ArrowArray length field for lightweight smoke tests.
+arrowArrayLength :: ArrowCData -> IO Int64
+arrowArrayLength ArrowCData{arrowArrayForeignPtr} = withForeignPtr arrowArrayForeignPtr $ \ptr -> cArrowArrayLength <$> peek ptr
+
+-- | Copy the exported ArrowSchema format string, when present.
+arrowSchemaFormat :: ArrowCData -> IO (Maybe String)
+arrowSchemaFormat ArrowCData{arrowSchemaForeignPtr} = withForeignPtr arrowSchemaForeignPtr $ \ptr -> peek ptr >>= peekOptionalCString . cArrowSchemaFormat
+
+-- | Explicitly release Arrow C Data callbacks. Safe to call more than once.
+releaseArrowCData :: ArrowCData -> IO ()
+releaseArrowCData ArrowCData{arrowArrayForeignPtr, arrowSchemaForeignPtr} = do
+  finalizeForeignPtr arrowArrayForeignPtr
+  finalizeForeignPtr arrowSchemaForeignPtr
 
 -- | Create a streaming '.tio' file through the C ABI.
 createStreaming :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> IO (Result TensorFile)
@@ -575,6 +674,137 @@ withEntrySelectors selectors action = go selectors []
     SelectTake indices ->
       withArray indices $ \indicesPtr ->
         go rest (CArcadiaTioEntrySelector 2 0 0 indicesPtr (CSize (fromIntegral (length indices))) : acc)
+
+withReadOptions :: ReadOptions -> (Ptr CArcadiaTioReadWithOptionsOptions -> IO a) -> IO a
+withReadOptions options action =
+  alloca $ \optionsPtr -> do
+    poke optionsPtr (readOptionsToC options)
+    action optionsPtr
+
+withShapeReadOptions :: ReadOptions -> ReadShapePolicy -> (Ptr CArcadiaTioReadWithShapePolicyOptions -> IO a) -> IO a
+withShapeReadOptions options policy action =
+  withShapePolicy policy $ \shapePolicy ->
+    alloca $ \optionsPtr -> do
+      poke optionsPtr CArcadiaTioReadWithShapePolicyOptions
+        { cShapeReadOptionsVersion = 1
+        , cShapeReadOptionsStructSize = 104
+        , cShapeReadOptionsMode = readExecutionModeToRaw (readOptionMode options)
+        , cShapeReadOptionsMaxThreads = CSize (fromIntegral (max 0 (readOptionMaxThreads options)))
+        , cShapeReadOptionsShapePolicy = shapePolicy
+        }
+      action optionsPtr
+
+withShapePolicy :: ReadShapePolicy -> (CArcadiaTioReadShapePolicyOptions -> IO a) -> IO a
+withShapePolicy policy action =
+  case policy of
+    ReadShapeExplicitExtents extents ->
+      withArray extents $ \extentsPtr ->
+        action emptyCArcadiaTioReadShapePolicyOptions
+          { cReadShapePolicyPolicy = readShapePolicyToRaw policy
+          , cReadShapePolicyExplicitExtents = if null extents then nullPtr else extentsPtr
+          , cReadShapePolicyExplicitExtentsLen = CSize (fromIntegral (length extents))
+          }
+    _ -> action emptyCArcadiaTioReadShapePolicyOptions{cReadShapePolicyPolicy = readShapePolicyToRaw policy}
+
+withQueryTraceContext :: QueryTraceContext -> (Ptr CArcadiaTioQueryTraceContext -> IO a) -> IO a
+withQueryTraceContext QueryTraceContext{queryTraceRunId, queryTraceRowId, queryTraceRepeatIndex, queryTracePhase, queryTraceLanguage, queryTraceApiSurface, queryTraceOperation, queryTraceClock} action =
+  withCString queryTraceRunId $ \runIdPtr ->
+    withCString queryTraceRowId $ \rowIdPtr ->
+      withCString queryTracePhase $ \phasePtr ->
+        withCString queryTraceLanguage $ \languagePtr ->
+          withCString queryTraceApiSurface $ \apiSurfacePtr ->
+            withCString queryTraceOperation $ \operationPtr ->
+              withCString queryTraceClock $ \traceClockPtr ->
+                alloca $ \tracePtr -> do
+                  poke tracePtr CArcadiaTioQueryTraceContext
+                    { cTraceContextVersion = 1
+                    , cTraceContextStructSize = 80
+                    , cTraceContextRunId = runIdPtr
+                    , cTraceContextRowId = rowIdPtr
+                    , cTraceContextRepeatIndex = queryTraceRepeatIndex
+                    , cTraceContextPhase = phasePtr
+                    , cTraceContextLanguage = languagePtr
+                    , cTraceContextApiSurface = apiSurfacePtr
+                    , cTraceContextOperation = operationPtr
+                    , cTraceContextTraceClock = traceClockPtr
+                    }
+                  action tracePtr
+
+readOptionsToC :: ReadOptions -> CArcadiaTioReadWithOptionsOptions
+readOptionsToC ReadOptions{readOptionMode, readOptionMaxThreads} =
+  CArcadiaTioReadWithOptionsOptions
+    { cReadOptionsVersion = 1
+    , cReadOptionsStructSize = 32
+    , cReadOptionsMode = readExecutionModeToRaw readOptionMode
+    , cReadOptionsMaxThreads = CSize (fromIntegral (max 0 readOptionMaxThreads))
+    }
+
+readExecutionModeToRaw :: ReadExecutionMode -> CInt
+readExecutionModeToRaw mode = case mode of
+  ReadSerial -> 0
+  ReadParallelThreads -> 1
+
+readExecutionModeFromRaw :: CInt -> Result ReadExecutionMode
+readExecutionModeFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
+  0 -> Right ReadSerial
+  1 -> Right ReadParallelThreads
+  _ -> Left (invalidArgument "native read report has unknown execution mode")
+
+readShapePolicyToRaw :: ReadShapePolicy -> CInt
+readShapePolicyToRaw policy = case policy of
+  ReadShapeFileEnvelope -> 0
+  ReadShapeCurrentHead -> 1
+  ReadShapeUnion -> 2
+  ReadShapeIntersection -> 3
+  ReadShapeInitialRegistered -> 4
+  ReadShapeExplicitExtents{} -> 5
+
+validateQueryTraceContext :: QueryTraceContext -> Result ()
+validateQueryTraceContext QueryTraceContext{queryTraceRunId, queryTraceRowId, queryTracePhase, queryTraceLanguage, queryTraceApiSurface, queryTraceOperation, queryTraceClock} = do
+  validateRequiredString "query trace run_id" queryTraceRunId
+  validateRequiredString "query trace row_id" queryTraceRowId
+  validateRequiredString "query trace phase" queryTracePhase
+  validateRequiredString "query trace language" queryTraceLanguage
+  validateRequiredString "query trace api_surface" queryTraceApiSurface
+  validateRequiredString "query trace operation" queryTraceOperation
+  validateRequiredString "query trace clock" queryTraceClock
+
+validateReadIndexItems :: [ReadIndexItem] -> Result ()
+validateReadIndexItems items
+  | null items = Left (invalidArgument "read index items must not be empty")
+  | otherwise = mapM_ validateReadIndexItem items
+ where
+  validateReadIndexItem item = case item of
+    ReadIndexSlice _ _ step | step == 0 -> Left (invalidArgument "read index slice step must not be zero")
+    _ -> Right ()
+
+readIndexItemToC :: ReadIndexItem -> CArcadiaTioReadIndexItem
+readIndexItemToC item = case item of
+  ReadIndexAll -> CArcadiaTioReadIndexItem 0 0 0 0 0 1 0
+  ReadIndexSlice maybeStart maybeEnd step ->
+    CArcadiaTioReadIndexItem
+      1
+      (maybe 0 (const 1) maybeStart)
+      (maybe 0 id maybeStart)
+      (maybe 0 (const 1) maybeEnd)
+      (maybe 0 id maybeEnd)
+      step
+      0
+  ReadIndexIndex index -> CArcadiaTioReadIndexItem 2 0 0 0 0 1 index
+  ReadIndexNewAxis -> CArcadiaTioReadIndexItem 3 0 0 0 0 1 0
+  ReadIndexEllipsis -> CArcadiaTioReadIndexItem 4 0 0 0 0 1 0
+
+readIndexLoweringFromRaw :: CInt -> Result ReadIndexLoweringKind
+readIndexLoweringFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
+  0 -> Right ReadIndexLoweringUnknown
+  1 -> Right ReadIndexLoweringSelectorRead
+  2 -> Right ReadIndexLoweringSelectorReadWithShapePostprocess
+  _ -> Left (invalidArgument "native read-index report has unknown lowering kind")
+
+historicalQuerySourceKindFromRaw :: CInt -> Result HistoricalQuerySourceKind
+historicalQuerySourceKindFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
+  0 -> Right HistoricalQueryRetainedVisibleCommit
+  _ -> Left (invalidArgument "native historical read report has unknown source kind")
 
 withManyCStrings :: [String] -> ([CString] -> IO a) -> IO a
 withManyCStrings [] action = action []
@@ -940,6 +1170,218 @@ readAtCommitDenseSelected TensorFile{tensorFileNative, tensorFileHandle} commitS
   freeDenseOutputs tensorPtr maskPtr = do
     capiTensorFree tensorFileNative tensorPtr
     capiMaskFree tensorFileNative maskPtr
+
+-- | Read current visible data with selectors and execution options, returning a
+-- copied tensor and copied execution report.
+readWithOptions :: TensorFile -> [EntrySelector] -> ReadOptions -> IO (Result (SomeTensor, ReadExecutionReport))
+readWithOptions file@TensorFile{tensorFileNative} selectors options =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withReadOptions options $ \optionsPtr ->
+      readTensorWithReport file $ \handle tensorPtr reportPtr ->
+        capiReadWithOptions tensorFileNative handle selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+
+-- | Dense variant of 'readWithOptions'.
+readWithOptionsDense :: TensorFile -> [EntrySelector] -> ReadOptions -> Double -> IO (Result (SomeDenseRead, ReadExecutionReport))
+readWithOptionsDense file@TensorFile{tensorFileNative} selectors options fillValue =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withReadOptions options $ \optionsPtr ->
+      readDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+        capiReadWithOptionsDense tensorFileNative handle selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+
+-- | Read current visible data with an explicit shape policy.
+readWithShapePolicy :: TensorFile -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> IO (Result (SomeTensor, ReadExecutionReport))
+readWithShapePolicy file@TensorFile{tensorFileNative} selectors options policy =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withShapeReadOptions options policy $ \optionsPtr ->
+      readTensorWithReport file $ \handle tensorPtr reportPtr ->
+        capiReadWithShapePolicy tensorFileNative handle selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+
+-- | Dense variant of 'readWithShapePolicy'.
+readWithShapePolicyDense :: TensorFile -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> Double -> IO (Result (SomeDenseRead, ReadExecutionReport))
+readWithShapePolicyDense file@TensorFile{tensorFileNative} selectors options policy fillValue =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withShapeReadOptions options policy $ \optionsPtr ->
+      readDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+        capiReadWithShapePolicyDense tensorFileNative handle selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+
+-- | Attributed current read that also returns native query-trace JSON.
+readWithOptionsAttributed :: TensorFile -> [EntrySelector] -> ReadOptions -> QueryTraceContext -> IO (Result (SomeTensor, ReadExecutionReport, QueryTraceJson))
+readWithOptionsAttributed TensorFile{tensorFileNative, tensorFileHandle} selectors options traceContext =
+  case validateQueryTraceContext traceContext of
+    Left err -> pure (Left err)
+    Right () ->
+      withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+        withReadOptions options $ \optionsPtr ->
+          withQueryTraceContext traceContext $ \tracePtr ->
+            withForeignPtr tensorFileHandle $ \handle ->
+              alloca $ \tensorPtr ->
+                alloca $ \reportPtr ->
+                  alloca $ \traceJsonPtr -> do
+                    poke tensorPtr emptyCArcadiaTioTensor
+                    poke reportPtr emptyCArcadiaTioReadExecutionReport
+                    poke traceJsonPtr emptyCArcadiaTioQueryTraceJson
+                    status <- capiReadWithOptionsAttributed tensorFileNative handle selectorsPtr selectorsLen optionsPtr tracePtr tensorPtr reportPtr traceJsonPtr
+                    finishAttributedRead tensorFileNative status tensorPtr reportPtr traceJsonPtr copySomeTensor
+
+-- | Dense attributed current read variant.
+readWithOptionsDenseAttributed :: TensorFile -> [EntrySelector] -> ReadOptions -> QueryTraceContext -> Double -> IO (Result (SomeDenseRead, ReadExecutionReport, QueryTraceJson))
+readWithOptionsDenseAttributed TensorFile{tensorFileNative, tensorFileHandle} selectors options traceContext fillValue =
+  case validateQueryTraceContext traceContext of
+    Left err -> pure (Left err)
+    Right () ->
+      withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+        withReadOptions options $ \optionsPtr ->
+          withQueryTraceContext traceContext $ \tracePtr ->
+            withForeignPtr tensorFileHandle $ \handle ->
+              alloca $ \tensorPtr ->
+                alloca $ \maskPtr ->
+                  alloca $ \reportPtr ->
+                    alloca $ \traceJsonPtr -> do
+                      poke tensorPtr emptyCArcadiaTioTensor
+                      poke maskPtr emptyCArcadiaTioMask
+                      poke reportPtr emptyCArcadiaTioReadExecutionReport
+                      poke traceJsonPtr emptyCArcadiaTioQueryTraceJson
+                      status <- capiReadWithOptionsDenseAttributed tensorFileNative handle selectorsPtr selectorsLen optionsPtr tracePtr fillValue tensorPtr maskPtr reportPtr traceJsonPtr
+                      finishAttributedDenseRead tensorFileNative status tensorPtr maskPtr reportPtr traceJsonPtr
+
+-- | Historical read with selectors and execution options.
+readAtCommitWithOptions :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> IO (Result (SomeTensor, HistoricalReadExecutionReport))
+readAtCommitWithOptions file@TensorFile{tensorFileNative} commitSeqValue selectors options =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withReadOptions options $ \optionsPtr ->
+      readHistoricalTensorWithReport file $ \handle tensorPtr reportPtr ->
+        capiReadAtCommitWithOptions tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+
+-- | Dense historical read with selectors and execution options.
+readAtCommitWithOptionsDense :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> Double -> IO (Result (SomeDenseRead, HistoricalReadExecutionReport))
+readAtCommitWithOptionsDense file@TensorFile{tensorFileNative} commitSeqValue selectors options fillValue =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withReadOptions options $ \optionsPtr ->
+      readHistoricalDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+        capiReadAtCommitWithOptionsDense tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+
+-- | Historical read with an explicit shape policy.
+readAtCommitWithShapePolicy :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> IO (Result (SomeTensor, HistoricalReadExecutionReport))
+readAtCommitWithShapePolicy file@TensorFile{tensorFileNative} commitSeqValue selectors options policy =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withShapeReadOptions options policy $ \optionsPtr ->
+      readHistoricalTensorWithReport file $ \handle tensorPtr reportPtr ->
+        capiReadAtCommitWithShapePolicy tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+
+-- | Dense historical read with an explicit shape policy.
+readAtCommitWithShapePolicyDense :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> Double -> IO (Result (SomeDenseRead, HistoricalReadExecutionReport))
+readAtCommitWithShapePolicyDense file@TensorFile{tensorFileNative} commitSeqValue selectors options policy fillValue =
+  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+    withShapeReadOptions options policy $ \optionsPtr ->
+      readHistoricalDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+        capiReadAtCommitWithShapePolicyDense tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+
+-- | Read by Python-style index items and return the native lowering report.
+readIndex :: TensorFile -> [ReadIndexItem] -> IO (Result (SomeTensor, ReadIndexReport))
+readIndex TensorFile{tensorFileNative, tensorFileHandle} items =
+  case validateReadIndexItems items of
+    Left err -> pure (Left err)
+    Right () ->
+      withArray (map readIndexItemToC items) $ \itemsPtr ->
+        withForeignPtr tensorFileHandle $ \handle ->
+          alloca $ \tensorPtr ->
+            alloca $ \reportPtr -> do
+              poke tensorPtr emptyCArcadiaTioTensor
+              poke reportPtr emptyCArcadiaTioReadIndexReport
+              status <- capiReadIndex tensorFileNative handle itemsPtr (CSize (fromIntegral (length items))) tensorPtr reportPtr
+              if status == okStatus
+                then do
+                  tensor <- peek tensorPtr >>= copySomeTensor
+                  report <- peek reportPtr >>= readIndexReportFromC
+                  capiTensorFree tensorFileNative tensorPtr
+                  capiReadIndexReportFree tensorFileNative reportPtr
+                  pure $ (,) <$> tensor <*> report
+                else do
+                  err <- lastError tensorFileNative
+                  capiTensorFree tensorFileNative tensorPtr
+                  capiReadIndexReportFree tensorFileNative reportPtr
+                  pure (Left err)
+
+-- | Read the native index-checkpoint cadence metadata.
+getIndexCheckpointEveryCommits :: TensorFile -> IO (Result Word32)
+getIndexCheckpointEveryCommits file = withHandleOutput file (capiGetIndexCheckpointEveryCommits (tensorFileNative file)) Right
+
+-- | Set the native index-checkpoint cadence metadata.
+setIndexCheckpointEveryCommits :: TensorFile -> Word32 -> IO (Result ())
+setIndexCheckpointEveryCommits file@TensorFile{tensorFileNative} everyCommits =
+  callStatus file $ \handle -> capiSetIndexCheckpointEveryCommits tensorFileNative handle everyCommits
+
+-- | Rewrite one selector with an f32 tensor.
+rewriteF32 :: TensorFile -> EntrySelector -> Tensor Float -> IO (Result ())
+rewriteF32 file@TensorFile{tensorFileNative} selector tensor@Tensor{tensorShape, tensorValues} =
+  case validateTensor tensor of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors [selector] $ \selectorPtr _ ->
+      withForeignPtr (tensorFileHandle file) $ \handle ->
+        VS.unsafeWith tensorValues $ \valuesPtr ->
+          withArray tensorShape $ \shapePtr ->
+            callStatus file $ \_ -> capiRewriteF32 tensorFileNative handle selectorPtr (castPtr valuesPtr) shapePtr (CSize (fromIntegral (length tensorShape)))
+
+-- | Rewrite one selector with an f64 tensor.
+rewriteF64 :: TensorFile -> EntrySelector -> Tensor Double -> IO (Result ())
+rewriteF64 file@TensorFile{tensorFileNative} selector tensor@Tensor{tensorShape, tensorValues} =
+  case validateTensor tensor of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors [selector] $ \selectorPtr _ ->
+      withForeignPtr (tensorFileHandle file) $ \handle ->
+        VS.unsafeWith tensorValues $ \valuesPtr ->
+          withArray tensorShape $ \shapePtr ->
+            callStatus file $ \_ -> capiRewriteF64 tensorFileNative handle selectorPtr valuesPtr shapePtr (CSize (fromIntegral (length tensorShape)))
+
+-- | Rewrite a selector slice with an f32 tensor.
+rewriteSliceF32 :: TensorFile -> [EntrySelector] -> Tensor Float -> IO (Result ())
+rewriteSliceF32 file@TensorFile{tensorFileNative} selectors tensor@Tensor{tensorShape, tensorValues} =
+  case validateTensor tensor *> validateRewriteSelectors selectors of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withForeignPtr (tensorFileHandle file) $ \handle ->
+        VS.unsafeWith tensorValues $ \valuesPtr ->
+          withArray tensorShape $ \shapePtr ->
+            callStatus file $ \_ -> capiRewriteSliceF32 tensorFileNative handle selectorsPtr selectorsLen (castPtr valuesPtr) shapePtr (CSize (fromIntegral (length tensorShape)))
+
+-- | Rewrite a selector slice with an f64 tensor.
+rewriteSliceF64 :: TensorFile -> [EntrySelector] -> Tensor Double -> IO (Result ())
+rewriteSliceF64 file@TensorFile{tensorFileNative} selectors tensor@Tensor{tensorShape, tensorValues} =
+  case validateTensor tensor *> validateRewriteSelectors selectors of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withForeignPtr (tensorFileHandle file) $ \handle ->
+        VS.unsafeWith tensorValues $ \valuesPtr ->
+          withArray tensorShape $ \shapePtr ->
+            callStatus file $ \_ -> capiRewriteSliceF64 tensorFileNative handle selectorsPtr selectorsLen valuesPtr shapePtr (CSize (fromIntegral (length tensorShape)))
+
+-- | Clear native sparse chunks by chunk keys.
+clearBlocks :: TensorFile -> [[Word32]] -> IO (Result ())
+clearBlocks file@TensorFile{tensorFileNative} keys =
+  case validateChunkKeys keys of
+    Left err -> pure (Left err)
+    Right () -> withChunkKeys keys $ \keysPtr keysLen ->
+      callStatus file $ \handle -> capiClearBlocks tensorFileNative handle keysPtr keysLen
+
+-- | Export the full visible values through the Arrow C Data Interface. The
+-- returned release callbacks are owned by 'ArrowCData'.
+readValuesArrow :: TensorFile -> IO (Result ArrowCData)
+readValuesArrow TensorFile{tensorFileNative, tensorFileHandle} =
+  withForeignPtr tensorFileHandle $ \handle -> do
+    arrayPtr <- malloc
+    schemaPtr <- malloc
+    poke arrayPtr emptyCArrowArray
+    poke schemaPtr emptyCArrowSchema
+    status <- capiReadValuesArrow tensorFileNative handle arrayPtr schemaPtr
+    if status == okStatus
+      then Right <$> wrapArrowCData arrayPtr schemaPtr
+      else do
+        err <- lastError tensorFileNative
+        releaseArrowArrayPtr arrayPtr
+        releaseArrowSchemaPtr schemaPtr
+        free arrayPtr
+        free schemaPtr
+        pure (Left err)
 
 -- | Return shallow compaction analysis stats.
 analyzeCompaction :: TensorFile -> IO (Result CompactionStats)
@@ -1499,6 +1941,217 @@ readScalar TensorFile{tensorFileNative, tensorFileHandle} indices =
               Nothing -> Left (invalidArgument "native scalar has unknown dtype")
               Just scalarType -> Right ScalarValue{scalarDType = scalarType, scalarValue = cScalarValue}
           else Left <$> lastError tensorFileNative
+
+validateRewriteSelectors :: [EntrySelector] -> Result ()
+validateRewriteSelectors selectors
+  | null selectors = Left (invalidArgument "rewrite slice selectors must not be empty")
+  | otherwise = Right ()
+
+validateChunkKeys :: [[Word32]] -> Result ()
+validateChunkKeys keys
+  | null keys = Left (invalidArgument "clear block keys must not be empty")
+  | any null keys = Left (invalidArgument "clear block key coordinates must not be empty")
+  | otherwise = Right ()
+
+withChunkKeys :: [[Word32]] -> (Ptr CArcadiaTioChunkKey -> CSize -> IO a) -> IO a
+withChunkKeys keys action = go keys []
+ where
+  go [] acc = withArray (reverse acc) $ \keysPtr -> action keysPtr (CSize (fromIntegral (length keys)))
+  go (coords : rest) acc =
+    withArray coords $ \coordsPtr ->
+      go rest (CArcadiaTioChunkKey coordsPtr (CSize (fromIntegral (length coords))) : acc)
+
+wrapArrowCData :: Ptr CArrowArray -> Ptr CArrowSchema -> IO ArrowCData
+wrapArrowCData arrayPtr schemaPtr = do
+  arrayFp <- FC.newForeignPtr arrayPtr (releaseArrowArrayPtr arrayPtr >> free arrayPtr)
+  schemaFp <- FC.newForeignPtr schemaPtr (releaseArrowSchemaPtr schemaPtr >> free schemaPtr)
+  pure ArrowCData{arrowArrayForeignPtr = arrayFp, arrowSchemaForeignPtr = schemaFp}
+
+releaseArrowArrayPtr :: Ptr CArrowArray -> IO ()
+releaseArrowArrayPtr ptr = do
+  array <- peek ptr
+  if cArrowArrayRelease array == nullFunPtr
+    then pure ()
+    else arrowArrayRelease (cArrowArrayRelease array) ptr
+
+releaseArrowSchemaPtr :: Ptr CArrowSchema -> IO ()
+releaseArrowSchemaPtr ptr = do
+  schema <- peek ptr
+  if cArrowSchemaRelease schema == nullFunPtr
+    then pure ()
+    else arrowSchemaRelease (cArrowSchemaRelease schema) ptr
+
+readTensorWithReport :: TensorFile -> (Ptr CHandle -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadExecutionReport -> IO CInt) -> IO (Result (SomeTensor, ReadExecutionReport))
+readTensorWithReport TensorFile{tensorFileNative, tensorFileHandle} nativeRead =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \tensorPtr ->
+      alloca $ \reportPtr -> do
+        poke tensorPtr emptyCArcadiaTioTensor
+        poke reportPtr emptyCArcadiaTioReadExecutionReport
+        status <- nativeRead handle tensorPtr reportPtr
+        if status == okStatus
+          then do
+            tensor <- peek tensorPtr >>= copySomeTensor
+            report <- peek reportPtr >>= readExecutionReportFromC
+            capiTensorFree tensorFileNative tensorPtr
+            capiReadExecutionReportFree tensorFileNative reportPtr
+            pure $ (,) <$> tensor <*> report
+          else do
+            err <- lastError tensorFileNative
+            capiTensorFree tensorFileNative tensorPtr
+            capiReadExecutionReportFree tensorFileNative reportPtr
+            pure (Left err)
+
+readDenseWithReport :: TensorFile -> (Ptr CHandle -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioReadExecutionReport -> IO CInt) -> IO (Result (SomeDenseRead, ReadExecutionReport))
+readDenseWithReport TensorFile{tensorFileNative, tensorFileHandle} nativeRead =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \tensorPtr ->
+      alloca $ \maskPtr ->
+        alloca $ \reportPtr -> do
+          poke tensorPtr emptyCArcadiaTioTensor
+          poke maskPtr emptyCArcadiaTioMask
+          poke reportPtr emptyCArcadiaTioReadExecutionReport
+          status <- nativeRead handle tensorPtr maskPtr reportPtr
+          if status == okStatus
+            then do
+              dense <- copySomeDenseReadFromPtrs tensorPtr maskPtr
+              report <- peek reportPtr >>= readExecutionReportFromC
+              capiTensorFree tensorFileNative tensorPtr
+              capiMaskFree tensorFileNative maskPtr
+              capiReadExecutionReportFree tensorFileNative reportPtr
+              pure $ (,) <$> dense <*> report
+            else do
+              err <- lastError tensorFileNative
+              capiTensorFree tensorFileNative tensorPtr
+              capiMaskFree tensorFileNative maskPtr
+              capiReadExecutionReportFree tensorFileNative reportPtr
+              pure (Left err)
+
+readHistoricalTensorWithReport :: TensorFile -> (Ptr CHandle -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt) -> IO (Result (SomeTensor, HistoricalReadExecutionReport))
+readHistoricalTensorWithReport TensorFile{tensorFileNative, tensorFileHandle} nativeRead =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \tensorPtr ->
+      alloca $ \reportPtr -> do
+        poke tensorPtr emptyCArcadiaTioTensor
+        poke reportPtr emptyCArcadiaTioHistoricalReadExecutionReport
+        status <- nativeRead handle tensorPtr reportPtr
+        if status == okStatus
+          then do
+            tensor <- peek tensorPtr >>= copySomeTensor
+            report <- peek reportPtr >>= historicalReadExecutionReportFromC
+            capiTensorFree tensorFileNative tensorPtr
+            capiHistoricalReadExecutionReportFree tensorFileNative reportPtr
+            pure $ (,) <$> tensor <*> report
+          else do
+            err <- lastError tensorFileNative
+            capiTensorFree tensorFileNative tensorPtr
+            capiHistoricalReadExecutionReportFree tensorFileNative reportPtr
+            pure (Left err)
+
+readHistoricalDenseWithReport :: TensorFile -> (Ptr CHandle -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt) -> IO (Result (SomeDenseRead, HistoricalReadExecutionReport))
+readHistoricalDenseWithReport TensorFile{tensorFileNative, tensorFileHandle} nativeRead =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \tensorPtr ->
+      alloca $ \maskPtr ->
+        alloca $ \reportPtr -> do
+          poke tensorPtr emptyCArcadiaTioTensor
+          poke maskPtr emptyCArcadiaTioMask
+          poke reportPtr emptyCArcadiaTioHistoricalReadExecutionReport
+          status <- nativeRead handle tensorPtr maskPtr reportPtr
+          if status == okStatus
+            then do
+              dense <- copySomeDenseReadFromPtrs tensorPtr maskPtr
+              report <- peek reportPtr >>= historicalReadExecutionReportFromC
+              capiTensorFree tensorFileNative tensorPtr
+              capiMaskFree tensorFileNative maskPtr
+              capiHistoricalReadExecutionReportFree tensorFileNative reportPtr
+              pure $ (,) <$> dense <*> report
+            else do
+              err <- lastError tensorFileNative
+              capiTensorFree tensorFileNative tensorPtr
+              capiMaskFree tensorFileNative maskPtr
+              capiHistoricalReadExecutionReportFree tensorFileNative reportPtr
+              pure (Left err)
+
+finishAttributedRead :: NativeLibrary -> CInt -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadExecutionReport -> Ptr CArcadiaTioQueryTraceJson -> (CArcadiaTioTensor -> IO (Result a)) -> IO (Result (a, ReadExecutionReport, QueryTraceJson))
+finishAttributedRead native status tensorPtr reportPtr traceJsonPtr copyTensor =
+  if status == okStatus
+    then do
+      tensor <- peek tensorPtr >>= copyTensor
+      report <- peek reportPtr >>= readExecutionReportFromC
+      traceJson <- peek traceJsonPtr >>= queryTraceJsonFromC
+      capiTensorFree native tensorPtr
+      capiReadExecutionReportFree native reportPtr
+      capiQueryTraceJsonFree native traceJsonPtr
+      pure $ (,,) <$> tensor <*> report <*> traceJson
+    else do
+      err <- lastError native
+      capiTensorFree native tensorPtr
+      capiReadExecutionReportFree native reportPtr
+      capiQueryTraceJsonFree native traceJsonPtr
+      pure (Left err)
+
+finishAttributedDenseRead :: NativeLibrary -> CInt -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioReadExecutionReport -> Ptr CArcadiaTioQueryTraceJson -> IO (Result (SomeDenseRead, ReadExecutionReport, QueryTraceJson))
+finishAttributedDenseRead native status tensorPtr maskPtr reportPtr traceJsonPtr =
+  if status == okStatus
+    then do
+      dense <- copySomeDenseReadFromPtrs tensorPtr maskPtr
+      report <- peek reportPtr >>= readExecutionReportFromC
+      traceJson <- peek traceJsonPtr >>= queryTraceJsonFromC
+      capiTensorFree native tensorPtr
+      capiMaskFree native maskPtr
+      capiReadExecutionReportFree native reportPtr
+      capiQueryTraceJsonFree native traceJsonPtr
+      pure $ (,,) <$> dense <*> report <*> traceJson
+    else do
+      err <- lastError native
+      capiTensorFree native tensorPtr
+      capiMaskFree native maskPtr
+      capiReadExecutionReportFree native reportPtr
+      capiQueryTraceJsonFree native traceJsonPtr
+      pure (Left err)
+
+readExecutionReportFromC :: CArcadiaTioReadExecutionReport -> IO (Result ReadExecutionReport)
+readExecutionReportFromC CArcadiaTioReadExecutionReport{cReadReportRequestedMode, cReadReportQueryMaxThreads, cReadReportQueryEffectiveMode, cReadReportQueryEffectiveThreads, cReadReportQueryParallelRuntime, cReadReportQueryParallelFallbackReason, cReadReportQueryParallelReasonCode, cReadReportQueryParallelReasonCodeTaxonomy} = do
+  requested <- pure (readExecutionModeFromRaw cReadReportRequestedMode)
+  effective <- pure (readExecutionModeFromRaw cReadReportQueryEffectiveMode)
+  runtime <- peekOptionalCString cReadReportQueryParallelRuntime
+  fallback <- peekOptionalCString cReadReportQueryParallelFallbackReason
+  reasonCode <- peekOptionalCString cReadReportQueryParallelReasonCode
+  taxonomy <- peekOptionalCString cReadReportQueryParallelReasonCodeTaxonomy
+  pure $ do
+    req <- requested
+    eff <- effective
+    Right
+      ReadExecutionReport
+        { readReportRequestedMode = req
+        , readReportQueryMaxThreads = fromIntegralCSize cReadReportQueryMaxThreads
+        , readReportQueryEffectiveMode = eff
+        , readReportQueryEffectiveThreads = fromIntegralCSize cReadReportQueryEffectiveThreads
+        , readReportQueryParallelRuntime = runtime
+        , readReportQueryParallelFallbackReason = fallback
+        , readReportQueryParallelReasonCode = reasonCode
+        , readReportQueryParallelReasonCodeTaxonomy = taxonomy
+        }
+
+historicalReadExecutionReportFromC :: CArcadiaTioHistoricalReadExecutionReport -> IO (Result HistoricalReadExecutionReport)
+historicalReadExecutionReportFromC CArcadiaTioHistoricalReadExecutionReport{cHistoricalReadReportBase, cHistoricalReadReportQuerySourceKind, cHistoricalReadReportQueryCommitSeq} = do
+  base <- readExecutionReportFromC cHistoricalReadReportBase
+  pure $ do
+    report <- base
+    source <- historicalQuerySourceKindFromRaw cHistoricalReadReportQuerySourceKind
+    Right HistoricalReadExecutionReport{historicalReadExecutionReport = report, historicalReadQuerySourceKind = source, historicalReadQueryCommitSeq = cHistoricalReadReportQueryCommitSeq}
+
+queryTraceJsonFromC :: CArcadiaTioQueryTraceJson -> IO (Result QueryTraceJson)
+queryTraceJsonFromC CArcadiaTioQueryTraceJson{cTraceJsonJson}
+  | cTraceJsonJson == nullPtr = pure (Left (invalidArgument "native query trace JSON pointer is null"))
+  | otherwise = Right . QueryTraceJson <$> peekCString cTraceJsonJson
+
+readIndexReportFromC :: CArcadiaTioReadIndexReport -> IO (Result ReadIndexReport)
+readIndexReportFromC CArcadiaTioReadIndexReport{cReadIndexReportLoweringKind, cReadIndexReportUsedFullTensorFallback} =
+  pure $ do
+    lowering <- readIndexLoweringFromRaw cReadIndexReportLoweringKind
+    Right ReadIndexReport{readIndexLoweringKind = lowering, readIndexUsedFullTensorFallback = cReadIndexReportUsedFullTensorFallback /= 0}
 
 readTensor :: TensorFile -> (Ptr CHandle -> Ptr CArcadiaTioTensor -> IO CInt) -> IO (Result SomeTensor)
 readTensor TensorFile{tensorFileNative, tensorFileHandle} nativeRead =

@@ -38,9 +38,9 @@ blockers remain visible and can be promoted to a hard failure with
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 111
+- wrapped: 146
 - intentionally not applicable: 20
-- deferred blockers: 273
+- deferred blockers: 238
 - unknown/unmapped: 0
 
 These counts are an inventory baseline, not a packaging, support, or deployment statement.
@@ -72,7 +72,7 @@ Legend:
 | Append range return | ✅ C/C++/public wrapper expose range helpers | ✅ | Haskell uses `*_with_range` and returns `AppendRange`. |
 | Dense read-all `f32/f64/i32/i64` | ✅ | ✅ | Copies native tensor into Haskell-owned `Vector.Storable`. |
 | Null-aware dense read with mask | ✅ | ✅ | `readAllDense*` copies `ArcadiaTioMask` into Haskell-owned vector. |
-| Selector reads / axis ranges / entry ranges | ✅ | ⚠️ partial | Axis range/take/one and entry range/take are exposed; richer selector ADTs/read options remain missing. |
+| Selector reads / axis ranges / entry ranges | ✅ | ✅ | Axis range/take/one, entry range/take, selector-bearing option reads, and read-index wrappers are exposed with copied reports. |
 | Scalar reads | ✅ | ✅ | `readScalar` returns dtype plus native double-valued scalar carrier. |
 | File metadata load/query | ✅ `load_meta`, metadata accessors | ⚠️ partial | `rank`, `dtype`, `appendAxis`, `dimLens`, `chunkPlan`, `filePath`, and basic `loadMeta` are exposed; richer coordinate/universe metadata remains missing. |
 | Tensor helper operations | ✅ Rust tensor ops | ❌ | Could add Haskell-owned tensor helpers independent of native ABI. |
@@ -80,13 +80,13 @@ Legend:
 | Signed integer sparse exact predicates | ✅ | ✅ | `SparsePredicateEqualI32` / `SparsePredicateEqualI64` are exposed and tested through V2 sparse rule calls. |
 | Coordinate metadata/create/read/lookup | ✅ | ❌ | Large surface; should be later than basic metadata/selectors. |
 | Universe-aware authoring/reads | ✅ | ❌ | Deferred. |
-| Commit history: head/list/read-at-commit | ✅ | ⚠️ partial | `headCommit`, `listCommits`, full and selector-bearing `readAtCommit`/dense variants are exposed; historical read options/report variants remain missing. |
+| Commit history: head/list/read-at-commit | ✅ | ✅ | `headCommit`, `listCommits`, full/selector-bearing historical reads, dense variants, and historical option/report variants are exposed. |
 | Revert/pop rollback markers | ✅ | ⚠️ partial | `pop`, `popBatched`, and `revertCommit` wrappers surface native status; broader tests for supported/unsupported layout states remain missing. |
-| Rewrite / rewrite-slice | ✅ | ❌ | Requires selector ADTs and dtype-specific write validation. |
+| Rewrite / rewrite-slice / clear-block | ✅ | ⚠️ partial | `rewriteF32`/`rewriteF64`, slice variants, and `clearBlocks` are exposed with Haskell validation; native V4 may still report unsupported/invalid for current runtime layouts. |
 | Compaction / retained-history compaction | ✅ | ⚠️ partial | Shallow `analyzeCompaction`, `compactTo`, `maybeCompact`, auto-compaction config/state, and `maybeCompactAuto` are exposed; retained-history and detailed report families remain missing. |
 | Reform | ✅ | ❌ | Requires report/option ownership wrappers. |
 | Diagnostics / precise accounting | ✅ | ❌ | Requires report structs and free functions. |
-| Arrow C Data export | ✅ via C ABI/C++ | ❌ | Possible later; Haskell ownership/release API must be explicit. |
+| Arrow C Data export | ✅ via C ABI/C++ | ✅ | `readValuesArrow` returns an explicit owned `ArrowCData`; callbacks are released by `releaseArrowCData`/finalizers without exposing raw release functions. |
 | OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/close and minimal metadata row/root counts. OCB create/append/dictionary/read/summary APIs remain missing. |
 | OCB direct Rust-core reader path | ✅ public Rust `arcadia-tio-ocb-core` | ❌ | Haskell should still use C ABI unless a separate pure Haskell/Rust-core bridge is approved. |
 | Tests without native library | N/A | ✅ skips gracefully | `cabal test all` skips when env vars are absent. |
@@ -101,11 +101,9 @@ Before closing a later parity slice, run the machine inventory with
 deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.
 
-1. Add read-options/shape-policy reports for current and historical reads.
-2. Add retained-history compaction, reform, and detailed diagnostics/accounting report wrappers.
-3. Add coordinate metadata/read/lookup wrappers.
-4. Add rewrite/rewrite-slice/clear-block mutation wrappers after selector ADTs exist.
-5. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
+1. Add retained-history compaction, reform, and detailed diagnostics/accounting report wrappers.
+2. Add coordinate metadata/read/lookup wrappers.
+3. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
    row-group summaries, read requests/outcomes, cleanup, and structured OCB errors.
 6. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
    `cabal test all` without native env, and an optional native-library job gated

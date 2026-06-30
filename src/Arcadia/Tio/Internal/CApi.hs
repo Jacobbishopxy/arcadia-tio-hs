@@ -25,6 +25,29 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompressionConfig(..)
   , compressionConfigStructSize
   , CArcadiaTioEntrySelector(..)
+  , CArcadiaTioReadShapePolicyOptions(..)
+  , CArcadiaTioReadWithShapePolicyOptions(..)
+  , CArcadiaTioReadWithOptionsOptions(..)
+  , CArcadiaTioReadExecutionReport(..)
+  , CArcadiaTioQueryTraceContext(..)
+  , CArcadiaTioQueryTraceJson(..)
+  , CArcadiaTioReadIndexItem(..)
+  , CArcadiaTioReadIndexReport(..)
+  , CArcadiaTioChunkKey(..)
+  , CArrowArray(..)
+  , CArrowSchema(..)
+  , emptyCArrowArray
+  , emptyCArrowSchema
+  , arrowArrayRelease
+  , arrowSchemaRelease
+  , CArcadiaTioHistoricalReadWithOptionsOptions
+  , CArcadiaTioHistoricalReadWithShapePolicyOptions
+  , CArcadiaTioHistoricalReadExecutionReport(..)
+  , emptyCArcadiaTioReadShapePolicyOptions
+  , emptyCArcadiaTioReadExecutionReport
+  , emptyCArcadiaTioQueryTraceJson
+  , emptyCArcadiaTioReadIndexReport
+  , emptyCArcadiaTioHistoricalReadExecutionReport
   , CArcadiaTioChunkPlan(..)
   , emptyCArcadiaTioChunkPlan
   , CArcadiaTioCommitInfo(..)
@@ -86,6 +109,29 @@ module Arcadia.Tio.Internal.CApi
   , capiRevertCommit
   , capiReadAtCommit
   , capiReadAtCommitDense
+  , capiReadExecutionReportFree
+  , capiQueryTraceJsonFree
+  , capiHistoricalReadExecutionReportFree
+  , capiReadIndexReportFree
+  , capiReadIndex
+  , capiReadWithOptions
+  , capiReadWithOptionsDense
+  , capiReadWithShapePolicy
+  , capiReadWithShapePolicyDense
+  , capiReadWithOptionsAttributed
+  , capiReadWithOptionsDenseAttributed
+  , capiReadAtCommitWithOptions
+  , capiReadAtCommitWithOptionsDense
+  , capiReadAtCommitWithShapePolicy
+  , capiReadAtCommitWithShapePolicyDense
+  , capiGetIndexCheckpointEveryCommits
+  , capiSetIndexCheckpointEveryCommits
+  , capiRewriteF32
+  , capiRewriteF64
+  , capiRewriteSliceF32
+  , capiRewriteSliceF64
+  , capiClearBlocks
+  , capiReadValuesArrow
   , capiAnalyzeCompaction
   , capiCompactTo
   , capiMaybeCompact
@@ -117,7 +163,7 @@ import Data.Int (Int32, Int64)
 import Data.Word (Word8, Word32, Word64)
 import Foreign.C.String (CString, peekCString)
 import Foreign.C.Types (CFloat, CInt(..), CSize(..))
-import Foreign.Ptr (FunPtr, Ptr, nullPtr)
+import Foreign.Ptr (FunPtr, Ptr, nullFunPtr, nullPtr)
 import Foreign.Storable (Storable(..))
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
@@ -407,6 +453,369 @@ instance Storable CArcadiaTioEntrySelector where
     pokeByteOff ptr 8 cEntrySelectorEnd
     pokeByteOff ptr 16 cEntrySelectorIndices
     pokeByteOff ptr 24 cEntrySelectorIndicesLen
+
+readShapePolicyOptionsStructSize :: CSize
+readShapePolicyOptionsStructSize = 72
+
+readOptionsStructSize :: CSize
+readOptionsStructSize = 32
+
+readWithShapePolicyOptionsStructSize :: CSize
+readWithShapePolicyOptionsStructSize = 104
+
+readExecutionReportStructSize :: CSize
+readExecutionReportStructSize = 80
+
+queryTraceContextStructSize :: CSize
+queryTraceContextStructSize = 80
+
+queryTraceJsonStructSize :: CSize
+queryTraceJsonStructSize = 24
+
+readIndexReportStructSize :: CSize
+readIndexReportStructSize = 32
+
+historicalReadExecutionReportStructSize :: CSize
+historicalReadExecutionReportStructSize = 96
+
+-- | Raw read shape-policy options matching @ArcadiaTioReadShapePolicyOptions@.
+data CArcadiaTioReadShapePolicyOptions = CArcadiaTioReadShapePolicyOptions
+  { cReadShapePolicyVersion :: Word32
+  , cReadShapePolicyStructSize :: CSize
+  , cReadShapePolicyPolicy :: CInt
+  , cReadShapePolicyExplicitExtents :: Ptr Word64
+  , cReadShapePolicyExplicitExtentsLen :: CSize
+  , cReadShapePolicyExplicitUniverseAxes :: Ptr ()
+  , cReadShapePolicyExplicitUniverseAxesLen :: CSize
+  , cReadShapePolicyExplicitExtentAxes :: Ptr ()
+  , cReadShapePolicyExplicitExtentAxesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadShapePolicyOptions where
+  sizeOf _ = fromIntegral readShapePolicyOptionsStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr =
+    CArcadiaTioReadShapePolicyOptions
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 8
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 40
+      <*> peekByteOff ptr 48
+      <*> peekByteOff ptr 56
+      <*> peekByteOff ptr 64
+  poke ptr CArcadiaTioReadShapePolicyOptions{cReadShapePolicyVersion, cReadShapePolicyStructSize, cReadShapePolicyPolicy, cReadShapePolicyExplicitExtents, cReadShapePolicyExplicitExtentsLen, cReadShapePolicyExplicitUniverseAxes, cReadShapePolicyExplicitUniverseAxesLen, cReadShapePolicyExplicitExtentAxes, cReadShapePolicyExplicitExtentAxesLen} = do
+    pokeByteOff ptr 0 cReadShapePolicyVersion
+    pokeByteOff ptr 8 cReadShapePolicyStructSize
+    pokeByteOff ptr 16 cReadShapePolicyPolicy
+    pokeByteOff ptr 24 cReadShapePolicyExplicitExtents
+    pokeByteOff ptr 32 cReadShapePolicyExplicitExtentsLen
+    pokeByteOff ptr 40 cReadShapePolicyExplicitUniverseAxes
+    pokeByteOff ptr 48 cReadShapePolicyExplicitUniverseAxesLen
+    pokeByteOff ptr 56 cReadShapePolicyExplicitExtentAxes
+    pokeByteOff ptr 64 cReadShapePolicyExplicitExtentAxesLen
+
+emptyCArcadiaTioReadShapePolicyOptions :: CArcadiaTioReadShapePolicyOptions
+emptyCArcadiaTioReadShapePolicyOptions =
+  CArcadiaTioReadShapePolicyOptions
+    { cReadShapePolicyVersion = 1
+    , cReadShapePolicyStructSize = readShapePolicyOptionsStructSize
+    , cReadShapePolicyPolicy = 0
+    , cReadShapePolicyExplicitExtents = nullPtr
+    , cReadShapePolicyExplicitExtentsLen = 0
+    , cReadShapePolicyExplicitUniverseAxes = nullPtr
+    , cReadShapePolicyExplicitUniverseAxesLen = 0
+    , cReadShapePolicyExplicitExtentAxes = nullPtr
+    , cReadShapePolicyExplicitExtentAxesLen = 0
+    }
+
+-- | Raw read options matching @ArcadiaTioReadWithOptionsOptions@.
+data CArcadiaTioReadWithOptionsOptions = CArcadiaTioReadWithOptionsOptions
+  { cReadOptionsVersion :: Word32
+  , cReadOptionsStructSize :: CSize
+  , cReadOptionsMode :: CInt
+  , cReadOptionsMaxThreads :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadWithOptionsOptions where
+  sizeOf _ = fromIntegral readOptionsStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioReadWithOptionsOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr CArcadiaTioReadWithOptionsOptions{cReadOptionsVersion, cReadOptionsStructSize, cReadOptionsMode, cReadOptionsMaxThreads} = do
+    pokeByteOff ptr 0 cReadOptionsVersion
+    pokeByteOff ptr 8 cReadOptionsStructSize
+    pokeByteOff ptr 16 cReadOptionsMode
+    pokeByteOff ptr 24 cReadOptionsMaxThreads
+
+-- | Raw shape-policy read options matching @ArcadiaTioReadWithShapePolicyOptions@.
+data CArcadiaTioReadWithShapePolicyOptions = CArcadiaTioReadWithShapePolicyOptions
+  { cShapeReadOptionsVersion :: Word32
+  , cShapeReadOptionsStructSize :: CSize
+  , cShapeReadOptionsMode :: CInt
+  , cShapeReadOptionsMaxThreads :: CSize
+  , cShapeReadOptionsShapePolicy :: CArcadiaTioReadShapePolicyOptions
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadWithShapePolicyOptions where
+  sizeOf _ = fromIntegral readWithShapePolicyOptionsStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioReadWithShapePolicyOptions <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32
+  poke ptr CArcadiaTioReadWithShapePolicyOptions{cShapeReadOptionsVersion, cShapeReadOptionsStructSize, cShapeReadOptionsMode, cShapeReadOptionsMaxThreads, cShapeReadOptionsShapePolicy} = do
+    pokeByteOff ptr 0 cShapeReadOptionsVersion
+    pokeByteOff ptr 8 cShapeReadOptionsStructSize
+    pokeByteOff ptr 16 cShapeReadOptionsMode
+    pokeByteOff ptr 24 cShapeReadOptionsMaxThreads
+    pokeByteOff ptr 32 cShapeReadOptionsShapePolicy
+
+-- | Raw read-execution report matching @ArcadiaTioReadExecutionReport@.
+data CArcadiaTioReadExecutionReport = CArcadiaTioReadExecutionReport
+  { cReadReportVersion :: Word32
+  , cReadReportStructSize :: CSize
+  , cReadReportRequestedMode :: CInt
+  , cReadReportQueryMaxThreads :: CSize
+  , cReadReportQueryEffectiveMode :: CInt
+  , cReadReportQueryEffectiveThreads :: CSize
+  , cReadReportQueryParallelRuntime :: CString
+  , cReadReportQueryParallelFallbackReason :: CString
+  , cReadReportQueryParallelReasonCode :: CString
+  , cReadReportQueryParallelReasonCodeTaxonomy :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadExecutionReport where
+  sizeOf _ = fromIntegral readExecutionReportStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr =
+    CArcadiaTioReadExecutionReport
+      <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56
+      <*> peekByteOff ptr 64 <*> peekByteOff ptr 72
+  poke ptr CArcadiaTioReadExecutionReport{cReadReportVersion, cReadReportStructSize, cReadReportRequestedMode, cReadReportQueryMaxThreads, cReadReportQueryEffectiveMode, cReadReportQueryEffectiveThreads, cReadReportQueryParallelRuntime, cReadReportQueryParallelFallbackReason, cReadReportQueryParallelReasonCode, cReadReportQueryParallelReasonCodeTaxonomy} = do
+    pokeByteOff ptr 0 cReadReportVersion
+    pokeByteOff ptr 8 cReadReportStructSize
+    pokeByteOff ptr 16 cReadReportRequestedMode
+    pokeByteOff ptr 24 cReadReportQueryMaxThreads
+    pokeByteOff ptr 32 cReadReportQueryEffectiveMode
+    pokeByteOff ptr 40 cReadReportQueryEffectiveThreads
+    pokeByteOff ptr 48 cReadReportQueryParallelRuntime
+    pokeByteOff ptr 56 cReadReportQueryParallelFallbackReason
+    pokeByteOff ptr 64 cReadReportQueryParallelReasonCode
+    pokeByteOff ptr 72 cReadReportQueryParallelReasonCodeTaxonomy
+
+emptyCArcadiaTioReadExecutionReport :: CArcadiaTioReadExecutionReport
+emptyCArcadiaTioReadExecutionReport =
+  CArcadiaTioReadExecutionReport 1 readExecutionReportStructSize 0 0 0 0 nullPtr nullPtr nullPtr nullPtr
+
+-- | Raw query-trace context matching @ArcadiaTioQueryTraceContext@.
+data CArcadiaTioQueryTraceContext = CArcadiaTioQueryTraceContext
+  { cTraceContextVersion :: Word32
+  , cTraceContextStructSize :: CSize
+  , cTraceContextRunId :: CString
+  , cTraceContextRowId :: CString
+  , cTraceContextRepeatIndex :: Word32
+  , cTraceContextPhase :: CString
+  , cTraceContextLanguage :: CString
+  , cTraceContextApiSurface :: CString
+  , cTraceContextOperation :: CString
+  , cTraceContextTraceClock :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioQueryTraceContext where
+  sizeOf _ = fromIntegral queryTraceContextStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioQueryTraceContext <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72
+  poke ptr CArcadiaTioQueryTraceContext{cTraceContextVersion, cTraceContextStructSize, cTraceContextRunId, cTraceContextRowId, cTraceContextRepeatIndex, cTraceContextPhase, cTraceContextLanguage, cTraceContextApiSurface, cTraceContextOperation, cTraceContextTraceClock} = do
+    pokeByteOff ptr 0 cTraceContextVersion
+    pokeByteOff ptr 8 cTraceContextStructSize
+    pokeByteOff ptr 16 cTraceContextRunId
+    pokeByteOff ptr 24 cTraceContextRowId
+    pokeByteOff ptr 32 cTraceContextRepeatIndex
+    pokeByteOff ptr 40 cTraceContextPhase
+    pokeByteOff ptr 48 cTraceContextLanguage
+    pokeByteOff ptr 56 cTraceContextApiSurface
+    pokeByteOff ptr 64 cTraceContextOperation
+    pokeByteOff ptr 72 cTraceContextTraceClock
+
+-- | Raw owned query-trace JSON output matching @ArcadiaTioQueryTraceJson@.
+data CArcadiaTioQueryTraceJson = CArcadiaTioQueryTraceJson
+  { cTraceJsonVersion :: Word32
+  , cTraceJsonStructSize :: CSize
+  , cTraceJsonJson :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioQueryTraceJson where
+  sizeOf _ = fromIntegral queryTraceJsonStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioQueryTraceJson <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16
+  poke ptr CArcadiaTioQueryTraceJson{cTraceJsonVersion, cTraceJsonStructSize, cTraceJsonJson} = do
+    pokeByteOff ptr 0 cTraceJsonVersion
+    pokeByteOff ptr 8 cTraceJsonStructSize
+    pokeByteOff ptr 16 cTraceJsonJson
+
+emptyCArcadiaTioQueryTraceJson :: CArcadiaTioQueryTraceJson
+emptyCArcadiaTioQueryTraceJson = CArcadiaTioQueryTraceJson 1 queryTraceJsonStructSize nullPtr
+
+-- | Raw read-index item matching @ArcadiaTioReadIndexItem@.
+data CArcadiaTioReadIndexItem = CArcadiaTioReadIndexItem
+  { cReadIndexItemKind :: CInt
+  , cReadIndexItemHasStart :: Word8
+  , cReadIndexItemStart :: Int64
+  , cReadIndexItemHasEnd :: Word8
+  , cReadIndexItemEnd :: Int64
+  , cReadIndexItemStep :: Int64
+  , cReadIndexItemIndex :: Int64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadIndexItem where
+  sizeOf _ = 48
+  alignment _ = alignment (undefined :: Int64)
+  peek ptr = CArcadiaTioReadIndexItem <$> peekByteOff ptr 0 <*> peekByteOff ptr 4 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40
+  poke ptr CArcadiaTioReadIndexItem{cReadIndexItemKind, cReadIndexItemHasStart, cReadIndexItemStart, cReadIndexItemHasEnd, cReadIndexItemEnd, cReadIndexItemStep, cReadIndexItemIndex} = do
+    pokeByteOff ptr 0 cReadIndexItemKind
+    pokeByteOff ptr 4 cReadIndexItemHasStart
+    pokeByteOff ptr 8 cReadIndexItemStart
+    pokeByteOff ptr 16 cReadIndexItemHasEnd
+    pokeByteOff ptr 24 cReadIndexItemEnd
+    pokeByteOff ptr 32 cReadIndexItemStep
+    pokeByteOff ptr 40 cReadIndexItemIndex
+
+-- | Raw read-index report matching @ArcadiaTioReadIndexReport@.
+data CArcadiaTioReadIndexReport = CArcadiaTioReadIndexReport
+  { cReadIndexReportVersion :: Word32
+  , cReadIndexReportStructSize :: CSize
+  , cReadIndexReportLoweringKind :: CInt
+  , cReadIndexReportUsedFullTensorFallback :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioReadIndexReport where
+  sizeOf _ = fromIntegral readIndexReportStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioReadIndexReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20
+  poke ptr CArcadiaTioReadIndexReport{cReadIndexReportVersion, cReadIndexReportStructSize, cReadIndexReportLoweringKind, cReadIndexReportUsedFullTensorFallback} = do
+    pokeByteOff ptr 0 cReadIndexReportVersion
+    pokeByteOff ptr 8 cReadIndexReportStructSize
+    pokeByteOff ptr 16 cReadIndexReportLoweringKind
+    pokeByteOff ptr 20 cReadIndexReportUsedFullTensorFallback
+
+emptyCArcadiaTioReadIndexReport :: CArcadiaTioReadIndexReport
+emptyCArcadiaTioReadIndexReport = CArcadiaTioReadIndexReport 1 readIndexReportStructSize 0 0
+
+-- | Raw historical read options matching @ArcadiaTioHistoricalReadWithOptionsOptions@.
+type CArcadiaTioHistoricalReadWithOptionsOptions = CArcadiaTioReadWithOptionsOptions
+
+-- | Raw historical shape-policy options matching @ArcadiaTioHistoricalReadWithShapePolicyOptions@.
+type CArcadiaTioHistoricalReadWithShapePolicyOptions = CArcadiaTioReadWithShapePolicyOptions
+
+-- | Raw historical read-execution report matching @ArcadiaTioHistoricalReadExecutionReport@.
+data CArcadiaTioHistoricalReadExecutionReport = CArcadiaTioHistoricalReadExecutionReport
+  { cHistoricalReadReportBase :: CArcadiaTioReadExecutionReport
+  , cHistoricalReadReportQuerySourceKind :: CInt
+  , cHistoricalReadReportQueryCommitSeq :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioHistoricalReadExecutionReport where
+  sizeOf _ = fromIntegral historicalReadExecutionReportStructSize
+  alignment _ = alignment (undefined :: CSize)
+  peek ptr = CArcadiaTioHistoricalReadExecutionReport <$> peekByteOff ptr 0 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88
+  poke ptr CArcadiaTioHistoricalReadExecutionReport{cHistoricalReadReportBase, cHistoricalReadReportQuerySourceKind, cHistoricalReadReportQueryCommitSeq} = do
+    pokeByteOff ptr 0 cHistoricalReadReportBase
+    pokeByteOff ptr 80 cHistoricalReadReportQuerySourceKind
+    pokeByteOff ptr 88 cHistoricalReadReportQueryCommitSeq
+
+emptyCArcadiaTioHistoricalReadExecutionReport :: CArcadiaTioHistoricalReadExecutionReport
+emptyCArcadiaTioHistoricalReadExecutionReport =
+  CArcadiaTioHistoricalReadExecutionReport emptyCArcadiaTioReadExecutionReport{cReadReportStructSize = historicalReadExecutionReportStructSize} 0 0
+
+-- | Raw chunk key matching @ArcadiaTioChunkKey@.
+data CArcadiaTioChunkKey = CArcadiaTioChunkKey
+  { cChunkKeyCoords :: Ptr Word32
+  , cChunkKeyLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioChunkKey where
+  sizeOf _ = 16
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioChunkKey <$> peekByteOff ptr 0 <*> peekByteOff ptr 8
+  poke ptr CArcadiaTioChunkKey{cChunkKeyCoords, cChunkKeyLen} = do
+    pokeByteOff ptr 0 cChunkKeyCoords
+    pokeByteOff ptr 8 cChunkKeyLen
+
+-- | Minimal Arrow C Data Interface array. Release callbacks are invoked through
+-- 'arrowArrayRelease'.
+data CArrowArray = CArrowArray
+  { cArrowArrayLength :: Int64
+  , cArrowArrayNullCount :: Int64
+  , cArrowArrayOffset :: Int64
+  , cArrowArrayNBuffers :: Int64
+  , cArrowArrayNChildren :: Int64
+  , cArrowArrayBuffers :: Ptr ()
+  , cArrowArrayChildren :: Ptr ()
+  , cArrowArrayDictionary :: Ptr CArrowArray
+  , cArrowArrayRelease :: FunPtr ArrowArrayReleaseFn
+  , cArrowArrayPrivateData :: Ptr ()
+  }
+  deriving (Eq, Show)
+
+instance Storable CArrowArray where
+  sizeOf _ = 80
+  alignment _ = alignment (undefined :: Int64)
+  peek ptr = CArrowArray <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72
+  poke ptr CArrowArray{cArrowArrayLength, cArrowArrayNullCount, cArrowArrayOffset, cArrowArrayNBuffers, cArrowArrayNChildren, cArrowArrayBuffers, cArrowArrayChildren, cArrowArrayDictionary, cArrowArrayRelease, cArrowArrayPrivateData} = do
+    pokeByteOff ptr 0 cArrowArrayLength
+    pokeByteOff ptr 8 cArrowArrayNullCount
+    pokeByteOff ptr 16 cArrowArrayOffset
+    pokeByteOff ptr 24 cArrowArrayNBuffers
+    pokeByteOff ptr 32 cArrowArrayNChildren
+    pokeByteOff ptr 40 cArrowArrayBuffers
+    pokeByteOff ptr 48 cArrowArrayChildren
+    pokeByteOff ptr 56 cArrowArrayDictionary
+    pokeByteOff ptr 64 cArrowArrayRelease
+    pokeByteOff ptr 72 cArrowArrayPrivateData
+
+emptyCArrowArray :: CArrowArray
+emptyCArrowArray = CArrowArray 0 0 0 0 0 nullPtr nullPtr nullPtr nullFunPtr nullPtr
+
+-- | Minimal Arrow C Data Interface schema.
+data CArrowSchema = CArrowSchema
+  { cArrowSchemaFormat :: CString
+  , cArrowSchemaName :: CString
+  , cArrowSchemaMetadata :: CString
+  , cArrowSchemaFlags :: Int64
+  , cArrowSchemaNChildren :: Int64
+  , cArrowSchemaChildren :: Ptr ()
+  , cArrowSchemaDictionary :: Ptr CArrowSchema
+  , cArrowSchemaRelease :: FunPtr ArrowSchemaReleaseFn
+  , cArrowSchemaPrivateData :: Ptr ()
+  }
+  deriving (Eq, Show)
+
+instance Storable CArrowSchema where
+  sizeOf _ = 72
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArrowSchema <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64
+  poke ptr CArrowSchema{cArrowSchemaFormat, cArrowSchemaName, cArrowSchemaMetadata, cArrowSchemaFlags, cArrowSchemaNChildren, cArrowSchemaChildren, cArrowSchemaDictionary, cArrowSchemaRelease, cArrowSchemaPrivateData} = do
+    pokeByteOff ptr 0 cArrowSchemaFormat
+    pokeByteOff ptr 8 cArrowSchemaName
+    pokeByteOff ptr 16 cArrowSchemaMetadata
+    pokeByteOff ptr 24 cArrowSchemaFlags
+    pokeByteOff ptr 32 cArrowSchemaNChildren
+    pokeByteOff ptr 40 cArrowSchemaChildren
+    pokeByteOff ptr 48 cArrowSchemaDictionary
+    pokeByteOff ptr 56 cArrowSchemaRelease
+    pokeByteOff ptr 64 cArrowSchemaPrivateData
+
+emptyCArrowSchema :: CArrowSchema
+emptyCArrowSchema = CArrowSchema nullPtr nullPtr nullPtr 0 0 nullPtr nullPtr nullFunPtr nullPtr
 
 -- | Raw chunk plan matching @ArcadiaTioChunkPlan@.
 data CArcadiaTioChunkPlan = CArcadiaTioChunkPlan
@@ -780,6 +1189,31 @@ type PopBatchedFn = Ptr CHandle -> Word32 -> IO CInt
 type RevertCommitFn = Ptr CHandle -> Word64 -> IO CInt
 type ReadAtCommitFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
 type ReadAtCommitDenseFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> IO CInt
+type ReadExecutionReportFreeFn = Ptr CArcadiaTioReadExecutionReport -> IO ()
+type QueryTraceJsonFreeFn = Ptr CArcadiaTioQueryTraceJson -> IO ()
+type HistoricalReadExecutionReportFreeFn = Ptr CArcadiaTioHistoricalReadExecutionReport -> IO ()
+type ReadIndexReportFreeFn = Ptr CArcadiaTioReadIndexReport -> IO ()
+type ReadIndexFn = Ptr CHandle -> Ptr CArcadiaTioReadIndexItem -> CSize -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadIndexReport -> IO CInt
+type ReadWithOptionsFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithOptionsOptions -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadExecutionReport -> IO CInt
+type ReadWithOptionsDenseFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithOptionsOptions -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioReadExecutionReport -> IO CInt
+type ReadWithShapePolicyFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithShapePolicyOptions -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadExecutionReport -> IO CInt
+type ReadWithShapePolicyDenseFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithShapePolicyOptions -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioReadExecutionReport -> IO CInt
+type ReadWithOptionsAttributedFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithOptionsOptions -> Ptr CArcadiaTioQueryTraceContext -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioReadExecutionReport -> Ptr CArcadiaTioQueryTraceJson -> IO CInt
+type ReadWithOptionsDenseAttributedFn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioReadWithOptionsOptions -> Ptr CArcadiaTioQueryTraceContext -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioReadExecutionReport -> Ptr CArcadiaTioQueryTraceJson -> IO CInt
+type HistoricalReadWithOptionsFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioHistoricalReadWithOptionsOptions -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt
+type HistoricalReadWithOptionsDenseFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioHistoricalReadWithOptionsOptions -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt
+type HistoricalReadWithShapePolicyFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioHistoricalReadWithShapePolicyOptions -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt
+type HistoricalReadWithShapePolicyDenseFn = Ptr CHandle -> Word64 -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CArcadiaTioHistoricalReadWithShapePolicyOptions -> Double -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioMask -> Ptr CArcadiaTioHistoricalReadExecutionReport -> IO CInt
+type GetIndexCheckpointEveryCommitsFn = Ptr CHandle -> Ptr Word32 -> IO CInt
+type SetIndexCheckpointEveryCommitsFn = Ptr CHandle -> Word32 -> IO CInt
+type RewriteF32Fn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> Ptr CFloat -> Ptr Word64 -> CSize -> IO CInt
+type RewriteF64Fn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> Ptr Double -> Ptr Word64 -> CSize -> IO CInt
+type RewriteSliceF32Fn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr CFloat -> Ptr Word64 -> CSize -> IO CInt
+type RewriteSliceF64Fn = Ptr CHandle -> Ptr CArcadiaTioEntrySelector -> CSize -> Ptr Double -> Ptr Word64 -> CSize -> IO CInt
+type ClearBlocksFn = Ptr CHandle -> Ptr CArcadiaTioChunkKey -> CSize -> IO CInt
+type ReadValuesArrowFn = Ptr CHandle -> Ptr CArrowArray -> Ptr CArrowSchema -> IO CInt
+type ArrowArrayReleaseFn = Ptr CArrowArray -> IO ()
+type ArrowSchemaReleaseFn = Ptr CArrowSchema -> IO ()
 type AnalyzeCompactionFn = Ptr CHandle -> Ptr CArcadiaTioCompactionStats -> IO CInt
 type CompactToFn = Ptr CHandle -> CString -> Word32 -> Word64 -> IO CInt
 type MaybeCompactFn = Ptr CHandle -> CString -> Double -> Word64 -> Word32 -> Word64 -> Ptr Word8 -> IO CInt
@@ -844,6 +1278,31 @@ foreign import ccall safe "dynamic" mkPopBatched :: FunPtr PopBatchedFn -> PopBa
 foreign import ccall safe "dynamic" mkRevertCommit :: FunPtr RevertCommitFn -> RevertCommitFn
 foreign import ccall safe "dynamic" mkReadAtCommit :: FunPtr ReadAtCommitFn -> ReadAtCommitFn
 foreign import ccall safe "dynamic" mkReadAtCommitDense :: FunPtr ReadAtCommitDenseFn -> ReadAtCommitDenseFn
+foreign import ccall safe "dynamic" mkReadExecutionReportFree :: FunPtr ReadExecutionReportFreeFn -> ReadExecutionReportFreeFn
+foreign import ccall safe "dynamic" mkQueryTraceJsonFree :: FunPtr QueryTraceJsonFreeFn -> QueryTraceJsonFreeFn
+foreign import ccall safe "dynamic" mkHistoricalReadExecutionReportFree :: FunPtr HistoricalReadExecutionReportFreeFn -> HistoricalReadExecutionReportFreeFn
+foreign import ccall safe "dynamic" mkReadIndexReportFree :: FunPtr ReadIndexReportFreeFn -> ReadIndexReportFreeFn
+foreign import ccall safe "dynamic" mkReadIndex :: FunPtr ReadIndexFn -> ReadIndexFn
+foreign import ccall safe "dynamic" mkReadWithOptions :: FunPtr ReadWithOptionsFn -> ReadWithOptionsFn
+foreign import ccall safe "dynamic" mkReadWithOptionsDense :: FunPtr ReadWithOptionsDenseFn -> ReadWithOptionsDenseFn
+foreign import ccall safe "dynamic" mkReadWithShapePolicy :: FunPtr ReadWithShapePolicyFn -> ReadWithShapePolicyFn
+foreign import ccall safe "dynamic" mkReadWithShapePolicyDense :: FunPtr ReadWithShapePolicyDenseFn -> ReadWithShapePolicyDenseFn
+foreign import ccall safe "dynamic" mkReadWithOptionsAttributed :: FunPtr ReadWithOptionsAttributedFn -> ReadWithOptionsAttributedFn
+foreign import ccall safe "dynamic" mkReadWithOptionsDenseAttributed :: FunPtr ReadWithOptionsDenseAttributedFn -> ReadWithOptionsDenseAttributedFn
+foreign import ccall safe "dynamic" mkHistoricalReadWithOptions :: FunPtr HistoricalReadWithOptionsFn -> HistoricalReadWithOptionsFn
+foreign import ccall safe "dynamic" mkHistoricalReadWithOptionsDense :: FunPtr HistoricalReadWithOptionsDenseFn -> HistoricalReadWithOptionsDenseFn
+foreign import ccall safe "dynamic" mkHistoricalReadWithShapePolicy :: FunPtr HistoricalReadWithShapePolicyFn -> HistoricalReadWithShapePolicyFn
+foreign import ccall safe "dynamic" mkHistoricalReadWithShapePolicyDense :: FunPtr HistoricalReadWithShapePolicyDenseFn -> HistoricalReadWithShapePolicyDenseFn
+foreign import ccall safe "dynamic" mkGetIndexCheckpointEveryCommits :: FunPtr GetIndexCheckpointEveryCommitsFn -> GetIndexCheckpointEveryCommitsFn
+foreign import ccall safe "dynamic" mkSetIndexCheckpointEveryCommits :: FunPtr SetIndexCheckpointEveryCommitsFn -> SetIndexCheckpointEveryCommitsFn
+foreign import ccall safe "dynamic" mkRewriteF32 :: FunPtr RewriteF32Fn -> RewriteF32Fn
+foreign import ccall safe "dynamic" mkRewriteF64 :: FunPtr RewriteF64Fn -> RewriteF64Fn
+foreign import ccall safe "dynamic" mkRewriteSliceF32 :: FunPtr RewriteSliceF32Fn -> RewriteSliceF32Fn
+foreign import ccall safe "dynamic" mkRewriteSliceF64 :: FunPtr RewriteSliceF64Fn -> RewriteSliceF64Fn
+foreign import ccall safe "dynamic" mkClearBlocks :: FunPtr ClearBlocksFn -> ClearBlocksFn
+foreign import ccall safe "dynamic" mkReadValuesArrow :: FunPtr ReadValuesArrowFn -> ReadValuesArrowFn
+foreign import ccall safe "dynamic" mkArrowArrayRelease :: FunPtr ArrowArrayReleaseFn -> ArrowArrayReleaseFn
+foreign import ccall safe "dynamic" mkArrowSchemaRelease :: FunPtr ArrowSchemaReleaseFn -> ArrowSchemaReleaseFn
 foreign import ccall safe "dynamic" mkAnalyzeCompaction :: FunPtr AnalyzeCompactionFn -> AnalyzeCompactionFn
 foreign import ccall safe "dynamic" mkCompactTo :: FunPtr CompactToFn -> CompactToFn
 foreign import ccall safe "dynamic" mkMaybeCompact :: FunPtr MaybeCompactFn -> MaybeCompactFn
@@ -920,6 +1379,29 @@ data NativeLibrary = NativeLibrary
   , nativeRevertCommit :: RevertCommitFn
   , nativeReadAtCommit :: ReadAtCommitFn
   , nativeReadAtCommitDense :: ReadAtCommitDenseFn
+  , nativeReadExecutionReportFree :: ReadExecutionReportFreeFn
+  , nativeQueryTraceJsonFree :: QueryTraceJsonFreeFn
+  , nativeHistoricalReadExecutionReportFree :: HistoricalReadExecutionReportFreeFn
+  , nativeReadIndexReportFree :: ReadIndexReportFreeFn
+  , nativeReadIndex :: ReadIndexFn
+  , nativeReadWithOptions :: ReadWithOptionsFn
+  , nativeReadWithOptionsDense :: ReadWithOptionsDenseFn
+  , nativeReadWithShapePolicy :: ReadWithShapePolicyFn
+  , nativeReadWithShapePolicyDense :: ReadWithShapePolicyDenseFn
+  , nativeReadWithOptionsAttributed :: ReadWithOptionsAttributedFn
+  , nativeReadWithOptionsDenseAttributed :: ReadWithOptionsDenseAttributedFn
+  , nativeHistoricalReadWithOptions :: HistoricalReadWithOptionsFn
+  , nativeHistoricalReadWithOptionsDense :: HistoricalReadWithOptionsDenseFn
+  , nativeHistoricalReadWithShapePolicy :: HistoricalReadWithShapePolicyFn
+  , nativeHistoricalReadWithShapePolicyDense :: HistoricalReadWithShapePolicyDenseFn
+  , nativeGetIndexCheckpointEveryCommits :: GetIndexCheckpointEveryCommitsFn
+  , nativeSetIndexCheckpointEveryCommits :: SetIndexCheckpointEveryCommitsFn
+  , nativeRewriteF32 :: RewriteF32Fn
+  , nativeRewriteF64 :: RewriteF64Fn
+  , nativeRewriteSliceF32 :: RewriteSliceF32Fn
+  , nativeRewriteSliceF64 :: RewriteSliceF64Fn
+  , nativeClearBlocks :: ClearBlocksFn
+  , nativeReadValuesArrow :: ReadValuesArrowFn
   , nativeAnalyzeCompaction :: AnalyzeCompactionFn
   , nativeCompactTo :: CompactToFn
   , nativeMaybeCompact :: MaybeCompactFn
@@ -1051,6 +1533,29 @@ loadUnchecked path = do
   nativeRevertCommit <- mkRevertCommit <$> dlsym dl "arcadia_tio_revert_commit"
   nativeReadAtCommit <- mkReadAtCommit <$> dlsym dl "arcadia_tio_read_at_commit"
   nativeReadAtCommitDense <- mkReadAtCommitDense <$> dlsym dl "arcadia_tio_read_at_commit_dense"
+  nativeReadExecutionReportFree <- mkReadExecutionReportFree <$> dlsym dl "arcadia_tio_read_execution_report_free"
+  nativeQueryTraceJsonFree <- mkQueryTraceJsonFree <$> dlsym dl "arcadia_tio_query_trace_json_free"
+  nativeHistoricalReadExecutionReportFree <- mkHistoricalReadExecutionReportFree <$> dlsym dl "arcadia_tio_historical_read_execution_report_free"
+  nativeReadIndexReportFree <- mkReadIndexReportFree <$> dlsym dl "arcadia_tio_read_index_report_free"
+  nativeReadIndex <- mkReadIndex <$> dlsym dl "arcadia_tio_read_index"
+  nativeReadWithOptions <- mkReadWithOptions <$> dlsym dl "arcadia_tio_read_with_options"
+  nativeReadWithOptionsDense <- mkReadWithOptionsDense <$> dlsym dl "arcadia_tio_read_with_options_dense"
+  nativeReadWithShapePolicy <- mkReadWithShapePolicy <$> dlsym dl "arcadia_tio_read_with_shape_policy"
+  nativeReadWithShapePolicyDense <- mkReadWithShapePolicyDense <$> dlsym dl "arcadia_tio_read_with_shape_policy_dense"
+  nativeReadWithOptionsAttributed <- mkReadWithOptionsAttributed <$> dlsym dl "arcadia_tio_read_with_options_attributed"
+  nativeReadWithOptionsDenseAttributed <- mkReadWithOptionsDenseAttributed <$> dlsym dl "arcadia_tio_read_with_options_dense_attributed"
+  nativeHistoricalReadWithOptions <- mkHistoricalReadWithOptions <$> dlsym dl "arcadia_tio_read_at_commit_with_options"
+  nativeHistoricalReadWithOptionsDense <- mkHistoricalReadWithOptionsDense <$> dlsym dl "arcadia_tio_read_at_commit_with_options_dense"
+  nativeHistoricalReadWithShapePolicy <- mkHistoricalReadWithShapePolicy <$> dlsym dl "arcadia_tio_read_at_commit_with_shape_policy"
+  nativeHistoricalReadWithShapePolicyDense <- mkHistoricalReadWithShapePolicyDense <$> dlsym dl "arcadia_tio_read_at_commit_with_shape_policy_dense"
+  nativeGetIndexCheckpointEveryCommits <- mkGetIndexCheckpointEveryCommits <$> dlsym dl "arcadia_tio_get_index_checkpoint_every_commits"
+  nativeSetIndexCheckpointEveryCommits <- mkSetIndexCheckpointEveryCommits <$> dlsym dl "arcadia_tio_set_index_checkpoint_every_commits"
+  nativeRewriteF32 <- mkRewriteF32 <$> dlsym dl "arcadia_tio_rewrite_f32"
+  nativeRewriteF64 <- mkRewriteF64 <$> dlsym dl "arcadia_tio_rewrite_f64"
+  nativeRewriteSliceF32 <- mkRewriteSliceF32 <$> dlsym dl "arcadia_tio_rewrite_slice_f32"
+  nativeRewriteSliceF64 <- mkRewriteSliceF64 <$> dlsym dl "arcadia_tio_rewrite_slice_f64"
+  nativeClearBlocks <- mkClearBlocks <$> dlsym dl "arcadia_tio_clear_blocks"
+  nativeReadValuesArrow <- mkReadValuesArrow <$> dlsym dl "arcadia_tio_read_values_arrow"
   nativeAnalyzeCompaction <- mkAnalyzeCompaction <$> dlsym dl "arcadia_tio_analyze_compaction"
   nativeCompactTo <- mkCompactTo <$> dlsym dl "arcadia_tio_compact_to"
   nativeMaybeCompact <- mkMaybeCompact <$> dlsym dl "arcadia_tio_maybe_compact"
@@ -1126,6 +1631,29 @@ loadUnchecked path = do
       , nativeRevertCommit
       , nativeReadAtCommit
       , nativeReadAtCommitDense
+      , nativeReadExecutionReportFree
+      , nativeQueryTraceJsonFree
+      , nativeHistoricalReadExecutionReportFree
+      , nativeReadIndexReportFree
+      , nativeReadIndex
+      , nativeReadWithOptions
+      , nativeReadWithOptionsDense
+      , nativeReadWithShapePolicy
+      , nativeReadWithShapePolicyDense
+      , nativeReadWithOptionsAttributed
+      , nativeReadWithOptionsDenseAttributed
+      , nativeHistoricalReadWithOptions
+      , nativeHistoricalReadWithOptionsDense
+      , nativeHistoricalReadWithShapePolicy
+      , nativeHistoricalReadWithShapePolicyDense
+      , nativeGetIndexCheckpointEveryCommits
+      , nativeSetIndexCheckpointEveryCommits
+      , nativeRewriteF32
+      , nativeRewriteF64
+      , nativeRewriteSliceF32
+      , nativeRewriteSliceF64
+      , nativeClearBlocks
+      , nativeReadValuesArrow
       , nativeAnalyzeCompaction
       , nativeCompactTo
       , nativeMaybeCompact
@@ -1302,6 +1830,81 @@ capiReadAtCommit NativeLibrary{nativeReadAtCommit} = nativeReadAtCommit
 
 capiReadAtCommitDense :: NativeLibrary -> ReadAtCommitDenseFn
 capiReadAtCommitDense NativeLibrary{nativeReadAtCommitDense} = nativeReadAtCommitDense
+
+capiReadExecutionReportFree :: NativeLibrary -> ReadExecutionReportFreeFn
+capiReadExecutionReportFree NativeLibrary{nativeReadExecutionReportFree} = nativeReadExecutionReportFree
+
+capiQueryTraceJsonFree :: NativeLibrary -> QueryTraceJsonFreeFn
+capiQueryTraceJsonFree NativeLibrary{nativeQueryTraceJsonFree} = nativeQueryTraceJsonFree
+
+capiHistoricalReadExecutionReportFree :: NativeLibrary -> HistoricalReadExecutionReportFreeFn
+capiHistoricalReadExecutionReportFree NativeLibrary{nativeHistoricalReadExecutionReportFree} = nativeHistoricalReadExecutionReportFree
+
+capiReadIndexReportFree :: NativeLibrary -> ReadIndexReportFreeFn
+capiReadIndexReportFree NativeLibrary{nativeReadIndexReportFree} = nativeReadIndexReportFree
+
+capiReadIndex :: NativeLibrary -> ReadIndexFn
+capiReadIndex NativeLibrary{nativeReadIndex} = nativeReadIndex
+
+capiReadWithOptions :: NativeLibrary -> ReadWithOptionsFn
+capiReadWithOptions NativeLibrary{nativeReadWithOptions} = nativeReadWithOptions
+
+capiReadWithOptionsDense :: NativeLibrary -> ReadWithOptionsDenseFn
+capiReadWithOptionsDense NativeLibrary{nativeReadWithOptionsDense} = nativeReadWithOptionsDense
+
+capiReadWithShapePolicy :: NativeLibrary -> ReadWithShapePolicyFn
+capiReadWithShapePolicy NativeLibrary{nativeReadWithShapePolicy} = nativeReadWithShapePolicy
+
+capiReadWithShapePolicyDense :: NativeLibrary -> ReadWithShapePolicyDenseFn
+capiReadWithShapePolicyDense NativeLibrary{nativeReadWithShapePolicyDense} = nativeReadWithShapePolicyDense
+
+capiReadWithOptionsAttributed :: NativeLibrary -> ReadWithOptionsAttributedFn
+capiReadWithOptionsAttributed NativeLibrary{nativeReadWithOptionsAttributed} = nativeReadWithOptionsAttributed
+
+capiReadWithOptionsDenseAttributed :: NativeLibrary -> ReadWithOptionsDenseAttributedFn
+capiReadWithOptionsDenseAttributed NativeLibrary{nativeReadWithOptionsDenseAttributed} = nativeReadWithOptionsDenseAttributed
+
+capiReadAtCommitWithOptions :: NativeLibrary -> HistoricalReadWithOptionsFn
+capiReadAtCommitWithOptions NativeLibrary{nativeHistoricalReadWithOptions} = nativeHistoricalReadWithOptions
+
+capiReadAtCommitWithOptionsDense :: NativeLibrary -> HistoricalReadWithOptionsDenseFn
+capiReadAtCommitWithOptionsDense NativeLibrary{nativeHistoricalReadWithOptionsDense} = nativeHistoricalReadWithOptionsDense
+
+capiReadAtCommitWithShapePolicy :: NativeLibrary -> HistoricalReadWithShapePolicyFn
+capiReadAtCommitWithShapePolicy NativeLibrary{nativeHistoricalReadWithShapePolicy} = nativeHistoricalReadWithShapePolicy
+
+capiReadAtCommitWithShapePolicyDense :: NativeLibrary -> HistoricalReadWithShapePolicyDenseFn
+capiReadAtCommitWithShapePolicyDense NativeLibrary{nativeHistoricalReadWithShapePolicyDense} = nativeHistoricalReadWithShapePolicyDense
+
+capiGetIndexCheckpointEveryCommits :: NativeLibrary -> GetIndexCheckpointEveryCommitsFn
+capiGetIndexCheckpointEveryCommits NativeLibrary{nativeGetIndexCheckpointEveryCommits} = nativeGetIndexCheckpointEveryCommits
+
+capiSetIndexCheckpointEveryCommits :: NativeLibrary -> SetIndexCheckpointEveryCommitsFn
+capiSetIndexCheckpointEveryCommits NativeLibrary{nativeSetIndexCheckpointEveryCommits} = nativeSetIndexCheckpointEveryCommits
+
+capiRewriteF32 :: NativeLibrary -> RewriteF32Fn
+capiRewriteF32 NativeLibrary{nativeRewriteF32} = nativeRewriteF32
+
+capiRewriteF64 :: NativeLibrary -> RewriteF64Fn
+capiRewriteF64 NativeLibrary{nativeRewriteF64} = nativeRewriteF64
+
+capiRewriteSliceF32 :: NativeLibrary -> RewriteSliceF32Fn
+capiRewriteSliceF32 NativeLibrary{nativeRewriteSliceF32} = nativeRewriteSliceF32
+
+capiRewriteSliceF64 :: NativeLibrary -> RewriteSliceF64Fn
+capiRewriteSliceF64 NativeLibrary{nativeRewriteSliceF64} = nativeRewriteSliceF64
+
+capiClearBlocks :: NativeLibrary -> ClearBlocksFn
+capiClearBlocks NativeLibrary{nativeClearBlocks} = nativeClearBlocks
+
+capiReadValuesArrow :: NativeLibrary -> ReadValuesArrowFn
+capiReadValuesArrow NativeLibrary{nativeReadValuesArrow} = nativeReadValuesArrow
+
+arrowArrayRelease :: FunPtr ArrowArrayReleaseFn -> ArrowArrayReleaseFn
+arrowArrayRelease = mkArrowArrayRelease
+
+arrowSchemaRelease :: FunPtr ArrowSchemaReleaseFn -> ArrowSchemaReleaseFn
+arrowSchemaRelease = mkArrowSchemaRelease
 
 capiAnalyzeCompaction :: NativeLibrary -> AnalyzeCompactionFn
 capiAnalyzeCompaction NativeLibrary{nativeAnalyzeCompaction} = nativeAnalyzeCompaction
