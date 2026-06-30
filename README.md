@@ -43,7 +43,7 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 347 wrapped items, 24 intentionally not-applicable items, 33 deferred blockers, and 0 unknown/unmapped items; the remaining deferred blockers are OCB follow-up surfaces and prevent any broad 100% parity claim.
+deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 364 wrapped items, 24 intentionally not-applicable items, 16 deferred blockers, and 0 unknown/unmapped items; the remaining deferred blockers are OCB fill/cursor/follow-up surfaces and prevent any broad 100% parity claim.
 
 ## Current scope
 
@@ -104,6 +104,8 @@ Implemented:
   primitive/fixed-binary column chunks, validity bitmaps, dictionaries, ordering
   keys, write options, fixed-binary schema helpers, cleanup-orphan-tail results,
   and generated fixture read/dictionary/summary cross-checks;
+- expose exact OCB enum/type raw conversion helpers plus native init-helper-backed
+  open/read predicate defaults and copied fixed-binary descriptor widths;
 - free C-owned tensors, masks, strings, chunk plans, commit lists, OCB metadata,
   OCB read outcomes/reports/attribution/plans/summaries, and file metadata with
   the matching C ABI free functions after copying.

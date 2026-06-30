@@ -8,9 +8,9 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 347 |
+| wrapped | 364 |
 | not-applicable | 24 |
-| deferred-blocker | 33 |
+| deferred-blocker | 16 |
 | unknown-unmapped | 0 |
 | total | 404 |
 
@@ -108,6 +108,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_cleanup_result_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_close` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_column_array_fixed_binary_width` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_column_descriptor_fixed_binary_width` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_create` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_create_with_options` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_dictionary_entry_init` — resolved by Haskell dynamic-loader surface
@@ -118,8 +119,10 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_metadata` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_metadata_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_open` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_open_options_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_open_with_options` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_plan_read` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_predicate_value_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_primitive_values_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_attribution_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_attribution_init` — resolved by Haskell dynamic-loader surface
@@ -137,6 +140,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_read_report_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_read_request_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_reader_clone` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_ocb_row_group_predicate_init` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_ocb_row_group_summaries_init` — resolved by Haskell dynamic-loader surface
@@ -282,23 +286,35 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioHistoricalReadWithShapePolicyOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioMask` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioMetadataStability` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbBodyKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbBodyRefSummary` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbByteSlice` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbChecksumKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbCleanupResult` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnArray` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnBatch` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnChunkSummary` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbColumnChunkSummaryCodec` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnDescriptor` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbColumnStatsSummary` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbDictionaryDescriptor` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbDictionaryEntry` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbDictionaryValueKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbDictionaryValues` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbErrorKind` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbFailureCause` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbFile` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbLogicalKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbMetadata` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbNullOrder` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbOpenOptions` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbOpenValidation` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbOrderingDirection` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbOrderingKey` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbPhysicalType` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbPredicateValue` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbPrimitiveValues` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbProjectionKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadAttribution` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadOutcome` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbReadReport` — represented by Haskell public or raw C wrapper type
@@ -307,6 +323,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioOcbRowGroupSummaries` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbRowGroupSummary` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbValidityBitmap` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioOcbWriteChunkCodec` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbWriteColumn` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbWriteColumnChunk` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioOcbWriteDictionary` — represented by Haskell public or raw C wrapper type
@@ -395,39 +412,22 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 
 ## deferred-blocker items
 
-- `function` `arcadia_tio_ocb_column_descriptor_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_column_fill_buffer_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_column_fill_buffer_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_column_fill_buffer_set_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_open_options_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_predicate_value_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_read_cursor_options_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_read_cursor_report_free` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_read_cursor_report_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_read_fill_report_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_read_row_group_into` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_row_group_fill_request_init` — OCB read/write/dictionary/plan surface deferred
-- `function` `arcadia_tio_ocb_row_group_predicate_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_visit_batches` — OCB read/write/dictionary/plan surface deferred
-- `type` `ArcadiaTioOcbBodyKind` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbChecksumKind` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbColumnChunkSummaryCodec` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbColumnFillBuffer` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbDictionaryValueKind` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbErrorKind` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbFailureCause` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbLogicalKind` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbNullOrder` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbOpenValidation` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbOrderingDirection` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbPhysicalType` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbProjectionKind` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbReadCursorOptions` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbReadCursorReport` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbReadFillReport` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbReadPlan` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbRowGroupFillRequest` — OCB read/write/dictionary/plan type surface deferred
-- `type` `ArcadiaTioOcbWriteChunkCodec` — OCB read/write/dictionary/plan type surface deferred
 
 ## unknown-unmapped items
 

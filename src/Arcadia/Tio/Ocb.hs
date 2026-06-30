@@ -4,21 +4,39 @@
 module Arcadia.Tio.Ocb
   ( OcbFile
   , OcbOpenValidation(..)
+  , ocbOpenValidationToRaw
+  , ocbOpenValidationFromRaw
   , OcbOpenOptions(..)
   , defaultOcbOpenOptions
   , OcbErrorKind(..)
+  , ocbErrorKindToRaw
+  , ocbErrorKindFromRaw
   , OcbFailureCause(..)
+  , ocbFailureCauseToRaw
+  , ocbFailureCauseFromRaw
   , OcbPhysicalType(..)
+  , ocbPhysicalTypeToRaw
+  , ocbPhysicalTypeFromRaw
   , OcbLogicalKind(..)
+  , ocbLogicalKindToRaw
+  , ocbLogicalKindFromRaw
   , OcbDictionaryValueKind(..)
+  , ocbDictionaryValueKindToRaw
+  , ocbDictionaryValueKindFromRaw
   , OcbOrderingDirection(..)
+  , ocbOrderingDirectionToRaw
+  , ocbOrderingDirectionFromRaw
   , OcbNullOrder(..)
+  , ocbNullOrderToRaw
+  , ocbNullOrderFromRaw
   , OcbColumnDescriptor(..)
   , OcbDictionaryDescriptor(..)
   , OcbOrderingKey(..)
   , OcbMetadata(..)
   , OcbDictionaryValues(..)
   , OcbWriteChunkCodec(..)
+  , ocbWriteChunkCodecToRaw
+  , ocbWriteChunkCodecFromRaw
   , OcbWriteOptions(..)
   , defaultOcbWriteOptions
   , OcbDictionaryEntry(..)
@@ -36,6 +54,9 @@ module Arcadia.Tio.Ocb
   , append
   , appendWithOptions
   , cleanupOrphanTail
+  , OcbProjectionKind(..)
+  , ocbProjectionKindToRaw
+  , ocbProjectionKindFromRaw
   , OcbProjection(..)
   , OcbPredicateValue(..)
   , OcbRowGroupPredicate(..)
@@ -51,8 +72,15 @@ module Arcadia.Tio.Ocb
   , OcbReadWithAttribution(..)
   , OcbReadPlan
   , OcbBodyKind(..)
+  , ocbBodyKindToRaw
+  , ocbBodyKindFromRaw
   , OcbChecksumKind(..)
+  , ocbChecksumKindToRaw
+  , ocbChecksumKindFromRaw
   , OcbChunkSummaryCodec(..)
+  , OcbColumnChunkSummaryCodec
+  , ocbChunkSummaryCodecToRaw
+  , ocbChunkSummaryCodecFromRaw
   , OcbBodyRefSummary(..)
   , OcbColumnChunkSummary(..)
   , OcbColumnStatsSummary(..)
@@ -132,12 +160,15 @@ import Arcadia.Tio.Internal.CApi
   , capiOcbLastErrorCause
   , capiOcbLastErrorKind
   , capiOcbColumnArrayFixedBinaryWidth
+  , capiOcbColumnDescriptorFixedBinaryWidth
   , capiOcbPlanRead
   , capiOcbMetadata
   , capiOcbMetadataFree
   , capiOcbOpen
+  , capiOcbOpenOptionsInit
   , capiOcbOpenWithOptions
   , capiOcbReaderClone
+  , capiOcbPredicateValueInit
   , capiOcbReadAttributionFree
   , capiOcbReadAttributionInit
   , capiOcbReadBatches
@@ -153,6 +184,7 @@ import Arcadia.Tio.Internal.CApi
   , capiOcbReadReportFree
   , capiOcbReadReportInit
   , capiOcbReadRequestInit
+  , capiOcbRowGroupPredicateInit
   , capiOcbRowGroupSummaries
   , capiOcbRowGroupSummariesFree
   , capiOcbRowGroupSummariesInit
@@ -167,12 +199,8 @@ import Arcadia.Tio.Internal.CApi
   , capiOcbCleanupOrphanTail
   , emptyCArcadiaTioOcbDictionaryValues
   , emptyCArcadiaTioOcbMetadata
-  , emptyCArcadiaTioOcbOpenOptions
-  , emptyCArcadiaTioOcbPredicateValue
   , emptyCArcadiaTioOcbPrimitiveValues
   , emptyCArcadiaTioOcbValidityBitmap
-  , emptyCArcadiaTioOcbReadRequest
-  , emptyCArcadiaTioOcbRowGroupPredicate
   , emptyCArcadiaTioOcbWriteColumn
   , emptyCArcadiaTioOcbDictionaryEntry
   , emptyCArcadiaTioOcbWriteDictionary
@@ -276,6 +304,7 @@ data OcbColumnDescriptor = OcbColumnDescriptor
   , ocbColumnDictionaryId :: Maybe Word32
   , ocbColumnScale :: Int32
   , ocbColumnNullable :: Bool
+  , ocbColumnFixedBinaryWidth :: Word32
   }
   deriving (Eq, Show)
 
@@ -400,6 +429,12 @@ data OcbWriteSpec = OcbWriteSpec
 data OcbCleanupResult = OcbCleanupResult
   { ocbCleanupTruncated :: Bool
   }
+  deriving (Eq, Show)
+
+data OcbProjectionKind
+  = OcbProjectionKindAll
+  | OcbProjectionKindNames
+  | OcbProjectionKindUnknown Int
   deriving (Eq, Show)
 
 data OcbProjection
@@ -555,6 +590,8 @@ data OcbChunkSummaryCodec
   | OcbChunkSummaryCodecUnknown Int
   deriving (Eq, Show)
 
+type OcbColumnChunkSummaryCodec = OcbChunkSummaryCodec
+
 data OcbBodyRefSummary = OcbBodyRefSummary
   { ocbBodyRefOffset :: Word64
   , ocbBodyRefLength :: Word64
@@ -688,7 +725,9 @@ openWithOptions native path options
   | otherwise =
       withCString path $ \cPath ->
         alloca $ \optionsPtr -> do
-          poke optionsPtr (toCOpenOptions options)
+          capiOcbOpenOptionsInit native optionsPtr
+          initialized <- peek optionsPtr
+          poke optionsPtr (toCOpenOptions initialized options)
           handle <- capiOcbOpenWithOptions native cPath optionsPtr
           if handle == nullPtr
             then Left <$> lastError native
@@ -732,7 +771,7 @@ metadata OcbFile{ocbNative, ocbHandle} =
       poke outPtr emptyCArcadiaTioOcbMetadata
       status <- capiOcbMetadata ocbNative handle outPtr
       if status == okStatus
-        then (peek outPtr >>= copyOcbMetadata) `finally` capiOcbMetadataFree ocbNative outPtr
+        then (peek outPtr >>= copyOcbMetadata ocbNative) `finally` capiOcbMetadataFree ocbNative outPtr
         else do
           err <- lastError ocbNative
           capiOcbMetadataFree ocbNative outPtr
@@ -906,11 +945,12 @@ validateOcbReadRequest request
 withOcbReadRequest :: NativeLibrary -> OcbReadRequest -> (Ptr CArcadiaTioOcbReadRequest -> IO a) -> IO a
 withOcbReadRequest native request action =
   withProjection (ocbReadProjection request) $ \projectionKind namesPtr namesLen ->
-    withPredicates (ocbReadPredicates request) $ \predicatesPtr predicatesLen ->
+    withPredicates native (ocbReadPredicates request) $ \predicatesPtr predicatesLen ->
       alloca $ \requestPtr -> do
         capiOcbReadRequestInit native requestPtr
+        initialized <- peek requestPtr
         poke requestPtr
-          emptyCArcadiaTioOcbReadRequest
+          initialized
             { cOcbReadRequestProjectionKind = projectionKind
             , cOcbReadRequestColumnNames = namesPtr
             , cOcbReadRequestColumnNamesLen = namesLen
@@ -923,8 +963,8 @@ withOcbReadRequest native request action =
         action requestPtr
 
 withProjection :: OcbProjection -> (CInt -> Ptr CString -> CSize -> IO a) -> IO a
-withProjection OcbProjectionAll action = action 0 nullPtr 0
-withProjection (OcbProjectionNames names) action = withCStringArray names (action 1)
+withProjection OcbProjectionAll action = action (toOcbProjectionKind OcbProjectionKindAll) nullPtr 0
+withProjection (OcbProjectionNames names) action = withCStringArray names (action (toOcbProjectionKind OcbProjectionKindNames))
 
 withCStringArray :: [String] -> (Ptr CString -> CSize -> IO a) -> IO a
 withCStringArray [] action = action nullPtr 0
@@ -933,33 +973,45 @@ withCStringArray values action = go values []
     go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
     go (value:rest) acc = withCString value $ \cValue -> go rest (cValue : acc)
 
-withPredicates :: [OcbRowGroupPredicate] -> (Ptr CArcadiaTioOcbRowGroupPredicate -> CSize -> IO a) -> IO a
-withPredicates [] action = action nullPtr 0
-withPredicates predicates action = go predicates []
+withPredicates :: NativeLibrary -> [OcbRowGroupPredicate] -> (Ptr CArcadiaTioOcbRowGroupPredicate -> CSize -> IO a) -> IO a
+withPredicates _ [] action = action nullPtr 0
+withPredicates native predicates action = go predicates []
   where
     go [] acc = withArray (reverse acc) $ \ptr -> action ptr (fromIntegral (length acc))
     go (predicate:rest) acc =
-      withCString (ocbPredicateColumn predicate) $ \columnPtr ->
-        go rest (toCPredicate columnPtr predicate : acc)
+      withCString (ocbPredicateColumn predicate) $ \columnPtr -> do
+        cPredicate <- toCPredicate native columnPtr predicate
+        go rest (cPredicate : acc)
 
-toCPredicate :: CString -> OcbRowGroupPredicate -> CArcadiaTioOcbRowGroupPredicate
-toCPredicate columnPtr OcbRowGroupPredicate{ocbPredicateLower, ocbPredicateUpper} =
-  emptyCArcadiaTioOcbRowGroupPredicate
-    { cOcbRowGroupPredicateColumn = columnPtr
-    , cOcbRowGroupPredicateHasLower = maybe 0 (const 1) ocbPredicateLower
-    , cOcbRowGroupPredicateLower = maybe emptyCArcadiaTioOcbPredicateValue toCPredicateValue ocbPredicateLower
-    , cOcbRowGroupPredicateHasUpper = maybe 0 (const 1) ocbPredicateUpper
-    , cOcbRowGroupPredicateUpper = maybe emptyCArcadiaTioOcbPredicateValue toCPredicateValue ocbPredicateUpper
-    }
+toCPredicate :: NativeLibrary -> CString -> OcbRowGroupPredicate -> IO CArcadiaTioOcbRowGroupPredicate
+toCPredicate native columnPtr OcbRowGroupPredicate{ocbPredicateLower, ocbPredicateUpper} = do
+  base <- initializedRowGroupPredicate native
+  lower <- maybe (initializedPredicateValue native) (toCPredicateValue native) ocbPredicateLower
+  upper <- maybe (initializedPredicateValue native) (toCPredicateValue native) ocbPredicateUpper
+  pure
+    base
+      { cOcbRowGroupPredicateColumn = columnPtr
+      , cOcbRowGroupPredicateHasLower = maybe 0 (const 1) ocbPredicateLower
+      , cOcbRowGroupPredicateLower = lower
+      , cOcbRowGroupPredicateHasUpper = maybe 0 (const 1) ocbPredicateUpper
+      , cOcbRowGroupPredicateUpper = upper
+      }
 
-toCPredicateValue :: OcbPredicateValue -> CArcadiaTioOcbPredicateValue
-toCPredicateValue value = case value of
-  OcbPredicateI32 v -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = 0, cOcbPredicateValueI32 = v}
-  OcbPredicateI64 v -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = 1, cOcbPredicateValueI64 = v}
-  OcbPredicateF32 v -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = 2, cOcbPredicateValueF32 = CFloat v}
-  OcbPredicateF64 v -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = 3, cOcbPredicateValueF64 = v}
-  OcbPredicateUnknown physical -> emptyCArcadiaTioOcbPredicateValue{cOcbPredicateValuePhysicalType = toOcbPhysicalType physical}
+toCPredicateValue :: NativeLibrary -> OcbPredicateValue -> IO CArcadiaTioOcbPredicateValue
+toCPredicateValue native value = do
+  base <- initializedPredicateValue native
+  pure $ case value of
+    OcbPredicateI32 v -> base{cOcbPredicateValuePhysicalType = 0, cOcbPredicateValueI32 = v}
+    OcbPredicateI64 v -> base{cOcbPredicateValuePhysicalType = 1, cOcbPredicateValueI64 = v}
+    OcbPredicateF32 v -> base{cOcbPredicateValuePhysicalType = 2, cOcbPredicateValueF32 = CFloat v}
+    OcbPredicateF64 v -> base{cOcbPredicateValuePhysicalType = 3, cOcbPredicateValueF64 = v}
+    OcbPredicateUnknown physical -> base{cOcbPredicateValuePhysicalType = toOcbPhysicalType physical}
 
+initializedPredicateValue :: NativeLibrary -> IO CArcadiaTioOcbPredicateValue
+initializedPredicateValue native = alloca $ \ptr -> capiOcbPredicateValueInit native ptr >> peek ptr
+
+initializedRowGroupPredicate :: NativeLibrary -> IO CArcadiaTioOcbRowGroupPredicate
+initializedRowGroupPredicate native = alloca $ \ptr -> capiOcbRowGroupPredicateInit native ptr >> peek ptr
 
 
 copyOcbCleanupResult :: CArcadiaTioOcbCleanupResult -> IO OcbCleanupResult
@@ -1502,12 +1554,12 @@ copyOcbReadAttribution raw = do
       , ocbAttributionFallbackReason = fallback
       }
 
-copyOcbMetadata :: CArcadiaTioOcbMetadata -> IO (Result OcbMetadata)
-copyOcbMetadata raw@CArcadiaTioOcbMetadata{cOcbMetadataFormatName}
+copyOcbMetadata :: NativeLibrary -> CArcadiaTioOcbMetadata -> IO (Result OcbMetadata)
+copyOcbMetadata native raw@CArcadiaTioOcbMetadata{cOcbMetadataFormatName}
   | cOcbMetadataFormatName == nullPtr = pure (Left (invalidArgument "OCB metadata format_name is null"))
   | otherwise = do
       formatName <- peekCString cOcbMetadataFormatName
-      columns <- traverse copyOcbColumnDescriptor =<< peekArrayLen (cOcbMetadataColumns raw) (cOcbMetadataColumnsLen raw)
+      columns <- copyOcbColumnDescriptors native (cOcbMetadataColumns raw) (cOcbMetadataColumnsLen raw)
       dictionaries <- traverse copyOcbDictionaryDescriptor =<< peekArrayLen (cOcbMetadataDictionaries raw) (cOcbMetadataDictionariesLen raw)
       orderingKeys <- traverse copyOcbOrderingKey =<< peekArrayLen (cOcbMetadataOrderingKeys raw) (cOcbMetadataOrderingKeysLen raw)
       pure
@@ -1529,9 +1581,18 @@ copyOcbMetadata raw@CArcadiaTioOcbMetadata{cOcbMetadataFormatName}
               }
         )
 
-copyOcbColumnDescriptor :: CArcadiaTioOcbColumnDescriptor -> IO OcbColumnDescriptor
-copyOcbColumnDescriptor raw = do
+copyOcbColumnDescriptors :: NativeLibrary -> Ptr CArcadiaTioOcbColumnDescriptor -> CSize -> IO [OcbColumnDescriptor]
+copyOcbColumnDescriptors _ ptr len | ptr == nullPtr || len == 0 = pure []
+copyOcbColumnDescriptors native ptr (CSize len) = traverse copyAt [0 .. fromIntegral len - 1]
+  where
+    stride = sizeOf (undefined :: CArcadiaTioOcbColumnDescriptor)
+    copyAt index = copyOcbColumnDescriptor native (ptr `plusPtr` (index * stride))
+
+copyOcbColumnDescriptor :: NativeLibrary -> Ptr CArcadiaTioOcbColumnDescriptor -> IO OcbColumnDescriptor
+copyOcbColumnDescriptor native columnPtr = do
+  raw <- peek columnPtr
   name <- peekNullableCString (cOcbColumnDescriptorName raw)
+  fixedBinaryWidth <- capiOcbColumnDescriptorFixedBinaryWidth native columnPtr
   pure
     OcbColumnDescriptor
       { ocbColumnId = cOcbColumnDescriptorId raw
@@ -1544,6 +1605,7 @@ copyOcbColumnDescriptor raw = do
             else Just (cOcbColumnDescriptorDictionaryId raw)
       , ocbColumnScale = cOcbColumnDescriptorScale raw
       , ocbColumnNullable = cOcbColumnDescriptorNullable raw /= 0
+      , ocbColumnFixedBinaryWidth = fixedBinaryWidth
       }
 
 copyOcbDictionaryDescriptor :: CArcadiaTioOcbDictionaryDescriptor -> IO OcbDictionaryDescriptor
@@ -1613,17 +1675,35 @@ boolByte :: Bool -> Word8
 boolByte True = 1
 boolByte False = 0
 
-toCOpenOptions :: OcbOpenOptions -> CArcadiaTioOcbOpenOptions
-toCOpenOptions OcbOpenOptions{ocbOpenValidation} =
-  emptyCArcadiaTioOcbOpenOptions
+toCOpenOptions :: CArcadiaTioOcbOpenOptions -> OcbOpenOptions -> CArcadiaTioOcbOpenOptions
+toCOpenOptions initialized OcbOpenOptions{ocbOpenValidation} =
+  initialized
     { cOcbOpenOptionsValidation = toOcbOpenValidation ocbOpenValidation
     }
+
+ocbOpenValidationToRaw :: OcbOpenValidation -> Int
+ocbOpenValidationToRaw = fromIntegral . toOcbOpenValidation
+
+ocbOpenValidationFromRaw :: Int -> OcbOpenValidation
+ocbOpenValidationFromRaw = fromOcbOpenValidation . fromIntegral
 
 toOcbOpenValidation :: OcbOpenValidation -> CInt
 toOcbOpenValidation = \case
   OcbOpenValidationMetadataGraph -> 0
   OcbOpenValidationFullPayload -> 1
   OcbOpenValidationUnknown raw -> fromIntegral raw
+
+fromOcbOpenValidation :: CInt -> OcbOpenValidation
+fromOcbOpenValidation (CInt raw) = case raw of
+  0 -> OcbOpenValidationMetadataGraph
+  1 -> OcbOpenValidationFullPayload
+  _ -> OcbOpenValidationUnknown (fromIntegral raw)
+
+ocbErrorKindToRaw :: OcbErrorKind -> Int
+ocbErrorKindToRaw = fromIntegral . toOcbErrorKind
+
+ocbErrorKindFromRaw :: Int -> OcbErrorKind
+ocbErrorKindFromRaw = fromOcbErrorKind . fromIntegral
 
 fromOcbErrorKind :: CInt -> OcbErrorKind
 fromOcbErrorKind (CInt raw) = case raw of
@@ -1635,6 +1715,22 @@ fromOcbErrorKind (CInt raw) = case raw of
   5 -> OcbErrorKindIo
   _ -> OcbErrorKindUnknown (fromIntegral raw)
 
+toOcbErrorKind :: OcbErrorKind -> CInt
+toOcbErrorKind = \case
+  OcbErrorKindNone -> 0
+  OcbErrorKindInvalidInput -> 1
+  OcbErrorKindUnsupportedFormat -> 2
+  OcbErrorKindCorruptFile -> 3
+  OcbErrorKindLockUnavailable -> 4
+  OcbErrorKindIo -> 5
+  OcbErrorKindUnknown raw -> fromIntegral raw
+
+ocbFailureCauseToRaw :: OcbFailureCause -> Int
+ocbFailureCauseToRaw = fromIntegral . toOcbFailureCause
+
+ocbFailureCauseFromRaw :: Int -> OcbFailureCause
+ocbFailureCauseFromRaw = fromOcbFailureCause . fromIntegral
+
 fromOcbFailureCause :: CInt -> OcbFailureCause
 fromOcbFailureCause (CInt raw) = case raw of
   0 -> OcbFailureCauseNone
@@ -1643,6 +1739,21 @@ fromOcbFailureCause (CInt raw) = case raw of
   3 -> OcbFailureCauseCorruptFile
   4 -> OcbFailureCauseLockUnavailable
   _ -> OcbFailureCauseUnknown (fromIntegral raw)
+
+toOcbFailureCause :: OcbFailureCause -> CInt
+toOcbFailureCause = \case
+  OcbFailureCauseNone -> 0
+  OcbFailureCauseInvalidInput -> 1
+  OcbFailureCauseUnsupportedFormat -> 2
+  OcbFailureCauseCorruptFile -> 3
+  OcbFailureCauseLockUnavailable -> 4
+  OcbFailureCauseUnknown raw -> fromIntegral raw
+
+ocbPhysicalTypeToRaw :: OcbPhysicalType -> Int
+ocbPhysicalTypeToRaw = fromIntegral . toOcbPhysicalType
+
+ocbPhysicalTypeFromRaw :: Int -> OcbPhysicalType
+ocbPhysicalTypeFromRaw = fromOcbPhysicalType . fromIntegral
 
 fromOcbPhysicalType :: CInt -> OcbPhysicalType
 fromOcbPhysicalType (CInt raw) = case raw of
@@ -1662,6 +1773,11 @@ toOcbPhysicalType = \case
   OcbPhysicalFixedBinary -> 4
   OcbPhysicalUnknown raw -> fromIntegral raw
 
+ocbLogicalKindToRaw :: OcbLogicalKind -> Int
+ocbLogicalKindToRaw = fromIntegral . toOcbLogicalKind
+
+ocbLogicalKindFromRaw :: Int -> OcbLogicalKind
+ocbLogicalKindFromRaw = fromOcbLogicalKind . fromIntegral
 
 toOcbLogicalKind :: OcbLogicalKind -> CInt
 toOcbLogicalKind = \case
@@ -1673,6 +1789,12 @@ toOcbLogicalKind = \case
   OcbLogicalOpaqueKey -> 5
   OcbLogicalUnknown raw -> fromIntegral raw
 
+ocbDictionaryValueKindToRaw :: OcbDictionaryValueKind -> Int
+ocbDictionaryValueKindToRaw = fromIntegral . toOcbDictionaryValueKind
+
+ocbDictionaryValueKindFromRaw :: Int -> OcbDictionaryValueKind
+ocbDictionaryValueKindFromRaw = fromOcbDictionaryValueKind . fromIntegral
+
 toOcbDictionaryValueKind :: OcbDictionaryValueKind -> CInt
 toOcbDictionaryValueKind = \case
   OcbDictionaryUtf8 -> 0
@@ -1681,11 +1803,23 @@ toOcbDictionaryValueKind = \case
   OcbDictionaryEnumLabels -> 3
   OcbDictionaryValueUnknown raw -> fromIntegral raw
 
+ocbOrderingDirectionToRaw :: OcbOrderingDirection -> Int
+ocbOrderingDirectionToRaw = fromIntegral . toOcbOrderingDirection
+
+ocbOrderingDirectionFromRaw :: Int -> OcbOrderingDirection
+ocbOrderingDirectionFromRaw = fromOcbOrderingDirection . fromIntegral
+
 toOcbOrderingDirection :: OcbOrderingDirection -> CInt
 toOcbOrderingDirection = \case
   OcbOrderingAscending -> 0
   OcbOrderingDescending -> 1
   OcbOrderingDirectionUnknown raw -> fromIntegral raw
+
+ocbNullOrderToRaw :: OcbNullOrder -> Int
+ocbNullOrderToRaw = fromIntegral . toOcbNullOrder
+
+ocbNullOrderFromRaw :: Int -> OcbNullOrder
+ocbNullOrderFromRaw = fromOcbNullOrder . fromIntegral
 
 toOcbNullOrder :: OcbNullOrder -> CInt
 toOcbNullOrder = \case
@@ -1694,11 +1828,47 @@ toOcbNullOrder = \case
   OcbNoNulls -> 2
   OcbNullOrderUnknown raw -> fromIntegral raw
 
+ocbProjectionKindToRaw :: OcbProjectionKind -> Int
+ocbProjectionKindToRaw = fromIntegral . toOcbProjectionKind
+
+ocbProjectionKindFromRaw :: Int -> OcbProjectionKind
+ocbProjectionKindFromRaw = fromOcbProjectionKind . fromIntegral
+
+toOcbProjectionKind :: OcbProjectionKind -> CInt
+toOcbProjectionKind = \case
+  OcbProjectionKindAll -> 0
+  OcbProjectionKindNames -> 1
+  OcbProjectionKindUnknown raw -> fromIntegral raw
+
+fromOcbProjectionKind :: CInt -> OcbProjectionKind
+fromOcbProjectionKind (CInt raw) = case raw of
+  0 -> OcbProjectionKindAll
+  1 -> OcbProjectionKindNames
+  _ -> OcbProjectionKindUnknown (fromIntegral raw)
+
+ocbWriteChunkCodecToRaw :: OcbWriteChunkCodec -> Int
+ocbWriteChunkCodecToRaw = fromIntegral . toOcbWriteChunkCodec
+
+ocbWriteChunkCodecFromRaw :: Int -> OcbWriteChunkCodec
+ocbWriteChunkCodecFromRaw = fromOcbWriteChunkCodec . fromIntegral
+
 toOcbWriteChunkCodec :: OcbWriteChunkCodec -> CInt
 toOcbWriteChunkCodec = \case
   OcbWriteChunkCodecNone -> 0
   OcbWriteChunkCodecZstd -> 1
   OcbWriteChunkCodecUnknown raw -> fromIntegral raw
+
+fromOcbWriteChunkCodec :: CInt -> OcbWriteChunkCodec
+fromOcbWriteChunkCodec (CInt raw) = case raw of
+  0 -> OcbWriteChunkCodecNone
+  1 -> OcbWriteChunkCodecZstd
+  _ -> OcbWriteChunkCodecUnknown (fromIntegral raw)
+
+ocbBodyKindToRaw :: OcbBodyKind -> Int
+ocbBodyKindToRaw = fromIntegral . toOcbBodyKind
+
+ocbBodyKindFromRaw :: Int -> OcbBodyKind
+ocbBodyKindFromRaw = fromOcbBodyKind . fromIntegral
 
 fromOcbBodyKind :: CInt -> OcbBodyKind
 fromOcbBodyKind (CInt raw) = case raw of
@@ -1717,17 +1887,58 @@ fromOcbBodyKind (CInt raw) = case raw of
   12 -> OcbBodyRowGroupIndexDelta
   _ -> OcbBodyKindUnknown (fromIntegral raw)
 
+toOcbBodyKind :: OcbBodyKind -> CInt
+toOcbBodyKind = \case
+  OcbBodyUnknown -> 0
+  OcbBodyRoot -> 1
+  OcbBodySchema -> 2
+  OcbBodyDictionaryIndex -> 3
+  OcbBodyDictionaryValues -> 4
+  OcbBodyRowGroupIndex -> 5
+  OcbBodyOrderingProof -> 6
+  OcbBodyColumnChunk -> 7
+  OcbBodyStringTable -> 8
+  OcbBodyDebugJsonMetadata -> 9
+  OcbBodyValidityBitmap -> 10
+  OcbBodyKeyTuple -> 11
+  OcbBodyRowGroupIndexDelta -> 12
+  OcbBodyKindUnknown raw -> fromIntegral raw
+
+ocbChecksumKindToRaw :: OcbChecksumKind -> Int
+ocbChecksumKindToRaw = fromIntegral . toOcbChecksumKind
+
+ocbChecksumKindFromRaw :: Int -> OcbChecksumKind
+ocbChecksumKindFromRaw = fromOcbChecksumKind . fromIntegral
+
 fromOcbChecksumKind :: CInt -> OcbChecksumKind
 fromOcbChecksumKind (CInt raw) = case raw of
   0 -> OcbChecksumNone
   1 -> OcbChecksumCrc32c
   _ -> OcbChecksumKindUnknown (fromIntegral raw)
 
+toOcbChecksumKind :: OcbChecksumKind -> CInt
+toOcbChecksumKind = \case
+  OcbChecksumNone -> 0
+  OcbChecksumCrc32c -> 1
+  OcbChecksumKindUnknown raw -> fromIntegral raw
+
+ocbChunkSummaryCodecToRaw :: OcbChunkSummaryCodec -> Int
+ocbChunkSummaryCodecToRaw = fromIntegral . toOcbChunkSummaryCodec
+
+ocbChunkSummaryCodecFromRaw :: Int -> OcbChunkSummaryCodec
+ocbChunkSummaryCodecFromRaw = fromOcbChunkSummaryCodec . fromIntegral
+
 fromOcbChunkSummaryCodec :: CInt -> OcbChunkSummaryCodec
 fromOcbChunkSummaryCodec (CInt raw) = case raw of
   0 -> OcbChunkSummaryCodecNone
   1 -> OcbChunkSummaryCodecZstd
   _ -> OcbChunkSummaryCodecUnknown (fromIntegral raw)
+
+toOcbChunkSummaryCodec :: OcbChunkSummaryCodec -> CInt
+toOcbChunkSummaryCodec = \case
+  OcbChunkSummaryCodecNone -> 0
+  OcbChunkSummaryCodecZstd -> 1
+  OcbChunkSummaryCodecUnknown raw -> fromIntegral raw
 
 fromOcbLogicalKind :: CInt -> OcbLogicalKind
 fromOcbLogicalKind (CInt raw) = case raw of

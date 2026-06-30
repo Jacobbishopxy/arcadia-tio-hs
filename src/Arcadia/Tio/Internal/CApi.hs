@@ -351,6 +351,7 @@ module Arcadia.Tio.Internal.CApi
   , capiOcbMetadataFree
   , capiOcbDictionaryValues
   , capiOcbDictionaryValuesFree
+  , capiOcbOpenOptionsInit
   , capiOcbPrimitiveValuesInit
   , capiOcbValidityBitmapInit
   , capiOcbWriteOptionsInit
@@ -371,6 +372,8 @@ module Arcadia.Tio.Internal.CApi
   , capiOcbCleanupOrphanTail
   , capiOcbReadRequestInit
   , capiOcbReadReportInit
+  , capiOcbPredicateValueInit
+  , capiOcbRowGroupPredicateInit
   , capiOcbReadAttributionInit
   , capiOcbReadOutcomeInit
   , capiOcbReadBatches
@@ -378,6 +381,7 @@ module Arcadia.Tio.Internal.CApi
   , capiOcbReadReportFree
   , capiOcbReadAttributionFree
   , capiOcbReadOutcomeFree
+  , capiOcbColumnDescriptorFixedBinaryWidth
   , capiOcbColumnArrayFixedBinaryWidth
   , capiOcbPlanRead
   , capiOcbReadPlanReport
@@ -3792,6 +3796,7 @@ type OcbMetadataFn = Ptr COcbFile -> Ptr CArcadiaTioOcbMetadata -> IO CInt
 type OcbMetadataFreeFn = Ptr CArcadiaTioOcbMetadata -> IO ()
 type OcbDictionaryValuesFn = Ptr COcbFile -> Word32 -> Ptr CArcadiaTioOcbDictionaryValues -> IO CInt
 type OcbDictionaryValuesFreeFn = Ptr CArcadiaTioOcbDictionaryValues -> IO ()
+type OcbOpenOptionsInitFn = Ptr CArcadiaTioOcbOpenOptions -> IO ()
 type OcbPrimitiveValuesInitFn = Ptr CArcadiaTioOcbPrimitiveValues -> IO ()
 type OcbValidityBitmapInitFn = Ptr CArcadiaTioOcbValidityBitmap -> IO ()
 type OcbWriteOptionsInitFn = Ptr CArcadiaTioOcbWriteOptions -> IO ()
@@ -3803,6 +3808,8 @@ type OcbWriteRowGroupInitFn = Ptr CArcadiaTioOcbWriteRowGroup -> IO ()
 type OcbWriteOrderingKeyInitFn = Ptr CArcadiaTioOcbWriteOrderingKey -> IO ()
 type OcbWriteSpecInitFn = Ptr CArcadiaTioOcbWriteSpec -> IO ()
 type OcbCleanupResultInitFn = Ptr CArcadiaTioOcbCleanupResult -> IO ()
+type OcbPredicateValueInitFn = Ptr CArcadiaTioOcbPredicateValue -> IO ()
+type OcbRowGroupPredicateInitFn = Ptr CArcadiaTioOcbRowGroupPredicate -> IO ()
 type OcbWriteColumnSetFixedBinaryWidthFn = Ptr CArcadiaTioOcbWriteColumn -> Word32 -> IO ()
 type OcbWriteColumnFixedBinaryWidthFn = Ptr CArcadiaTioOcbWriteColumn -> IO Word32
 type OcbCreateFn = CString -> Ptr CArcadiaTioOcbWriteSpec -> IO CInt
@@ -3819,6 +3826,7 @@ type OcbReadBatchesWithAttributionFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadReq
 type OcbReadReportFreeFn = Ptr CArcadiaTioOcbReadReport -> IO ()
 type OcbReadAttributionFreeFn = Ptr CArcadiaTioOcbReadAttribution -> IO ()
 type OcbReadOutcomeFreeFn = Ptr CArcadiaTioOcbReadOutcome -> IO ()
+type OcbColumnDescriptorFixedBinaryWidthFn = Ptr CArcadiaTioOcbColumnDescriptor -> IO Word32
 type OcbColumnArrayFixedBinaryWidthFn = Ptr CArcadiaTioOcbColumnArray -> IO Word32
 type OcbPlanReadFn = Ptr COcbFile -> Ptr CArcadiaTioOcbReadRequest -> Ptr (Ptr COcbReadPlan) -> IO CInt
 type OcbReadPlanReportFn = Ptr COcbReadPlan -> Ptr CArcadiaTioOcbReadReport -> IO CInt
@@ -3980,6 +3988,7 @@ foreign import ccall safe "dynamic" mkOcbMetadata :: FunPtr OcbMetadataFn -> Ocb
 foreign import ccall safe "dynamic" mkOcbMetadataFree :: FunPtr OcbMetadataFreeFn -> OcbMetadataFreeFn
 foreign import ccall safe "dynamic" mkOcbDictionaryValues :: FunPtr OcbDictionaryValuesFn -> OcbDictionaryValuesFn
 foreign import ccall safe "dynamic" mkOcbDictionaryValuesFree :: FunPtr OcbDictionaryValuesFreeFn -> OcbDictionaryValuesFreeFn
+foreign import ccall safe "dynamic" mkOcbOpenOptionsInit :: FunPtr OcbOpenOptionsInitFn -> OcbOpenOptionsInitFn
 foreign import ccall safe "dynamic" mkOcbPrimitiveValuesInit :: FunPtr OcbPrimitiveValuesInitFn -> OcbPrimitiveValuesInitFn
 foreign import ccall safe "dynamic" mkOcbValidityBitmapInit :: FunPtr OcbValidityBitmapInitFn -> OcbValidityBitmapInitFn
 foreign import ccall safe "dynamic" mkOcbWriteOptionsInit :: FunPtr OcbWriteOptionsInitFn -> OcbWriteOptionsInitFn
@@ -3991,6 +4000,8 @@ foreign import ccall safe "dynamic" mkOcbWriteRowGroupInit :: FunPtr OcbWriteRow
 foreign import ccall safe "dynamic" mkOcbWriteOrderingKeyInit :: FunPtr OcbWriteOrderingKeyInitFn -> OcbWriteOrderingKeyInitFn
 foreign import ccall safe "dynamic" mkOcbWriteSpecInit :: FunPtr OcbWriteSpecInitFn -> OcbWriteSpecInitFn
 foreign import ccall safe "dynamic" mkOcbCleanupResultInit :: FunPtr OcbCleanupResultInitFn -> OcbCleanupResultInitFn
+foreign import ccall safe "dynamic" mkOcbPredicateValueInit :: FunPtr OcbPredicateValueInitFn -> OcbPredicateValueInitFn
+foreign import ccall safe "dynamic" mkOcbRowGroupPredicateInit :: FunPtr OcbRowGroupPredicateInitFn -> OcbRowGroupPredicateInitFn
 foreign import ccall safe "dynamic" mkOcbWriteColumnSetFixedBinaryWidth :: FunPtr OcbWriteColumnSetFixedBinaryWidthFn -> OcbWriteColumnSetFixedBinaryWidthFn
 foreign import ccall safe "dynamic" mkOcbWriteColumnFixedBinaryWidth :: FunPtr OcbWriteColumnFixedBinaryWidthFn -> OcbWriteColumnFixedBinaryWidthFn
 foreign import ccall safe "dynamic" mkOcbCreate :: FunPtr OcbCreateFn -> OcbCreateFn
@@ -4007,6 +4018,7 @@ foreign import ccall safe "dynamic" mkOcbReadBatchesWithAttribution :: FunPtr Oc
 foreign import ccall safe "dynamic" mkOcbReadReportFree :: FunPtr OcbReadReportFreeFn -> OcbReadReportFreeFn
 foreign import ccall safe "dynamic" mkOcbReadAttributionFree :: FunPtr OcbReadAttributionFreeFn -> OcbReadAttributionFreeFn
 foreign import ccall safe "dynamic" mkOcbReadOutcomeFree :: FunPtr OcbReadOutcomeFreeFn -> OcbReadOutcomeFreeFn
+foreign import ccall safe "dynamic" mkOcbColumnDescriptorFixedBinaryWidth :: FunPtr OcbColumnDescriptorFixedBinaryWidthFn -> OcbColumnDescriptorFixedBinaryWidthFn
 foreign import ccall safe "dynamic" mkOcbColumnArrayFixedBinaryWidth :: FunPtr OcbColumnArrayFixedBinaryWidthFn -> OcbColumnArrayFixedBinaryWidthFn
 foreign import ccall safe "dynamic" mkOcbPlanRead :: FunPtr OcbPlanReadFn -> OcbPlanReadFn
 foreign import ccall safe "dynamic" mkOcbReadPlanReport :: FunPtr OcbReadPlanReportFn -> OcbReadPlanReportFn
@@ -4175,6 +4187,7 @@ data NativeLibrary = NativeLibrary
   , nativeOcbMetadataFree :: OcbMetadataFreeFn
   , nativeOcbDictionaryValues :: OcbDictionaryValuesFn
   , nativeOcbDictionaryValuesFree :: OcbDictionaryValuesFreeFn
+  , nativeOcbOpenOptionsInit :: OcbOpenOptionsInitFn
   , nativeOcbPrimitiveValuesInit :: OcbPrimitiveValuesInitFn
   , nativeOcbValidityBitmapInit :: OcbValidityBitmapInitFn
   , nativeOcbWriteOptionsInit :: OcbWriteOptionsInitFn
@@ -4186,6 +4199,8 @@ data NativeLibrary = NativeLibrary
   , nativeOcbWriteOrderingKeyInit :: OcbWriteOrderingKeyInitFn
   , nativeOcbWriteSpecInit :: OcbWriteSpecInitFn
   , nativeOcbCleanupResultInit :: OcbCleanupResultInitFn
+  , nativeOcbPredicateValueInit :: OcbPredicateValueInitFn
+  , nativeOcbRowGroupPredicateInit :: OcbRowGroupPredicateInitFn
   , nativeOcbWriteColumnSetFixedBinaryWidth :: OcbWriteColumnSetFixedBinaryWidthFn
   , nativeOcbWriteColumnFixedBinaryWidth :: OcbWriteColumnFixedBinaryWidthFn
   , nativeOcbCreate :: OcbCreateFn
@@ -4202,6 +4217,7 @@ data NativeLibrary = NativeLibrary
   , nativeOcbReadReportFree :: OcbReadReportFreeFn
   , nativeOcbReadAttributionFree :: OcbReadAttributionFreeFn
   , nativeOcbReadOutcomeFree :: OcbReadOutcomeFreeFn
+  , nativeOcbColumnDescriptorFixedBinaryWidth :: OcbColumnDescriptorFixedBinaryWidthFn
   , nativeOcbColumnArrayFixedBinaryWidth :: OcbColumnArrayFixedBinaryWidthFn
   , nativeOcbPlanRead :: OcbPlanReadFn
   , nativeOcbReadPlanReport :: OcbReadPlanReportFn
@@ -4425,6 +4441,7 @@ loadUnchecked path = do
   nativeOcbMetadataFree <- mkOcbMetadataFree <$> dlsym dl "arcadia_tio_ocb_metadata_free"
   nativeOcbDictionaryValues <- mkOcbDictionaryValues <$> dlsym dl "arcadia_tio_ocb_dictionary_values"
   nativeOcbDictionaryValuesFree <- mkOcbDictionaryValuesFree <$> dlsym dl "arcadia_tio_ocb_dictionary_values_free"
+  nativeOcbOpenOptionsInit <- mkOcbOpenOptionsInit <$> dlsym dl "arcadia_tio_ocb_open_options_init"
   nativeOcbPrimitiveValuesInit <- mkOcbPrimitiveValuesInit <$> dlsym dl "arcadia_tio_ocb_primitive_values_init"
   nativeOcbValidityBitmapInit <- mkOcbValidityBitmapInit <$> dlsym dl "arcadia_tio_ocb_validity_bitmap_init"
   nativeOcbWriteOptionsInit <- mkOcbWriteOptionsInit <$> dlsym dl "arcadia_tio_ocb_write_options_init"
@@ -4436,6 +4453,8 @@ loadUnchecked path = do
   nativeOcbWriteOrderingKeyInit <- mkOcbWriteOrderingKeyInit <$> dlsym dl "arcadia_tio_ocb_write_ordering_key_init"
   nativeOcbWriteSpecInit <- mkOcbWriteSpecInit <$> dlsym dl "arcadia_tio_ocb_write_spec_init"
   nativeOcbCleanupResultInit <- mkOcbCleanupResultInit <$> dlsym dl "arcadia_tio_ocb_cleanup_result_init"
+  nativeOcbPredicateValueInit <- mkOcbPredicateValueInit <$> dlsym dl "arcadia_tio_ocb_predicate_value_init"
+  nativeOcbRowGroupPredicateInit <- mkOcbRowGroupPredicateInit <$> dlsym dl "arcadia_tio_ocb_row_group_predicate_init"
   nativeOcbWriteColumnSetFixedBinaryWidth <- mkOcbWriteColumnSetFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_write_column_set_fixed_binary_width"
   nativeOcbWriteColumnFixedBinaryWidth <- mkOcbWriteColumnFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_write_column_fixed_binary_width"
   nativeOcbCreate <- mkOcbCreate <$> dlsym dl "arcadia_tio_ocb_create"
@@ -4452,6 +4471,7 @@ loadUnchecked path = do
   nativeOcbReadReportFree <- mkOcbReadReportFree <$> dlsym dl "arcadia_tio_ocb_read_report_free"
   nativeOcbReadAttributionFree <- mkOcbReadAttributionFree <$> dlsym dl "arcadia_tio_ocb_read_attribution_free"
   nativeOcbReadOutcomeFree <- mkOcbReadOutcomeFree <$> dlsym dl "arcadia_tio_ocb_read_outcome_free"
+  nativeOcbColumnDescriptorFixedBinaryWidth <- mkOcbColumnDescriptorFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_column_descriptor_fixed_binary_width"
   nativeOcbColumnArrayFixedBinaryWidth <- mkOcbColumnArrayFixedBinaryWidth <$> dlsym dl "arcadia_tio_ocb_column_array_fixed_binary_width"
   nativeOcbPlanRead <- mkOcbPlanRead <$> dlsym dl "arcadia_tio_ocb_plan_read"
   nativeOcbReadPlanReport <- mkOcbReadPlanReport <$> dlsym dl "arcadia_tio_ocb_read_plan_report"
@@ -4619,6 +4639,7 @@ loadUnchecked path = do
       , nativeOcbMetadataFree
       , nativeOcbDictionaryValues
       , nativeOcbDictionaryValuesFree
+      , nativeOcbOpenOptionsInit
       , nativeOcbPrimitiveValuesInit
       , nativeOcbValidityBitmapInit
       , nativeOcbWriteOptionsInit
@@ -4630,6 +4651,8 @@ loadUnchecked path = do
       , nativeOcbWriteOrderingKeyInit
       , nativeOcbWriteSpecInit
       , nativeOcbCleanupResultInit
+      , nativeOcbPredicateValueInit
+      , nativeOcbRowGroupPredicateInit
       , nativeOcbWriteColumnSetFixedBinaryWidth
       , nativeOcbWriteColumnFixedBinaryWidth
       , nativeOcbCreate
@@ -4646,6 +4669,7 @@ loadUnchecked path = do
       , nativeOcbReadReportFree
       , nativeOcbReadAttributionFree
       , nativeOcbReadOutcomeFree
+      , nativeOcbColumnDescriptorFixedBinaryWidth
       , nativeOcbColumnArrayFixedBinaryWidth
       , nativeOcbPlanRead
       , nativeOcbReadPlanReport
@@ -5126,6 +5150,8 @@ capiOcbDictionaryValues NativeLibrary{nativeOcbDictionaryValues} = nativeOcbDict
 capiOcbDictionaryValuesFree :: NativeLibrary -> OcbDictionaryValuesFreeFn
 capiOcbDictionaryValuesFree NativeLibrary{nativeOcbDictionaryValuesFree} = nativeOcbDictionaryValuesFree
 
+capiOcbOpenOptionsInit :: NativeLibrary -> OcbOpenOptionsInitFn
+capiOcbOpenOptionsInit NativeLibrary{nativeOcbOpenOptionsInit} = nativeOcbOpenOptionsInit
 
 capiOcbPrimitiveValuesInit :: NativeLibrary -> OcbPrimitiveValuesInitFn
 capiOcbPrimitiveValuesInit NativeLibrary{nativeOcbPrimitiveValuesInit} = nativeOcbPrimitiveValuesInit
@@ -5159,6 +5185,12 @@ capiOcbWriteSpecInit NativeLibrary{nativeOcbWriteSpecInit} = nativeOcbWriteSpecI
 
 capiOcbCleanupResultInit :: NativeLibrary -> OcbCleanupResultInitFn
 capiOcbCleanupResultInit NativeLibrary{nativeOcbCleanupResultInit} = nativeOcbCleanupResultInit
+
+capiOcbPredicateValueInit :: NativeLibrary -> OcbPredicateValueInitFn
+capiOcbPredicateValueInit NativeLibrary{nativeOcbPredicateValueInit} = nativeOcbPredicateValueInit
+
+capiOcbRowGroupPredicateInit :: NativeLibrary -> OcbRowGroupPredicateInitFn
+capiOcbRowGroupPredicateInit NativeLibrary{nativeOcbRowGroupPredicateInit} = nativeOcbRowGroupPredicateInit
 
 capiOcbWriteColumnSetFixedBinaryWidth :: NativeLibrary -> OcbWriteColumnSetFixedBinaryWidthFn
 capiOcbWriteColumnSetFixedBinaryWidth NativeLibrary{nativeOcbWriteColumnSetFixedBinaryWidth} = nativeOcbWriteColumnSetFixedBinaryWidth
@@ -5207,6 +5239,9 @@ capiOcbReadAttributionFree NativeLibrary{nativeOcbReadAttributionFree} = nativeO
 
 capiOcbReadOutcomeFree :: NativeLibrary -> OcbReadOutcomeFreeFn
 capiOcbReadOutcomeFree NativeLibrary{nativeOcbReadOutcomeFree} = nativeOcbReadOutcomeFree
+
+capiOcbColumnDescriptorFixedBinaryWidth :: NativeLibrary -> OcbColumnDescriptorFixedBinaryWidthFn
+capiOcbColumnDescriptorFixedBinaryWidth NativeLibrary{nativeOcbColumnDescriptorFixedBinaryWidth} = nativeOcbColumnDescriptorFixedBinaryWidth
 
 capiOcbColumnArrayFixedBinaryWidth :: NativeLibrary -> OcbColumnArrayFixedBinaryWidthFn
 capiOcbColumnArrayFixedBinaryWidth NativeLibrary{nativeOcbColumnArrayFixedBinaryWidth} = nativeOcbColumnArrayFixedBinaryWidth

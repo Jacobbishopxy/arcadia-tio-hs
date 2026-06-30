@@ -9,7 +9,7 @@ import qualified Data.Vector.Storable as VS
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Marshal.Array (withArray)
 import Foreign.Ptr (nullPtr)
-import Foreign.Storable (peek, sizeOf)
+import Foreign.Storable (peek, poke, sizeOf)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory, removeFile)
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
@@ -23,6 +23,7 @@ import qualified Arcadia.Tio.Ocb as Ocb
 main :: IO ()
 main = do
   testOcbWriteValidationPure
+  testOcbEnumConversionsPure
   testCoordinateEnumConversionsPure
   testNonOcbEnumPolicyConversionsPure
   configured <- nativeLibraryConfigured
@@ -82,6 +83,35 @@ testCoordinateEnumConversionsPure = do
   assertEqual "coordinate key domain raw-time raw" 7 (coordinateKeyDomainV2ToRaw CoordinateKeyRawTime)
   assertEqual "coordinate lookup error raw" 7 (coordinateLookupResultStatusV2ToRaw CoordinateLookupErrorV2)
   assertEqual "coordinate index use future raw preserved" 123 (coordinateIndexUseV2ToRaw (coordinateIndexUseV2FromRaw 123))
+
+testOcbEnumConversionsPure :: IO ()
+testOcbEnumConversionsPure = do
+  assertEqual "OCB open validation full payload raw" 1 (Ocb.ocbOpenValidationToRaw Ocb.OcbOpenValidationFullPayload)
+  assertEqual "OCB open validation unknown preserved" 42 (Ocb.ocbOpenValidationToRaw (Ocb.ocbOpenValidationFromRaw 42))
+  assertEqual "OCB error IO raw" 5 (Ocb.ocbErrorKindToRaw Ocb.OcbErrorKindIo)
+  assertEqual "OCB error unknown preserved" 43 (Ocb.ocbErrorKindToRaw (Ocb.ocbErrorKindFromRaw 43))
+  assertEqual "OCB failure corrupt raw" 3 (Ocb.ocbFailureCauseToRaw Ocb.OcbFailureCauseCorruptFile)
+  assertEqual "OCB failure unknown preserved" 44 (Ocb.ocbFailureCauseToRaw (Ocb.ocbFailureCauseFromRaw 44))
+  assertEqual "OCB physical fixed-binary raw" 4 (Ocb.ocbPhysicalTypeToRaw Ocb.OcbPhysicalFixedBinary)
+  assertEqual "OCB physical unknown preserved" 45 (Ocb.ocbPhysicalTypeToRaw (Ocb.ocbPhysicalTypeFromRaw 45))
+  assertEqual "OCB logical opaque key raw" 5 (Ocb.ocbLogicalKindToRaw Ocb.OcbLogicalOpaqueKey)
+  assertEqual "OCB logical unknown preserved" 46 (Ocb.ocbLogicalKindToRaw (Ocb.ocbLogicalKindFromRaw 46))
+  assertEqual "OCB dictionary enum labels raw" 3 (Ocb.ocbDictionaryValueKindToRaw Ocb.OcbDictionaryEnumLabels)
+  assertEqual "OCB dictionary unknown preserved" 47 (Ocb.ocbDictionaryValueKindToRaw (Ocb.ocbDictionaryValueKindFromRaw 47))
+  assertEqual "OCB ordering descending raw" 1 (Ocb.ocbOrderingDirectionToRaw Ocb.OcbOrderingDescending)
+  assertEqual "OCB ordering unknown preserved" 48 (Ocb.ocbOrderingDirectionToRaw (Ocb.ocbOrderingDirectionFromRaw 48))
+  assertEqual "OCB null order no-null raw" 2 (Ocb.ocbNullOrderToRaw Ocb.OcbNoNulls)
+  assertEqual "OCB null order unknown preserved" 49 (Ocb.ocbNullOrderToRaw (Ocb.ocbNullOrderFromRaw 49))
+  assertEqual "OCB projection names raw" 1 (Ocb.ocbProjectionKindToRaw Ocb.OcbProjectionKindNames)
+  assertEqual "OCB projection unknown preserved" 50 (Ocb.ocbProjectionKindToRaw (Ocb.ocbProjectionKindFromRaw 50))
+  assertEqual "OCB body row-group delta raw" 12 (Ocb.ocbBodyKindToRaw Ocb.OcbBodyRowGroupIndexDelta)
+  assertEqual "OCB body unknown preserved" 51 (Ocb.ocbBodyKindToRaw (Ocb.ocbBodyKindFromRaw 51))
+  assertEqual "OCB checksum crc32c raw" 1 (Ocb.ocbChecksumKindToRaw Ocb.OcbChecksumCrc32c)
+  assertEqual "OCB checksum unknown preserved" 52 (Ocb.ocbChecksumKindToRaw (Ocb.ocbChecksumKindFromRaw 52))
+  assertEqual "OCB chunk summary zstd raw" 1 (Ocb.ocbChunkSummaryCodecToRaw Ocb.OcbChunkSummaryCodecZstd)
+  assertEqual "OCB chunk summary unknown preserved" 53 (Ocb.ocbChunkSummaryCodecToRaw (Ocb.ocbChunkSummaryCodecFromRaw 53))
+  assertEqual "OCB write chunk none raw" 0 (Ocb.ocbWriteChunkCodecToRaw Ocb.OcbWriteChunkCodecNone)
+  assertEqual "OCB write chunk unknown preserved" 54 (Ocb.ocbWriteChunkCodecToRaw (Ocb.ocbWriteChunkCodecFromRaw 54))
 
 testNonOcbEnumPolicyConversionsPure :: IO ()
 testNonOcbEnumPolicyConversionsPure = do
@@ -889,6 +919,26 @@ testOcbReadBatchesAndAttribution native = do
           0
   fixedWidth <- withArray [fixedBinaryColumn] $ \columnPtr -> C.capiOcbColumnArrayFixedBinaryWidth native columnPtr
   assertEqual "OCB fixed-binary column array width preservation" 7 fixedWidth
+  alloca $ \optionsPtr -> do
+    C.capiOcbOpenOptionsInit native optionsPtr
+    options <- peek optionsPtr
+    assertEqual "OCB open options init struct size" 56 (fromIntegral (C.cOcbOpenOptionsStructSize options) :: Int)
+    assertEqual "OCB open options init validation" 0 (fromIntegral (C.cOcbOpenOptionsValidation options) :: Int)
+  alloca $ \predicateValuePtr -> do
+    C.capiOcbPredicateValueInit native predicateValuePtr
+    predicateValue <- peek predicateValuePtr
+    assertEqual "OCB predicate value init struct size" 72 (fromIntegral (C.cOcbPredicateValueStructSize predicateValue) :: Int)
+    assertEqual "OCB predicate value init physical" 0 (fromIntegral (C.cOcbPredicateValuePhysicalType predicateValue) :: Int)
+  alloca $ \predicatePtr -> do
+    C.capiOcbRowGroupPredicateInit native predicatePtr
+    predicate <- peek predicatePtr
+    assertEqual "OCB row-group predicate init struct size" 208 (fromIntegral (C.cOcbRowGroupPredicateStructSize predicate) :: Int)
+    assertEqual "OCB row-group predicate init lower" 0 (fromIntegral (C.cOcbRowGroupPredicateHasLower predicate) :: Int)
+    assertEqual "OCB row-group predicate init upper" 0 (fromIntegral (C.cOcbRowGroupPredicateHasUpper predicate) :: Int)
+  alloca $ \descriptorPtr -> do
+    poke descriptorPtr (C.CArcadiaTioOcbColumnDescriptor 1 80 0 nullPtr 0 0 0 0 0 0)
+    descriptorWidth <- C.capiOcbColumnDescriptorFixedBinaryWidth native descriptorPtr
+    assertEqual "OCB non-fixed descriptor width" 0 descriptorWidth
   alloca $ \requestPtr -> do
     C.capiOcbReadRequestInit native requestPtr
     request <- peek requestPtr
@@ -961,7 +1011,8 @@ testOcbCreateAppendSmoke native = do
   let plainPath = ".test-output" </> "ocb-create-append-smoke.ocb"
       optionsPath = ".test-output" </> "ocb-create-options-smoke.ocb"
       dictionaryPath = ".test-output" </> "ocb-dictionary-smoke.ocb"
-      cleanupBoth = cleanup plainPath >> cleanup optionsPath >> cleanup dictionaryPath
+      fixedPath = ".test-output" </> "ocb-fixed-binary-smoke.ocb"
+      cleanupBoth = cleanup plainPath >> cleanup optionsPath >> cleanup dictionaryPath >> cleanup fixedPath
   cleanupBoth
   (`finally` cleanupBoth) $ do
 
@@ -969,6 +1020,16 @@ testOcbCreateAppendSmoke native = do
     plainFile <- unwrap "OCB open created" =<< Ocb.open native plainPath
     plainMeta <- unwrap "OCB metadata created" =<< Ocb.metadata plainFile
     assertEqual "OCB created row count" 3 (Ocb.ocbRowCount plainMeta)
+    case Ocb.ocbColumns plainMeta of
+      [column] -> do
+        assertEqual "OCB metadata physical raw" 0 (Ocb.ocbPhysicalTypeToRaw (Ocb.ocbColumnPhysicalType column))
+        assertEqual "OCB metadata logical raw" 0 (Ocb.ocbLogicalKindToRaw (Ocb.ocbColumnLogicalKind column))
+      other -> error ("OCB metadata expected one column, got " <> show (length other))
+    case Ocb.ocbOrderingKeys plainMeta of
+      [ordering] -> do
+        assertEqual "OCB metadata ordering raw" 0 (Ocb.ocbOrderingDirectionToRaw (Ocb.ocbOrderingDirection ordering))
+        assertEqual "OCB metadata null-order raw" 2 (Ocb.ocbNullOrderToRaw (Ocb.ocbOrderingNullOrder ordering))
+      other -> error ("OCB metadata expected one ordering key, got " <> show (length other))
     assertOcbReadI32 "OCB created read" [1, 2, 3] plainFile
     Ocb.close plainFile
 
@@ -990,13 +1051,41 @@ testOcbCreateAppendSmoke native = do
     dictionaryFile <- unwrap "OCB open dictionary" =<< Ocb.open native dictionaryPath
     dictionaryMeta <- unwrap "OCB dictionary metadata" =<< Ocb.metadata dictionaryFile
     assertEqual "OCB dictionary descriptor count" 1 (length (Ocb.ocbDictionaries dictionaryMeta))
+    case Ocb.ocbDictionaries dictionaryMeta of
+      [dictionary] -> assertEqual "OCB dictionary metadata value kind raw" 0 (Ocb.ocbDictionaryValueKindToRaw (Ocb.ocbDictionaryValueKind dictionary))
+      other -> error ("OCB dictionary metadata expected one dictionary, got " <> show (length other))
     values <- unwrap "OCB dictionary values" =<< Ocb.dictionaryValues dictionaryFile 1
     assertEqual "OCB dictionary value entries" ["low", "high"] (Ocb.ocbDictionaryStringValues values)
     assertOcbReadI32 "OCB dictionary code read" [0, 0, 1] dictionaryFile
     summaries <- unwrap "OCB dictionary summaries" =<< Ocb.rowGroupSummaries dictionaryFile
     assertEqual "OCB dictionary summary count" 1 (length (Ocb.ocbRowGroupSummaries summaries))
-    assertEqual "OCB dictionary summary chunks" True (not (null (concatMap Ocb.ocbSummaryChunks (Ocb.ocbRowGroupSummaries summaries))))
+    let chunks = concatMap Ocb.ocbSummaryChunks (Ocb.ocbRowGroupSummaries summaries)
+    assertEqual "OCB dictionary summary chunks" True (not (null chunks))
+    case chunks of
+      (chunk:_) -> do
+        assertEqual "OCB chunk summary physical raw" 0 (Ocb.ocbPhysicalTypeToRaw (Ocb.ocbChunkPhysicalType chunk))
+        assertEqual "OCB chunk summary logical raw" 3 (Ocb.ocbLogicalKindToRaw (Ocb.ocbChunkLogicalKind chunk))
+        assertEqual "OCB chunk summary codec raw known" True (Ocb.ocbChunkSummaryCodecToRaw (Ocb.ocbChunkCodec chunk) >= 0)
+        assertEqual "OCB chunk summary value body raw known" True (Ocb.ocbBodyKindToRaw (Ocb.ocbBodyRefKind (Ocb.ocbChunkValueRef chunk)) >= 0)
+        assertEqual "OCB chunk summary checksum raw known" True (Ocb.ocbChecksumKindToRaw (Ocb.ocbBodyRefChecksumKind (Ocb.ocbChunkValueRef chunk)) >= 0)
+      [] -> error "OCB dictionary summaries expected at least one chunk"
     Ocb.close dictionaryFile
+
+    unwrap "OCB fixed-binary create" =<< Ocb.create native fixedPath fixedBinaryWriteSpec
+    fixedFile <- unwrap "OCB fixed-binary open" =<< Ocb.openWithOptions native fixedPath Ocb.defaultOcbOpenOptions{Ocb.ocbOpenValidation = Ocb.OcbOpenValidationFullPayload}
+    fixedMeta <- unwrap "OCB fixed-binary metadata" =<< Ocb.metadata fixedFile
+    case Ocb.ocbColumns fixedMeta of
+      [column] -> do
+        assertEqual "OCB fixed-binary metadata physical" Ocb.OcbPhysicalFixedBinary (Ocb.ocbColumnPhysicalType column)
+        assertEqual "OCB fixed-binary metadata width" 3 (Ocb.ocbColumnFixedBinaryWidth column)
+      other -> error ("OCB fixed-binary metadata expected one column, got " <> show (length other))
+    fixedOutcome <- unwrap "OCB fixed-binary read" =<< Ocb.readBatches fixedFile Ocb.defaultOcbReadRequest
+    case concatMap Ocb.ocbBatchColumns (Ocb.ocbOutcomeBatches fixedOutcome) of
+      [column] -> assertEqual "OCB fixed-binary read bytes" (Ocb.OcbValuesFixedBinary 3 [1,2,3,4,5,6]) (Ocb.ocbArrayValues column)
+      other -> error ("OCB fixed-binary read expected one column, got " <> show (length other))
+    Ocb.close fixedFile
+
+    assertErrorCode "OCB openWithOptions rejects NUL path" ErrorInvalidArgument =<< Ocb.openWithOptions native "bad\0path" Ocb.defaultOcbOpenOptions
 
     withBinaryFile plainPath AppendMode $ \handle -> hPutStr handle "deterministic orphan tail"
     truncated <- unwrap "OCB cleanup orphan tail" =<< Ocb.cleanupOrphanTail native plainPath
@@ -1006,6 +1095,25 @@ testOcbCreateAppendSmoke native = do
     Ocb.close cleanedFile
     cleanNoop <- unwrap "OCB cleanup clean no-op" =<< Ocb.cleanupOrphanTail native plainPath
     assertEqual "OCB cleanup no-op" False (Ocb.ocbCleanupTruncated cleanNoop)
+
+fixedBinaryWriteSpec :: Ocb.OcbWriteSpec
+fixedBinaryWriteSpec =
+  Ocb.OcbWriteSpec
+    { Ocb.ocbWriteColumns =
+        [ Ocb.OcbWriteColumn
+            { Ocb.ocbWriteColumnName = "blob"
+            , Ocb.ocbWriteColumnPhysicalType = Ocb.OcbPhysicalFixedBinary
+            , Ocb.ocbWriteColumnLogicalKind = Ocb.OcbLogicalOpaqueKey
+            , Ocb.ocbWriteColumnDictionaryId = Nothing
+            , Ocb.ocbWriteColumnScale = 0
+            , Ocb.ocbWriteColumnNullable = False
+            , Ocb.ocbWriteColumnFixedBinaryWidth = Just 3
+            }
+        ]
+    , Ocb.ocbWriteDictionaries = []
+    , Ocb.ocbWriteRowGroups = [Ocb.OcbWriteRowGroup [Ocb.OcbWriteColumnChunk 0 (Ocb.OcbValuesFixedBinary 3 [1,2,3,4,5,6]) Nothing]]
+    , Ocb.ocbWriteOrderingKeys = []
+    }
 
 dictionaryWriteSpec :: Ocb.OcbWriteSpec
 dictionaryWriteSpec =

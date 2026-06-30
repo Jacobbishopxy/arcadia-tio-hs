@@ -189,6 +189,19 @@ DEFERRED_TYPE_FRAGMENTS = (
 WRAPPED_OCB_TYPES = {
     "ArcadiaTioOcbFile",
     "ArcadiaTioOcbMetadata",
+    "ArcadiaTioOcbBodyKind",
+    "ArcadiaTioOcbChecksumKind",
+    "ArcadiaTioOcbColumnChunkSummaryCodec",
+    "ArcadiaTioOcbDictionaryValueKind",
+    "ArcadiaTioOcbErrorKind",
+    "ArcadiaTioOcbFailureCause",
+    "ArcadiaTioOcbLogicalKind",
+    "ArcadiaTioOcbNullOrder",
+    "ArcadiaTioOcbOpenValidation",
+    "ArcadiaTioOcbOrderingDirection",
+    "ArcadiaTioOcbPhysicalType",
+    "ArcadiaTioOcbProjectionKind",
+    "ArcadiaTioOcbWriteChunkCodec",
 }
 
 @dataclass(frozen=True)

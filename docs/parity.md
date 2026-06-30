@@ -39,12 +39,12 @@ The checked-in generated item list is [parity-inventory.generated.md](parity-inv
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 347
+- wrapped: 364
 - intentionally not applicable: 24
-- deferred blockers: 33
+- deferred blockers: 16
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 33 remaining deferred blockers are OCB follow-up surfaces and mean the wrapper must not claim broad 100% C ABI/public-surface parity.
+These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 16 remaining deferred blockers are OCB fill/cursor/follow-up surfaces and mean the wrapper must not claim broad 100% C ABI/public-surface parity.
 
 Legend:
 
@@ -88,7 +88,7 @@ Legend:
 | Reform | ✅ | ✅ | `reformTo` and `reformToEx` expose target-layout options, regular-chunked block-shape validation, copied report reason metadata, and native report cleanup. |
 | Diagnostics / precise accounting | ✅ | ✅ | `v4Diagnostics` and `v4DiagnosticsPrecise` expose status-aware report ADTs, byte families, precise-accounting validity/omitted-field details, owned strings, and matching native report frees. |
 | Arrow C Data export | ✅ via C ABI/C++ | ✅ | `readValuesArrow` returns an explicit owned `ArrowCData`; callbacks are released by `releaseArrowCData`/finalizers without exposing raw release functions. |
-| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/options/clone/errors, full copied metadata, dictionary values, read requests/outcomes/attribution, read plans, plan inspection/read-from-plan, generic row-group summaries, validated write-spec ADTs, create/create-with-options, append/append-with-options, fixed-binary width helper coverage, and cleanup-orphan-tail results. OCB cursor callbacks remain blocked until callback/user-data lifetime can be made safe; row-group fill remains blocked until caller-owned buffer shape, fixed-binary byte capacity, and validity ownership validation are represented safely. |
+| OCB open/metadata/read/write | ✅ Rust `format-ocb`, C/C++/Python/public Rust surfaces | ⚠️ partial | `Arcadia.Tio.Ocb` exposes selected-snapshot open/options/clone/errors, exact raw enum/type conversions, native init-helper-backed open/read predicate defaults, full copied metadata including fixed-binary descriptor widths, dictionary values, read requests/outcomes/attribution, read plans, plan inspection/read-from-plan, generic row-group summaries, validated write-spec ADTs, create/create-with-options, append/append-with-options, fixed-binary width helper coverage, and cleanup-orphan-tail results. OCB cursor callbacks remain blocked until callback/user-data lifetime can be made safe; row-group fill remains blocked until caller-owned buffer shape, fixed-binary byte capacity, and validity ownership validation are represented safely. |
 | OCB direct Rust-core reader path | ✅ public Rust `arcadia-tio-ocb-core` | ❌ | Haskell should still use C ABI unless a separate pure Haskell/Rust-core bridge is approved. |
 | Tests without native library | N/A | ✅ skips gracefully | `cabal test all` skips when env vars are absent. |
 | Native `.tio` roundtrip test | ✅ Rust tests | ✅ f32/f64/i32/i64 + sparse + metadata/selectors/dense-mask | Still a focused smoke, not exhaustive parity evidence. |
