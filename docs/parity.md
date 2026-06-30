@@ -32,19 +32,24 @@ ARCADIA_TIO_CAPI_INCLUDE_ROOT=/path/to/arcadia-tio/crates/arcadia-tio-capi/inclu
 
 The current machine inventory reports wrapped items, intentionally
 not-applicable ABI conveniences, deferred blockers, and unknown/unmapped items.
-A passing default run means there are no unknown/unmapped C ABI items; deferred
-blockers remain visible and can be promoted to a hard failure with
-`--fail-on-deferred` when later parity slices are ready for that stricter gate.
-The checked-in generated item list is [parity-inventory.generated.md](parity-inventory.generated.md).
+A passing default run means there are no unknown/unmapped C ABI items; the
+stricter TP-478 final gate also passed with `--fail-on-deferred`. The checked-in
+generated item list is [parity-inventory.generated.md](parity-inventory.generated.md).
 
-Current local header snapshot used while adding this gate:
+TP-478 final audited C ABI/public-wrapper parity gate:
 
 - wrapped: 380
 - intentionally not applicable: 24
 - deferred blockers: 0
 - unknown/unmapped: 0
 
-These counts are an inventory baseline for the frozen C ABI header snapshot, not a packaging, support, deployment, release, performance, or production-readiness statement. Zero deferred blockers in the machine inventory means the currently audited C ABI items are either wrapped or intentionally not applicable to the Haskell wrapper boundary; it does not by itself make a broader product-readiness claim.
+These counts support a narrow 100% parity claim for the current Haskell wrapper
+boundary over the audited frozen C ABI/public wrapper surface: every in-scope C
+ABI item is either wrapped or intentionally not applicable to this
+source-visible wrapper. They are not a packaging, support, deployment, release,
+performance, direct Rust-internal format implementation, or production-readiness
+statement, and they do not claim broader parity with private Rust internals or
+future header snapshots.
 
 Legend:
 
@@ -97,12 +102,15 @@ Legend:
 
 ## Recommended next slices
 
-Before closing a later parity slice, regenerate `docs/parity-inventory.generated.md`, then run the machine inventory with
-`--fail-on-deferred` against the same C ABI headers and resolve any new blockers
-by either adding wrappers or documenting why they are truly not applicable to the
-Haskell C-ABI wrapper boundary.
+Before closing a later parity slice or auditing a new C ABI header snapshot,
+regenerate `docs/parity-inventory.generated.md`, then run the machine inventory
+with `--fail-on-deferred` against the same C ABI headers and resolve any new
+blockers by either adding wrappers or documenting why they are truly not
+applicable to the Haskell C-ABI wrapper boundary.
 
-1. Expand coordinate parity beyond the current partial surface: fixed-text/dictionary append authoring ergonomics and any higher-level index policy helpers beyond the exact raw status/type surfaces.
+1. Improve ergonomics beyond C ABI parity, such as richer coordinate
+   fixed-text/dictionary append authoring helpers and higher-level index-policy
+   conveniences over the exact raw status/type surfaces.
 2. Add CI/hygiene checks once the public repo is ready: `cabal build all`,
    `cabal test all` without native env, and an optional native-library job gated
    by secrets/artifacts.

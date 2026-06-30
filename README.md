@@ -42,8 +42,14 @@ python3 scripts/parity_inventory.py \
   --markdown > docs/parity-inventory.generated.md
 ```
 
-The inventory fails on unknown/unmapped C ABI items by default and leaves known
-deferred blockers visible for follow-up wrapper slices. The current audited snapshot reports 380 wrapped items, 24 intentionally not-applicable items, 0 deferred blockers, and 0 unknown/unmapped items. These are C ABI inventory counts for the frozen header snapshot, not a packaging, support, deployment, release, performance, or production-readiness claim.
+The inventory fails on unknown/unmapped C ABI items by default and can enforce
+zero deferred blockers with `--fail-on-deferred`. The TP-478 final gate passed
+that stricter check against the frozen Arcadia TIO 0.2.0 C ABI header snapshot:
+380 wrapped items, 24 intentionally not-applicable C ABI conveniences, 0
+deferred blockers, and 0 unknown/unmapped items. This is a narrow 100% parity
+claim for the current Haskell wrapper boundary over the audited C ABI/public
+wrapper surface only. It is not a packaging, support, deployment, release,
+performance, direct Rust-internal implementation, or production-readiness claim.
 
 ## Current scope
 
