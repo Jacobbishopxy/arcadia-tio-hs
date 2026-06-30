@@ -23,6 +23,7 @@ import qualified Arcadia.Tio.Ocb as Ocb
 main :: IO ()
 main = do
   testOcbWriteValidationPure
+  testCoordinateEnumConversionsPure
   configured <- nativeLibraryConfigured
   unless configured $ do
     putStrLn "SKIP: ARCADIA_TIO_CAPI_LIB or ARCADIA_TIO_CAPI_LIB_DIR is not set"
@@ -52,6 +53,34 @@ main = do
   testOcbCreateAppendSmoke native
 
   putStrLn "PASS: dense .tio lifecycle/read parity smoke through libarcadia_tio_capi.so"
+
+
+testCoordinateEnumConversionsPure :: IO ()
+testCoordinateEnumConversionsPure = do
+  assertEqual "coordinate dtype i64 raw" CoordinateI64 (coordinateDTypeFromRaw 1)
+  assertEqual "coordinate dtype unknown preserved" 99 (coordinateDTypeToRaw (coordinateDTypeFromRaw 99))
+  assertEqual "coordinate kind domain raw" 4 (coordinateKindToRaw CoordinateDomainValue)
+  assertEqual "coordinate encoding epoch ns raw" 6 (coordinateEncodingToRaw CoordinateEncodingEpochNanoseconds)
+  assertEqual "coordinate sortedness unknown preserved" 42 (coordinateSortednessToRaw (coordinateSortednessFromRaw 42))
+  assertEqual "coordinate monotonicity non-increasing raw" 3 (coordinateMonotonicityToRaw CoordinateNonIncreasing)
+  assertEqual "coordinate uniqueness duplicate raw" 2 (coordinateUniquenessToRaw CoordinateHasDuplicates)
+  assertEqual "coordinate storage external raw" 1 (coordinateStorageKindToRaw CoordinateStorageExternal)
+  assertEqual "coordinate source v1 unknown preserved" 4 (coordinateSourceKindToRaw (coordinateSourceKindFromRaw 4))
+  assertEqual "coordinate validation unvalidated raw" 1 (coordinateValidationStatusToRaw CoordinateUnvalidated)
+  assertEqual "coordinate value domain append raw" 3 (coordinateValueDomainV2ToRaw CoordinateV2AppendSequence)
+  assertEqual "coordinate availability unsupported raw" 5 (coordinateAvailabilityV2ToRaw CoordinateUnsupportedV2)
+  assertEqual "coordinate status unsupported index raw" 10 (coordinateStatusCategoryV2ToRaw CoordinateStatusUnsupportedIndexV2)
+  assertEqual "coordinate code dtype u64 raw" 3 (coordinateCodeDTypeV2ToRaw CoordinateCodeU64)
+  assertEqual "coordinate fixed text encoding ascii raw" 0 (coordinateFixedTextEncodingV2ToRaw CoordinateFixedTextAsciiV2)
+  assertEqual "coordinate fixed text padding right-space raw" 0 (coordinateFixedTextPaddingV2ToRaw CoordinateFixedTextRightSpaceV2)
+  assertEqual "coordinate source v2 application registry raw" 4 (coordinateSourceKindV2ToRaw CoordinateSourceV2ApplicationRegistry)
+  assertEqual "coordinate index kind dictionary raw" 2 (coordinateIndexKindV2ToRaw CoordinateIndexDictionaryKeyV2)
+  assertEqual "coordinate index status unsupported raw" 4 (coordinateIndexValidationStatusV2ToRaw CoordinateIndexUnsupportedV2)
+  assertEqual "coordinate index fallback reject raw" 2 (coordinateIndexFallbackV2ToRaw CoordinateIndexFallbackRejectIndexDependentOperationV2)
+  assertEqual "coordinate index use unavailable raw" 3 (coordinateIndexUseV2ToRaw CoordinateIndexUseUnavailableV2)
+  assertEqual "coordinate key domain raw-time raw" 7 (coordinateKeyDomainV2ToRaw CoordinateKeyRawTime)
+  assertEqual "coordinate lookup error raw" 7 (coordinateLookupResultStatusV2ToRaw CoordinateLookupErrorV2)
+  assertEqual "coordinate index use future raw preserved" 123 (coordinateIndexUseV2ToRaw (coordinateIndexUseV2FromRaw 123))
 
 
 testOcbWriteValidationPure :: IO ()
@@ -689,7 +718,22 @@ testCoordinateCreateValidationAndVariants native = do
   v1File <- unwrap "createRandomAccessWithCoordinates" =<< createRandomAccessWithCoordinates native v1Path F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Name = "channel-v1"}]
   v1Meta <- unwrap "v1 random coordinate metadata" =<< coordinateMeta v1File
   assertEqual "v1 random coordinate name" [Just "channel-v1"] (map axisCoordinateMetaName v1Meta)
+  legacyIndex <- unwrap "coordinate index i32" =<< coordinateIndexI32 v1File 1 20
+  assertEqual "coordinate index i32 result" 1 legacyIndex
+  legacyRange <- unwrap "coordinate range i32" =<< coordinateRangeI32 v1File 1 10 20
+  assertEqual "coordinate range i32 result" (0, 2) legacyRange
+  assertErrorCode "coordinate index wrong dtype" ErrorInvalidArgument =<< coordinateIndexI64 v1File 1 20
+  assertErrorCode "coordinate range invalid bounds" ErrorInvalidArgument =<< coordinateRangeI32 v1File 1 30 10
   close v1File
+
+  let i64Path = ".test-output" </> "coordinate-v1-i64-index-range.tio"
+  cleanup i64Path
+  i64File <- unwrap "createRandomAccessWithCoordinates i64" =<< createRandomAccessWithCoordinates native i64Path F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Name = "channel-i64", axisCoordinateInputV2Values = CoordinateV2I64 [100, 200], axisCoordinateInputV2Encoding = CoordinateEncodingEpochNanoseconds}]
+  legacyIndex64 <- unwrap "coordinate index i64" =<< coordinateIndexI64 i64File 1 200
+  assertEqual "coordinate index i64 result" 1 legacyIndex64
+  legacyRange64 <- unwrap "coordinate range i64" =<< coordinateRangeI64 i64File 1 100 200
+  assertEqual "coordinate range i64 result" (0, 2) legacyRange64
+  close i64File
 
   let invalidPath tag = ".test-output" </> ("coordinate-invalid-" <> tag <> ".tio")
   assertErrorCode "coordinate rank validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "rank") F32 [] 0 emptyCreateMetadata [coord] defaultCoordinateV2Options

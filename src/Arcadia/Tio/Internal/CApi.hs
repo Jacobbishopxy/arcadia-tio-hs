@@ -13,6 +13,28 @@ module Arcadia.Tio.Internal.CApi
   , CHandle
   , COcbFile
   , COcbReadPlan
+  , CArcadiaTioCoordinateAvailabilityV2
+  , CArcadiaTioCoordinateCodeDTypeV2
+  , CArcadiaTioCoordinateDType
+  , CArcadiaTioCoordinateEncoding
+  , CArcadiaTioCoordinateFixedTextEncodingV2
+  , CArcadiaTioCoordinateFixedTextPaddingV2
+  , CArcadiaTioCoordinateIndexFallbackV2
+  , CArcadiaTioCoordinateIndexKindV2
+  , CArcadiaTioCoordinateIndexUseV2
+  , CArcadiaTioCoordinateIndexValidationStatusV2
+  , CArcadiaTioCoordinateKeyDomainV2
+  , CArcadiaTioCoordinateKind
+  , CArcadiaTioCoordinateLookupResultStatusV2
+  , CArcadiaTioCoordinateMonotonicity
+  , CArcadiaTioCoordinateSortedness
+  , CArcadiaTioCoordinateSourceKind
+  , CArcadiaTioCoordinateSourceKindV2
+  , CArcadiaTioCoordinateStatusCategoryV2
+  , CArcadiaTioCoordinateStorageKind
+  , CArcadiaTioCoordinateUniqueness
+  , CArcadiaTioCoordinateValidationStatus
+  , CArcadiaTioCoordinateValueDomainV2
   , CArcadiaTioAxisCoordinateInput(..)
   , CArcadiaTioAxisCoordinateMeta(..)
   , CArcadiaTioAxisCoordinateMetaV2(..)
@@ -198,6 +220,10 @@ module Arcadia.Tio.Internal.CApi
   , capiLoadCoordinateMetaV2
   , capiAxisCoordinateMetaV2Free
   , capiReadAxisCoordinates
+  , capiCoordinateIndexI32
+  , capiCoordinateIndexI64
+  , capiCoordinateRangeI32
+  , capiCoordinateRangeI64
   , capiReadAxisCoordinatesV2
   , capiCoordinateValueSliceV2Free
   , capiCoordinateDictionaryV2
@@ -394,6 +420,29 @@ data COcbFile
 -- | Opaque C OCB read plan handle.
 data COcbReadPlan
 
+-- | Raw enum typedef aliases for exact coordinate C ABI discriminants.
+type CArcadiaTioCoordinateAvailabilityV2 = CInt
+type CArcadiaTioCoordinateCodeDTypeV2 = CInt
+type CArcadiaTioCoordinateDType = CInt
+type CArcadiaTioCoordinateEncoding = CInt
+type CArcadiaTioCoordinateFixedTextEncodingV2 = CInt
+type CArcadiaTioCoordinateFixedTextPaddingV2 = CInt
+type CArcadiaTioCoordinateIndexFallbackV2 = CInt
+type CArcadiaTioCoordinateIndexKindV2 = CInt
+type CArcadiaTioCoordinateIndexUseV2 = CInt
+type CArcadiaTioCoordinateIndexValidationStatusV2 = CInt
+type CArcadiaTioCoordinateKeyDomainV2 = CInt
+type CArcadiaTioCoordinateKind = CInt
+type CArcadiaTioCoordinateLookupResultStatusV2 = CInt
+type CArcadiaTioCoordinateMonotonicity = CInt
+type CArcadiaTioCoordinateSortedness = CInt
+type CArcadiaTioCoordinateSourceKind = CInt
+type CArcadiaTioCoordinateSourceKindV2 = CInt
+type CArcadiaTioCoordinateStatusCategoryV2 = CInt
+type CArcadiaTioCoordinateStorageKind = CInt
+type CArcadiaTioCoordinateUniqueness = CInt
+type CArcadiaTioCoordinateValidationStatus = CInt
+type CArcadiaTioCoordinateValueDomainV2 = CInt
 
 -- | Raw Coordinate v1 create input.
 data CArcadiaTioAxisCoordinateInput = CArcadiaTioAxisCoordinateInput
@@ -3610,6 +3659,10 @@ type CoordinateMetaV2Fn = Ptr CHandle -> Ptr (Ptr CArcadiaTioAxisCoordinateMetaV
 type LoadCoordinateMetaV2Fn = CString -> Ptr (Ptr CArcadiaTioAxisCoordinateMetaV2) -> Ptr CSize -> IO CInt
 type AxisCoordinateMetaV2FreeFn = Ptr CArcadiaTioAxisCoordinateMetaV2 -> CSize -> IO ()
 type ReadAxisCoordinatesFn = Ptr CHandle -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type CoordinateIndexI32Fn = Ptr CHandle -> CSize -> Int32 -> Ptr Word32 -> IO CInt
+type CoordinateIndexI64Fn = Ptr CHandle -> CSize -> Int64 -> Ptr Word32 -> IO CInt
+type CoordinateRangeI32Fn = Ptr CHandle -> CSize -> Int32 -> Int32 -> Ptr Word32 -> Ptr Word32 -> IO CInt
+type CoordinateRangeI64Fn = Ptr CHandle -> CSize -> Int64 -> Int64 -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type ReadAxisCoordinatesV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateValueSliceV2 -> IO CInt
 type CoordinateValueSliceV2FreeFn = Ptr CArcadiaTioCoordinateValueSliceV2 -> IO ()
 type CoordinateDictionaryV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateDictionaryV2 -> IO CInt
@@ -3782,6 +3835,10 @@ foreign import ccall safe "dynamic" mkCoordinateMetaV2 :: FunPtr CoordinateMetaV
 foreign import ccall safe "dynamic" mkLoadCoordinateMetaV2 :: FunPtr LoadCoordinateMetaV2Fn -> LoadCoordinateMetaV2Fn
 foreign import ccall safe "dynamic" mkAxisCoordinateMetaV2Free :: FunPtr AxisCoordinateMetaV2FreeFn -> AxisCoordinateMetaV2FreeFn
 foreign import ccall safe "dynamic" mkReadAxisCoordinates :: FunPtr ReadAxisCoordinatesFn -> ReadAxisCoordinatesFn
+foreign import ccall safe "dynamic" mkCoordinateIndexI32 :: FunPtr CoordinateIndexI32Fn -> CoordinateIndexI32Fn
+foreign import ccall safe "dynamic" mkCoordinateIndexI64 :: FunPtr CoordinateIndexI64Fn -> CoordinateIndexI64Fn
+foreign import ccall safe "dynamic" mkCoordinateRangeI32 :: FunPtr CoordinateRangeI32Fn -> CoordinateRangeI32Fn
+foreign import ccall safe "dynamic" mkCoordinateRangeI64 :: FunPtr CoordinateRangeI64Fn -> CoordinateRangeI64Fn
 foreign import ccall safe "dynamic" mkReadAxisCoordinatesV2 :: FunPtr ReadAxisCoordinatesV2Fn -> ReadAxisCoordinatesV2Fn
 foreign import ccall safe "dynamic" mkCoordinateValueSliceV2Free :: FunPtr CoordinateValueSliceV2FreeFn -> CoordinateValueSliceV2FreeFn
 foreign import ccall safe "dynamic" mkCoordinateDictionaryV2 :: FunPtr CoordinateDictionaryV2Fn -> CoordinateDictionaryV2Fn
@@ -3974,6 +4031,10 @@ data NativeLibrary = NativeLibrary
   , nativeLoadCoordinateMetaV2 :: LoadCoordinateMetaV2Fn
   , nativeAxisCoordinateMetaV2Free :: AxisCoordinateMetaV2FreeFn
   , nativeReadAxisCoordinates :: ReadAxisCoordinatesFn
+  , nativeCoordinateIndexI32 :: CoordinateIndexI32Fn
+  , nativeCoordinateIndexI64 :: CoordinateIndexI64Fn
+  , nativeCoordinateRangeI32 :: CoordinateRangeI32Fn
+  , nativeCoordinateRangeI64 :: CoordinateRangeI64Fn
   , nativeReadAxisCoordinatesV2 :: ReadAxisCoordinatesV2Fn
   , nativeCoordinateValueSliceV2Free :: CoordinateValueSliceV2FreeFn
   , nativeCoordinateDictionaryV2 :: CoordinateDictionaryV2Fn
@@ -4220,6 +4281,10 @@ loadUnchecked path = do
   nativeLoadCoordinateMetaV2 <- mkLoadCoordinateMetaV2 <$> dlsym dl "arcadia_tio_load_coordinate_meta_v2"
   nativeAxisCoordinateMetaV2Free <- mkAxisCoordinateMetaV2Free <$> dlsym dl "arcadia_tio_axis_coordinate_meta_v2_free"
   nativeReadAxisCoordinates <- mkReadAxisCoordinates <$> dlsym dl "arcadia_tio_read_axis_coordinates"
+  nativeCoordinateIndexI32 <- mkCoordinateIndexI32 <$> dlsym dl "arcadia_tio_coordinate_index_i32"
+  nativeCoordinateIndexI64 <- mkCoordinateIndexI64 <$> dlsym dl "arcadia_tio_coordinate_index_i64"
+  nativeCoordinateRangeI32 <- mkCoordinateRangeI32 <$> dlsym dl "arcadia_tio_coordinate_range_i32"
+  nativeCoordinateRangeI64 <- mkCoordinateRangeI64 <$> dlsym dl "arcadia_tio_coordinate_range_i64"
   nativeReadAxisCoordinatesV2 <- mkReadAxisCoordinatesV2 <$> dlsym dl "arcadia_tio_read_axis_coordinates_v2"
   nativeCoordinateValueSliceV2Free <- mkCoordinateValueSliceV2Free <$> dlsym dl "arcadia_tio_coordinate_value_slice_v2_free"
   nativeCoordinateDictionaryV2 <- mkCoordinateDictionaryV2 <$> dlsym dl "arcadia_tio_coordinate_dictionary_v2"
@@ -4410,6 +4475,10 @@ loadUnchecked path = do
       , nativeLoadCoordinateMetaV2
       , nativeAxisCoordinateMetaV2Free
       , nativeReadAxisCoordinates
+      , nativeCoordinateIndexI32
+      , nativeCoordinateIndexI64
+      , nativeCoordinateRangeI32
+      , nativeCoordinateRangeI64
       , nativeReadAxisCoordinatesV2
       , nativeCoordinateValueSliceV2Free
       , nativeCoordinateDictionaryV2
@@ -4664,6 +4733,18 @@ capiAxisCoordinateMetaV2Free NativeLibrary{nativeAxisCoordinateMetaV2Free} = nat
 
 capiReadAxisCoordinates :: NativeLibrary -> ReadAxisCoordinatesFn
 capiReadAxisCoordinates NativeLibrary{nativeReadAxisCoordinates} = nativeReadAxisCoordinates
+
+capiCoordinateIndexI32 :: NativeLibrary -> CoordinateIndexI32Fn
+capiCoordinateIndexI32 NativeLibrary{nativeCoordinateIndexI32} = nativeCoordinateIndexI32
+
+capiCoordinateIndexI64 :: NativeLibrary -> CoordinateIndexI64Fn
+capiCoordinateIndexI64 NativeLibrary{nativeCoordinateIndexI64} = nativeCoordinateIndexI64
+
+capiCoordinateRangeI32 :: NativeLibrary -> CoordinateRangeI32Fn
+capiCoordinateRangeI32 NativeLibrary{nativeCoordinateRangeI32} = nativeCoordinateRangeI32
+
+capiCoordinateRangeI64 :: NativeLibrary -> CoordinateRangeI64Fn
+capiCoordinateRangeI64 NativeLibrary{nativeCoordinateRangeI64} = nativeCoordinateRangeI64
 
 capiReadAxisCoordinatesV2 :: NativeLibrary -> ReadAxisCoordinatesV2Fn
 capiReadAxisCoordinatesV2 NativeLibrary{nativeReadAxisCoordinatesV2} = nativeReadAxisCoordinatesV2

@@ -26,6 +26,10 @@ module Arcadia.Tio.TensorFile
   , coordinateMetaV2
   , loadCoordinateMetaV2
   , readAxisCoordinates
+  , coordinateIndexI32
+  , coordinateIndexI64
+  , coordinateRangeI32
+  , coordinateRangeI64
   , readAxisCoordinatesV2
   , coordinateDictionaryV2
   , coordinateLookupV2
@@ -283,6 +287,10 @@ import Arcadia.Tio.Internal.CApi
   , capiLoadCoordinateMetaV2
   , capiAxisCoordinateMetaV2Free
   , capiReadAxisCoordinates
+  , capiCoordinateIndexI32
+  , capiCoordinateIndexI64
+  , capiCoordinateRangeI32
+  , capiCoordinateRangeI64
   , capiReadAxisCoordinatesV2
   , capiCoordinateValueSliceV2Free
   , capiCoordinateDictionaryV2
@@ -518,6 +526,11 @@ import Arcadia.Tio.Types
   , coordinateEncodingToRaw
   , coordinateKindFromRaw
   , coordinateKindToRaw
+  , coordinateIndexFallbackV2FromRaw
+  , coordinateIndexKindV2FromRaw
+  , coordinateIndexUseV2FromRaw
+  , coordinateIndexValidationStatusV2FromRaw
+  , coordinateKeyDomainV2FromRaw
   , coordinateKeyDomainV2ToRaw
   , coordinateLookupResultStatusV2FromRaw
   , coordinateMonotonicityFromRaw
@@ -527,6 +540,7 @@ import Arcadia.Tio.Types
   , coordinateStatusCategoryV2FromRaw
   , coordinateStorageKindFromRaw
   , coordinateSourceKindFromRaw
+  , coordinateSourceKindV2FromRaw
   , coordinateUniquenessFromRaw
   , coordinateUniquenessToRaw
   , coordinateValidationStatusFromRaw
@@ -1939,7 +1953,7 @@ copyExternalBinding CArcadiaTioCoordinateExternalBindingV2{cCoordinateExternalBi
   display <- peekOptionalCString cCoordinateExternalBindingPrivacySafeDisplay
   contentId <- peekOptionalCString cCoordinateExternalBindingContentId
   pure $ Right CoordinateExternalBindingV2
-    { coordinateExternalBindingSourceKind = coordinateSourceKindFromRaw cCoordinateExternalBindingSourceKind
+    { coordinateExternalBindingSourceKind = coordinateSourceKindV2FromRaw cCoordinateExternalBindingSourceKind
     , coordinateExternalBindingLogicalId = logicalId
     , coordinateExternalBindingPrivacySafeDisplay = display
     , coordinateExternalBindingContentId = contentId
@@ -1957,17 +1971,17 @@ copyIndexSummary raw = do
   source <- copyIndexSourceBinding (cCoordinateIndexSummarySourceBinding raw)
   pure $ CoordinateIndexSummaryV2
     <$> pure indexId
-    <*> pure (cintToInt32 (cCoordinateIndexSummaryIndexKind raw))
-    <*> pure (cintToInt32 (cCoordinateIndexSummaryKeyDomain raw))
+    <*> pure (coordinateIndexKindV2FromRaw (cCoordinateIndexSummaryIndexKind raw))
+    <*> pure (coordinateKeyDomainV2FromRaw (cCoordinateIndexSummaryKeyDomain raw))
     <*> source
     <*> pure (coordinateSortednessFromRaw (cCoordinateIndexSummarySorted raw))
     <*> pure (coordinateMonotonicityFromRaw (cCoordinateIndexSummaryMonotonicity raw))
     <*> pure (coordinateUniquenessFromRaw (cCoordinateIndexSummaryUniqueness raw))
     <*> pure (cCoordinateIndexSummaryFormatVersion raw)
     <*> pure (cCoordinateIndexSummaryBuildVersion raw)
-    <*> pure (cintToInt32 (cCoordinateIndexSummaryValidationStatus raw))
-    <*> pure (cintToInt32 (cCoordinateIndexSummaryFallback raw))
-    <*> pure (cintToInt32 (cCoordinateIndexSummarySelectedUse raw))
+    <*> pure (coordinateIndexValidationStatusV2FromRaw (cCoordinateIndexSummaryValidationStatus raw))
+    <*> pure (coordinateIndexFallbackV2FromRaw (cCoordinateIndexSummaryFallback raw))
+    <*> pure (coordinateIndexUseV2FromRaw (cCoordinateIndexSummarySelectedUse raw))
     <*> pure (cCoordinateIndexSummaryRequired raw /= 0)
     <*> pure reason
 
@@ -1988,7 +2002,7 @@ copyIndexSourceBinding raw = do
     , coordinateIndexSourceDictionaryId = dictionaryId
     , coordinateIndexSourceDictionaryRevision = cCoordinateIndexSourceDictionaryRevision raw
     , coordinateIndexSourceDictionaryContentId = dictionaryContentId
-    , coordinateIndexSourceExternalSourceKind = coordinateSourceKindFromRaw (cCoordinateIndexSourceExternalSourceKind raw)
+    , coordinateIndexSourceExternalSourceKind = coordinateSourceKindV2FromRaw (cCoordinateIndexSourceExternalSourceKind raw)
     , coordinateIndexSourceExternalLogicalId = externalLogicalId
     , coordinateIndexSourceExternalContentId = externalContentId
     , coordinateIndexSourceRootId = rootId
@@ -2003,6 +2017,64 @@ readAxisCoordinates :: TensorFile -> Int -> IO (Result SomeTensor)
 readAxisCoordinates file@TensorFile{tensorFileNative} axis
   | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
   | otherwise = readTensor file $ \handle outPtr -> capiReadAxisCoordinates tensorFileNative handle (CSize (fromIntegral axis)) outPtr
+
+-- | Return the unique index for a validated inline i32 coordinate value.
+coordinateIndexI32 :: TensorFile -> Int -> Int32 -> IO (Result Word32)
+coordinateIndexI32 TensorFile{tensorFileNative, tensorFileHandle} axis value
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \outPtr -> do
+          poke outPtr 0
+          status <- capiCoordinateIndexI32 tensorFileNative handle (CSize (fromIntegral axis)) value outPtr
+          if status == okStatus
+            then Right <$> peek outPtr
+            else Left <$> lastError tensorFileNative
+
+-- | Return the unique index for a validated inline i64 coordinate value.
+coordinateIndexI64 :: TensorFile -> Int -> Int64 -> IO (Result Word32)
+coordinateIndexI64 TensorFile{tensorFileNative, tensorFileHandle} axis value
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \outPtr -> do
+          poke outPtr 0
+          status <- capiCoordinateIndexI64 tensorFileNative handle (CSize (fromIntegral axis)) value outPtr
+          if status == okStatus
+            then Right <$> peek outPtr
+            else Left <$> lastError tensorFileNative
+
+-- | Return the half-open index range overlapping an inclusive i32 coordinate interval.
+coordinateRangeI32 :: TensorFile -> Int -> Int32 -> Int32 -> IO (Result (Word32, Word32))
+coordinateRangeI32 TensorFile{tensorFileNative, tensorFileHandle} axis start end
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | start > end = pure (Left (invalidArgument "coordinate range start must be <= end"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \startPtr ->
+          alloca $ \endPtr -> do
+            poke startPtr 0
+            poke endPtr 0
+            status <- capiCoordinateRangeI32 tensorFileNative handle (CSize (fromIntegral axis)) start end startPtr endPtr
+            if status == okStatus
+              then (,) <$> peek startPtr <*> peek endPtr >>= pure . Right
+              else Left <$> lastError tensorFileNative
+
+-- | Return the half-open index range overlapping an inclusive i64 coordinate interval.
+coordinateRangeI64 :: TensorFile -> Int -> Int64 -> Int64 -> IO (Result (Word32, Word32))
+coordinateRangeI64 TensorFile{tensorFileNative, tensorFileHandle} axis start end
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | start > end = pure (Left (invalidArgument "coordinate range start must be <= end"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        alloca $ \startPtr ->
+          alloca $ \endPtr -> do
+            poke startPtr 0
+            poke endPtr 0
+            status <- capiCoordinateRangeI64 tensorFileNative handle (CSize (fromIntegral axis)) start end startPtr endPtr
+            if status == okStatus
+              then (,) <$> peek startPtr <*> peek endPtr >>= pure . Right
+              else Left <$> lastError tensorFileNative
 
 readAxisCoordinatesV2 :: TensorFile -> Int -> CoordinateV2Options -> IO (Result CoordinateValueSliceV2)
 readAxisCoordinatesV2 TensorFile{tensorFileNative, tensorFileHandle} axis options
@@ -2080,9 +2152,6 @@ peekCStringArray :: Ptr CString -> CSize -> IO [String]
 peekCStringArray ptr len
   | ptr == nullPtr || len == 0 = pure []
   | otherwise = mapM peekCString =<< peekArray (fromIntegralCSize len) ptr
-
-cintToInt32 :: CInt -> Int32
-cintToInt32 (CInt raw) = raw
 
 -- | Perform an exact Coordinate v2 lookup and copy the native result carrier.
 coordinateLookupV2 :: TensorFile -> Int -> CoordinateLookupKeyV2 -> CoordinateV2Options -> IO (Result CoordinateLookupResultV2)

@@ -39,12 +39,12 @@ The checked-in generated item list is [parity-inventory.generated.md](parity-inv
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 310
+- wrapped: 336
 - intentionally not applicable: 24
-- deferred blockers: 70
+- deferred blockers: 44
 - unknown/unmapped: 0
 
-These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 70 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
+These counts are an inventory baseline, not a packaging, support, deployment, release, or production-readiness statement. The 44 deferred blockers mean the wrapper must not claim broad 100% C ABI/public-surface parity.
 
 Legend:
 
@@ -79,7 +79,7 @@ Legend:
 | Tensor helper operations | ✅ Rust tensor ops | ❌ | Could add Haskell-owned tensor helpers independent of native ABI. |
 | Sparse-intent append/analyze | ✅ | ✅ | `SparseRule` ADTs plus `analyzeSparseAppend*` / `appendSparse*` wrappers use the C ABI V2 sparse rule and copy native analysis reasons. Direct no-range sparse V2 append C helpers are intentionally not separate Haskell APIs because the range-returning wrappers call the same native inputs and return the assigned `AppendRange`. |
 | Signed integer sparse exact predicates | ✅ | ✅ | `SparsePredicateEqualI32` / `SparsePredicateEqualI64` are exposed and tested through V2 sparse rule calls. |
-| Coordinate metadata/create/read/lookup | ✅ | ⚠️ partial | Coordinate v1/v2 metadata/read/dictionary, v2 lookup/range lookup, coordinate-aware create variants, and append-axis v2 dense append bindings are exposed. Native append-sequence numeric value reads currently report unsupported-domain status; legacy coordinate index/range helpers and richer fixed-text/dictionary authoring remain deferred. |
+| Coordinate metadata/create/read/lookup | ✅ | ⚠️ partial | Coordinate v1/v2 metadata/read/dictionary, v2 lookup/range lookup, legacy coordinate index/range helpers, coordinate-aware create variants, and append-axis v2 dense append bindings are exposed. Native append-sequence numeric value reads currently report unsupported-domain status; richer fixed-text/dictionary authoring remains outside the current safe high-level surface. |
 | Universe-aware authoring/reads | ✅ | ⚠️ partial | Streaming/random-access/policy create with universe axis identities, dense append with universe slot bindings/remaps, UUID/binding/remap ADTs, and explicit-universe shape-policy reads are exposed. No inferred-with-universe C ABI exists. |
 | Commit history: head/list/read-at-commit | ✅ | ✅ | `headCommit`, `listCommits`, full/selector-bearing historical reads, dense variants, and historical option/report variants are exposed. |
 | Revert/pop rollback markers | ✅ | ⚠️ partial | `pop`, `popBatched`, and `revertCommit` wrappers surface native status; broader tests for supported/unsupported layout states remain missing. |
@@ -102,7 +102,7 @@ Before closing a later parity slice, regenerate `docs/parity-inventory.generated
 deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.
 
-1. Expand coordinate parity beyond the current partial surface: legacy coordinate index/range helpers, fixed-text/dictionary append authoring ergonomics, and richer index status typing.
+1. Expand coordinate parity beyond the current partial surface: fixed-text/dictionary append authoring ergonomics and any higher-level index policy helpers beyond the exact raw status/type surfaces.
 2. Expand remaining blocked OCB read-side paths: safe cursor callback lifetime
    handling and safe row-group fill buffer APIs.
 3. Add CI/hygiene checks once the public repo is ready: `cabal build all`,

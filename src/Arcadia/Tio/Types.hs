@@ -116,24 +116,52 @@ module Arcadia.Tio.Types
   , coordinateUniquenessToRaw
   , coordinateUniquenessFromRaw
   , CoordinateStorageKind(..)
+  , coordinateStorageKindToRaw
   , coordinateStorageKindFromRaw
   , CoordinateSourceKind(..)
+  , coordinateSourceKindToRaw
   , coordinateSourceKindFromRaw
   , CoordinateValidationStatus(..)
+  , coordinateValidationStatusToRaw
   , coordinateValidationStatusFromRaw
   , CoordinateValueDomainV2(..)
   , coordinateValueDomainV2ToRaw
   , coordinateValueDomainV2FromRaw
   , CoordinateAvailabilityV2(..)
+  , coordinateAvailabilityV2ToRaw
   , coordinateAvailabilityV2FromRaw
   , CoordinateStatusCategoryV2(..)
+  , coordinateStatusCategoryV2ToRaw
   , coordinateStatusCategoryV2FromRaw
   , CoordinateCodeDTypeV2(..)
+  , coordinateCodeDTypeV2ToRaw
   , coordinateCodeDTypeV2FromRaw
+  , CoordinateFixedTextEncodingV2(..)
+  , coordinateFixedTextEncodingV2ToRaw
+  , coordinateFixedTextEncodingV2FromRaw
+  , CoordinateFixedTextPaddingV2(..)
+  , coordinateFixedTextPaddingV2ToRaw
+  , coordinateFixedTextPaddingV2FromRaw
+  , CoordinateSourceKindV2(..)
+  , coordinateSourceKindV2ToRaw
+  , coordinateSourceKindV2FromRaw
+  , CoordinateIndexKindV2(..)
+  , coordinateIndexKindV2ToRaw
+  , coordinateIndexKindV2FromRaw
+  , CoordinateIndexValidationStatusV2(..)
+  , coordinateIndexValidationStatusV2ToRaw
+  , coordinateIndexValidationStatusV2FromRaw
+  , CoordinateIndexFallbackV2(..)
+  , coordinateIndexFallbackV2ToRaw
+  , coordinateIndexFallbackV2FromRaw
+  , CoordinateIndexUseV2(..)
+  , coordinateIndexUseV2ToRaw
+  , coordinateIndexUseV2FromRaw
   , CoordinateKeyDomainV2(..)
   , coordinateKeyDomainV2ToRaw
   , coordinateKeyDomainV2FromRaw
   , CoordinateLookupResultStatusV2(..)
+  , coordinateLookupResultStatusV2ToRaw
   , coordinateLookupResultStatusV2FromRaw
   , CoordinateLookupKeyV2(..)
   , CoordinateLookupResultV2(..)
@@ -1047,14 +1075,20 @@ coordinateUniquenessFromRaw :: CInt -> CoordinateUniqueness
 coordinateUniquenessFromRaw (CInt raw) = case raw of 0 -> CoordinateUniquenessUnknownStatus; 1 -> CoordinateUnique; 2 -> CoordinateHasDuplicates; _ -> CoordinateUniquenessUnknown raw
 
 data CoordinateStorageKind = CoordinateStorageInline | CoordinateStorageExternal | CoordinateStorageKindUnknown Int32 deriving (Eq, Ord, Show)
+coordinateStorageKindToRaw :: CoordinateStorageKind -> CInt
+coordinateStorageKindToRaw v = CInt $ case v of CoordinateStorageInline -> 0; CoordinateStorageExternal -> 1; CoordinateStorageKindUnknown raw -> raw
 coordinateStorageKindFromRaw :: CInt -> CoordinateStorageKind
 coordinateStorageKindFromRaw (CInt raw) = case raw of 0 -> CoordinateStorageInline; 1 -> CoordinateStorageExternal; _ -> CoordinateStorageKindUnknown raw
 
-data CoordinateSourceKind = CoordinateSourceSameFileObject | CoordinateSourceRelativePath | CoordinateSourceAbsolutePath | CoordinateSourceUri | CoordinateSourceApplicationRegistry | CoordinateSourceKindUnknown Int32 deriving (Eq, Ord, Show)
+data CoordinateSourceKind = CoordinateSourceSameFileObject | CoordinateSourceRelativePath | CoordinateSourceAbsolutePath | CoordinateSourceUri | CoordinateSourceKindUnknown Int32 deriving (Eq, Ord, Show)
+coordinateSourceKindToRaw :: CoordinateSourceKind -> CInt
+coordinateSourceKindToRaw v = CInt $ case v of CoordinateSourceSameFileObject -> 0; CoordinateSourceRelativePath -> 1; CoordinateSourceAbsolutePath -> 2; CoordinateSourceUri -> 3; CoordinateSourceKindUnknown raw -> raw
 coordinateSourceKindFromRaw :: CInt -> CoordinateSourceKind
-coordinateSourceKindFromRaw (CInt raw) = case raw of 0 -> CoordinateSourceSameFileObject; 1 -> CoordinateSourceRelativePath; 2 -> CoordinateSourceAbsolutePath; 3 -> CoordinateSourceUri; 4 -> CoordinateSourceApplicationRegistry; _ -> CoordinateSourceKindUnknown raw
+coordinateSourceKindFromRaw (CInt raw) = case raw of 0 -> CoordinateSourceSameFileObject; 1 -> CoordinateSourceRelativePath; 2 -> CoordinateSourceAbsolutePath; 3 -> CoordinateSourceUri; _ -> CoordinateSourceKindUnknown raw
 
 data CoordinateValidationStatus = CoordinateValidated | CoordinateUnvalidated | CoordinateValidationStatusUnknown Int32 deriving (Eq, Ord, Show)
+coordinateValidationStatusToRaw :: CoordinateValidationStatus -> CInt
+coordinateValidationStatusToRaw v = CInt $ case v of CoordinateValidated -> 0; CoordinateUnvalidated -> 1; CoordinateValidationStatusUnknown raw -> raw
 coordinateValidationStatusFromRaw :: CInt -> CoordinateValidationStatus
 coordinateValidationStatusFromRaw (CInt raw) = case raw of 0 -> CoordinateValidated; 1 -> CoordinateUnvalidated; _ -> CoordinateValidationStatusUnknown raw
 
@@ -1065,16 +1099,64 @@ coordinateValueDomainV2FromRaw :: CInt -> CoordinateValueDomainV2
 coordinateValueDomainV2FromRaw (CInt raw) = case raw of 0 -> CoordinateV2InlineNumeric; 1 -> CoordinateV2FixedText; 2 -> CoordinateV2DictionaryCode; 3 -> CoordinateV2AppendSequence; 4 -> CoordinateV2ExternalReference; _ -> CoordinateValueDomainV2Unknown raw
 
 data CoordinateAvailabilityV2 = CoordinateAvailableV2 | CoordinateAbsentV2 | CoordinateUnknownV2 | CoordinateInvalidV2 | CoordinateUnavailableV2 | CoordinateUnsupportedV2 | CoordinateAvailabilityV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateAvailabilityV2ToRaw :: CoordinateAvailabilityV2 -> CInt
+coordinateAvailabilityV2ToRaw v = CInt $ case v of CoordinateAvailableV2 -> 0; CoordinateAbsentV2 -> 1; CoordinateUnknownV2 -> 2; CoordinateInvalidV2 -> 3; CoordinateUnavailableV2 -> 4; CoordinateUnsupportedV2 -> 5; CoordinateAvailabilityV2Unknown raw -> raw
 coordinateAvailabilityV2FromRaw :: CInt -> CoordinateAvailabilityV2
 coordinateAvailabilityV2FromRaw (CInt raw) = case raw of 0 -> CoordinateAvailableV2; 1 -> CoordinateAbsentV2; 2 -> CoordinateUnknownV2; 3 -> CoordinateInvalidV2; 4 -> CoordinateUnavailableV2; 5 -> CoordinateUnsupportedV2; _ -> CoordinateAvailabilityV2Unknown raw
 
 data CoordinateStatusCategoryV2 = CoordinateStatusOkV2 | CoordinateStatusInvalidArgumentV2 | CoordinateStatusUnsupportedDomainV2 | CoordinateStatusUnknownRequiredVersionV2 | CoordinateStatusRequiredUnavailableV2 | CoordinateStatusStaleExternalBindingV2 | CoordinateStatusDuplicateUniqueLookupV2 | CoordinateStatusLookupDomainMismatchV2 | CoordinateStatusInvalidIndexV2 | CoordinateStatusStaleIndexV2 | CoordinateStatusUnsupportedIndexV2 | CoordinateStatusCategoryV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateStatusCategoryV2ToRaw :: CoordinateStatusCategoryV2 -> CInt
+coordinateStatusCategoryV2ToRaw v = CInt $ case v of CoordinateStatusOkV2 -> 0; CoordinateStatusInvalidArgumentV2 -> 1; CoordinateStatusUnsupportedDomainV2 -> 2; CoordinateStatusUnknownRequiredVersionV2 -> 3; CoordinateStatusRequiredUnavailableV2 -> 4; CoordinateStatusStaleExternalBindingV2 -> 5; CoordinateStatusDuplicateUniqueLookupV2 -> 6; CoordinateStatusLookupDomainMismatchV2 -> 7; CoordinateStatusInvalidIndexV2 -> 8; CoordinateStatusStaleIndexV2 -> 9; CoordinateStatusUnsupportedIndexV2 -> 10; CoordinateStatusCategoryV2Unknown raw -> raw
 coordinateStatusCategoryV2FromRaw :: CInt -> CoordinateStatusCategoryV2
 coordinateStatusCategoryV2FromRaw (CInt raw) = case raw of 0 -> CoordinateStatusOkV2; 1 -> CoordinateStatusInvalidArgumentV2; 2 -> CoordinateStatusUnsupportedDomainV2; 3 -> CoordinateStatusUnknownRequiredVersionV2; 4 -> CoordinateStatusRequiredUnavailableV2; 5 -> CoordinateStatusStaleExternalBindingV2; 6 -> CoordinateStatusDuplicateUniqueLookupV2; 7 -> CoordinateStatusLookupDomainMismatchV2; 8 -> CoordinateStatusInvalidIndexV2; 9 -> CoordinateStatusStaleIndexV2; 10 -> CoordinateStatusUnsupportedIndexV2; _ -> CoordinateStatusCategoryV2Unknown raw
 
 data CoordinateCodeDTypeV2 = CoordinateCodeU8 | CoordinateCodeU16 | CoordinateCodeU32 | CoordinateCodeU64 | CoordinateCodeDTypeV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateCodeDTypeV2ToRaw :: CoordinateCodeDTypeV2 -> CInt
+coordinateCodeDTypeV2ToRaw v = CInt $ case v of CoordinateCodeU8 -> 0; CoordinateCodeU16 -> 1; CoordinateCodeU32 -> 2; CoordinateCodeU64 -> 3; CoordinateCodeDTypeV2Unknown raw -> raw
 coordinateCodeDTypeV2FromRaw :: CInt -> CoordinateCodeDTypeV2
 coordinateCodeDTypeV2FromRaw (CInt raw) = case raw of 0 -> CoordinateCodeU8; 1 -> CoordinateCodeU16; 2 -> CoordinateCodeU32; 3 -> CoordinateCodeU64; _ -> CoordinateCodeDTypeV2Unknown raw
+
+data CoordinateFixedTextEncodingV2 = CoordinateFixedTextAsciiV2 | CoordinateFixedTextEncodingV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateFixedTextEncodingV2ToRaw :: CoordinateFixedTextEncodingV2 -> CInt
+coordinateFixedTextEncodingV2ToRaw v = CInt $ case v of CoordinateFixedTextAsciiV2 -> 0; CoordinateFixedTextEncodingV2Unknown raw -> raw
+coordinateFixedTextEncodingV2FromRaw :: CInt -> CoordinateFixedTextEncodingV2
+coordinateFixedTextEncodingV2FromRaw (CInt raw) = case raw of 0 -> CoordinateFixedTextAsciiV2; _ -> CoordinateFixedTextEncodingV2Unknown raw
+
+data CoordinateFixedTextPaddingV2 = CoordinateFixedTextRightSpaceV2 | CoordinateFixedTextPaddingV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateFixedTextPaddingV2ToRaw :: CoordinateFixedTextPaddingV2 -> CInt
+coordinateFixedTextPaddingV2ToRaw v = CInt $ case v of CoordinateFixedTextRightSpaceV2 -> 0; CoordinateFixedTextPaddingV2Unknown raw -> raw
+coordinateFixedTextPaddingV2FromRaw :: CInt -> CoordinateFixedTextPaddingV2
+coordinateFixedTextPaddingV2FromRaw (CInt raw) = case raw of 0 -> CoordinateFixedTextRightSpaceV2; _ -> CoordinateFixedTextPaddingV2Unknown raw
+
+data CoordinateSourceKindV2 = CoordinateSourceV2SameFileObject | CoordinateSourceV2RelativePath | CoordinateSourceV2AbsolutePath | CoordinateSourceV2Uri | CoordinateSourceV2ApplicationRegistry | CoordinateSourceKindV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateSourceKindV2ToRaw :: CoordinateSourceKindV2 -> CInt
+coordinateSourceKindV2ToRaw v = CInt $ case v of CoordinateSourceV2SameFileObject -> 0; CoordinateSourceV2RelativePath -> 1; CoordinateSourceV2AbsolutePath -> 2; CoordinateSourceV2Uri -> 3; CoordinateSourceV2ApplicationRegistry -> 4; CoordinateSourceKindV2Unknown raw -> raw
+coordinateSourceKindV2FromRaw :: CInt -> CoordinateSourceKindV2
+coordinateSourceKindV2FromRaw (CInt raw) = case raw of 0 -> CoordinateSourceV2SameFileObject; 1 -> CoordinateSourceV2RelativePath; 2 -> CoordinateSourceV2AbsolutePath; 3 -> CoordinateSourceV2Uri; 4 -> CoordinateSourceV2ApplicationRegistry; _ -> CoordinateSourceKindV2Unknown raw
+
+data CoordinateIndexKindV2 = CoordinateIndexExactV2 | CoordinateIndexRangeV2 | CoordinateIndexDictionaryKeyV2 | CoordinateIndexKindV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateIndexKindV2ToRaw :: CoordinateIndexKindV2 -> CInt
+coordinateIndexKindV2ToRaw v = CInt $ case v of CoordinateIndexExactV2 -> 0; CoordinateIndexRangeV2 -> 1; CoordinateIndexDictionaryKeyV2 -> 2; CoordinateIndexKindV2Unknown raw -> raw
+coordinateIndexKindV2FromRaw :: CInt -> CoordinateIndexKindV2
+coordinateIndexKindV2FromRaw (CInt raw) = case raw of 0 -> CoordinateIndexExactV2; 1 -> CoordinateIndexRangeV2; 2 -> CoordinateIndexDictionaryKeyV2; _ -> CoordinateIndexKindV2Unknown raw
+
+data CoordinateIndexValidationStatusV2 = CoordinateIndexValidatedV2 | CoordinateIndexMissingV2 | CoordinateIndexStaleV2 | CoordinateIndexInvalidV2 | CoordinateIndexUnsupportedV2 | CoordinateIndexValidationStatusV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateIndexValidationStatusV2ToRaw :: CoordinateIndexValidationStatusV2 -> CInt
+coordinateIndexValidationStatusV2ToRaw v = CInt $ case v of CoordinateIndexValidatedV2 -> 0; CoordinateIndexMissingV2 -> 1; CoordinateIndexStaleV2 -> 2; CoordinateIndexInvalidV2 -> 3; CoordinateIndexUnsupportedV2 -> 4; CoordinateIndexValidationStatusV2Unknown raw -> raw
+coordinateIndexValidationStatusV2FromRaw :: CInt -> CoordinateIndexValidationStatusV2
+coordinateIndexValidationStatusV2FromRaw (CInt raw) = case raw of 0 -> CoordinateIndexValidatedV2; 1 -> CoordinateIndexMissingV2; 2 -> CoordinateIndexStaleV2; 3 -> CoordinateIndexInvalidV2; 4 -> CoordinateIndexUnsupportedV2; _ -> CoordinateIndexValidationStatusV2Unknown raw
+
+data CoordinateIndexFallbackV2 = CoordinateIndexFallbackAuthoritativeScanV2 | CoordinateIndexFallbackRebuildV2 | CoordinateIndexFallbackRejectIndexDependentOperationV2 | CoordinateIndexFallbackV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateIndexFallbackV2ToRaw :: CoordinateIndexFallbackV2 -> CInt
+coordinateIndexFallbackV2ToRaw v = CInt $ case v of CoordinateIndexFallbackAuthoritativeScanV2 -> 0; CoordinateIndexFallbackRebuildV2 -> 1; CoordinateIndexFallbackRejectIndexDependentOperationV2 -> 2; CoordinateIndexFallbackV2Unknown raw -> raw
+coordinateIndexFallbackV2FromRaw :: CInt -> CoordinateIndexFallbackV2
+coordinateIndexFallbackV2FromRaw (CInt raw) = case raw of 0 -> CoordinateIndexFallbackAuthoritativeScanV2; 1 -> CoordinateIndexFallbackRebuildV2; 2 -> CoordinateIndexFallbackRejectIndexDependentOperationV2; _ -> CoordinateIndexFallbackV2Unknown raw
+
+data CoordinateIndexUseV2 = CoordinateIndexUseIndexV2 | CoordinateIndexUseAuthoritativeScanV2 | CoordinateIndexUseRebuildV2 | CoordinateIndexUseUnavailableV2 | CoordinateIndexUseV2Unknown Int32 deriving (Eq, Ord, Show)
+coordinateIndexUseV2ToRaw :: CoordinateIndexUseV2 -> CInt
+coordinateIndexUseV2ToRaw v = CInt $ case v of CoordinateIndexUseIndexV2 -> 0; CoordinateIndexUseAuthoritativeScanV2 -> 1; CoordinateIndexUseRebuildV2 -> 2; CoordinateIndexUseUnavailableV2 -> 3; CoordinateIndexUseV2Unknown raw -> raw
+coordinateIndexUseV2FromRaw :: CInt -> CoordinateIndexUseV2
+coordinateIndexUseV2FromRaw (CInt raw) = case raw of 0 -> CoordinateIndexUseIndexV2; 1 -> CoordinateIndexUseAuthoritativeScanV2; 2 -> CoordinateIndexUseRebuildV2; 3 -> CoordinateIndexUseUnavailableV2; _ -> CoordinateIndexUseV2Unknown raw
 
 -- | Coordinate lookup key domain values from the C ABI.
 data CoordinateKeyDomainV2
@@ -1125,6 +1207,18 @@ data CoordinateLookupResultStatusV2
   | CoordinateLookupErrorV2
   | CoordinateLookupResultStatusV2Unknown Int32
   deriving (Eq, Ord, Show)
+
+coordinateLookupResultStatusV2ToRaw :: CoordinateLookupResultStatusV2 -> CInt
+coordinateLookupResultStatusV2ToRaw status = CInt $ case status of
+  CoordinateLookupUniqueV2 -> 0
+  CoordinateLookupRangeV2 -> 1
+  CoordinateLookupManyV2 -> 2
+  CoordinateLookupMissingV2 -> 3
+  CoordinateLookupUnavailableV2 -> 4
+  CoordinateLookupDuplicateV2 -> 5
+  CoordinateLookupUnsupportedV2 -> 6
+  CoordinateLookupErrorV2 -> 7
+  CoordinateLookupResultStatusV2Unknown raw -> raw
 
 coordinateLookupResultStatusV2FromRaw :: CInt -> CoordinateLookupResultStatusV2
 coordinateLookupResultStatusV2FromRaw (CInt raw) = case raw of
@@ -1229,7 +1323,7 @@ data CoordinateDictionarySummaryV2 = CoordinateDictionarySummaryV2
   deriving (Eq, Show)
 
 data CoordinateExternalBindingV2 = CoordinateExternalBindingV2
-  { coordinateExternalBindingSourceKind :: CoordinateSourceKind
+  { coordinateExternalBindingSourceKind :: CoordinateSourceKindV2
   , coordinateExternalBindingLogicalId :: Maybe String
   , coordinateExternalBindingPrivacySafeDisplay :: Maybe String
   , coordinateExternalBindingContentId :: Maybe String
@@ -1249,7 +1343,7 @@ data CoordinateIndexSourceBindingV2 = CoordinateIndexSourceBindingV2
   , coordinateIndexSourceDictionaryId :: Maybe String
   , coordinateIndexSourceDictionaryRevision :: Word64
   , coordinateIndexSourceDictionaryContentId :: Maybe String
-  , coordinateIndexSourceExternalSourceKind :: CoordinateSourceKind
+  , coordinateIndexSourceExternalSourceKind :: CoordinateSourceKindV2
   , coordinateIndexSourceExternalLogicalId :: Maybe String
   , coordinateIndexSourceExternalContentId :: Maybe String
   , coordinateIndexSourceRootId :: Maybe String
@@ -1262,17 +1356,17 @@ data CoordinateIndexSourceBindingV2 = CoordinateIndexSourceBindingV2
 
 data CoordinateIndexSummaryV2 = CoordinateIndexSummaryV2
   { coordinateIndexSummaryIndexId :: Maybe String
-  , coordinateIndexSummaryIndexKindRaw :: Int32
-  , coordinateIndexSummaryKeyDomainRaw :: Int32
+  , coordinateIndexSummaryIndexKind :: CoordinateIndexKindV2
+  , coordinateIndexSummaryKeyDomain :: CoordinateKeyDomainV2
   , coordinateIndexSummarySourceBinding :: CoordinateIndexSourceBindingV2
   , coordinateIndexSummarySorted :: CoordinateSortedness
   , coordinateIndexSummaryMonotonicity :: CoordinateMonotonicity
   , coordinateIndexSummaryUniqueness :: CoordinateUniqueness
   , coordinateIndexSummaryFormatVersion :: Word32
   , coordinateIndexSummaryBuildVersion :: Word32
-  , coordinateIndexSummaryValidationStatusRaw :: Int32
-  , coordinateIndexSummaryFallbackRaw :: Int32
-  , coordinateIndexSummarySelectedUseRaw :: Int32
+  , coordinateIndexSummaryValidationStatus :: CoordinateIndexValidationStatusV2
+  , coordinateIndexSummaryFallback :: CoordinateIndexFallbackV2
+  , coordinateIndexSummarySelectedUse :: CoordinateIndexUseV2
   , coordinateIndexSummaryRequired :: Bool
   , coordinateIndexSummaryReason :: Maybe String
   }

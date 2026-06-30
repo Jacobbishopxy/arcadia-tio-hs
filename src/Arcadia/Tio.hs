@@ -49,6 +49,10 @@ module Arcadia.Tio
   , coordinateMetaV2
   , loadCoordinateMetaV2
   , readAxisCoordinates
+  , coordinateIndexI32
+  , coordinateIndexI64
+  , coordinateRangeI32
+  , coordinateRangeI64
   , readAxisCoordinatesV2
   , coordinateDictionaryV2
   , coordinateLookupV2

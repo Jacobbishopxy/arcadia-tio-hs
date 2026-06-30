@@ -8,9 +8,9 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 310 |
+| wrapped | 336 |
 | not-applicable | 24 |
-| deferred-blocker | 70 |
+| deferred-blocker | 44 |
 | unknown-unmapped | 0 |
 | total | 404 |
 
@@ -56,11 +56,15 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_compaction_state` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_dictionary_v2` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_dictionary_v2_free` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_coordinate_index_i32` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_coordinate_index_i64` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_lookup_range_v2` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_lookup_result_v2_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_lookup_v2` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_meta` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_meta_v2` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_coordinate_range_i32` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_coordinate_range_i64` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_coordinate_value_slice_v2_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_create_inferred` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_create_inferred_ex` — resolved by Haskell dynamic-loader surface
@@ -226,16 +230,38 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `type` `ArcadiaTioCompressionCodec` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCompressionConfig` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCompressionMode` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateAvailabilityV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateCodeDTypeV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateDType` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateDictionaryEntryV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateDictionarySummaryV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateDictionaryV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateEncoding` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateExternalBindingV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateFixedTextEncodingV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateFixedTextLayoutV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateFixedTextPaddingV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateIndexFallbackV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateIndexKindV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateIndexSourceBindingV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateIndexSummaryV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateIndexUseV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateIndexValidationStatusV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateKeyDomainV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateKind` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateLookupKeyV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateLookupResultStatusV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateLookupResultV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateMonotonicity` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateSortedness` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateSourceKind` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateSourceKindV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateStatusCategoryV2` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateStorageKind` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateUniqueness` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateV2Options` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateValidationStatus` — represented by Haskell public or raw C wrapper type
+- `type` `ArcadiaTioCoordinateValueDomainV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCoordinateValueSliceV2` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioCreateWithUniverseOptions` — represented by Haskell public or raw C wrapper type
 - `type` `ArcadiaTioDType` — represented by Haskell public or raw C wrapper type
@@ -358,10 +384,6 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 
 ## deferred-blocker items
 
-- `function` `arcadia_tio_coordinate_index_i32` — known C ABI family deferred in parity docs
-- `function` `arcadia_tio_coordinate_index_i64` — known C ABI family deferred in parity docs
-- `function` `arcadia_tio_coordinate_range_i32` — known C ABI family deferred in parity docs
-- `function` `arcadia_tio_coordinate_range_i64` — known C ABI family deferred in parity docs
 - `function` `arcadia_tio_ocb_column_descriptor_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_column_fill_buffer_fixed_binary_width` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_column_fill_buffer_init` — OCB read/write/dictionary/plan surface deferred
@@ -377,28 +399,6 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_ocb_row_group_predicate_init` — OCB read/write/dictionary/plan surface deferred
 - `function` `arcadia_tio_ocb_visit_batches` — OCB read/write/dictionary/plan surface deferred
 - `type` `ArcadiaTioAxisIdentityMode` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateAvailabilityV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateCodeDTypeV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateDType` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateEncoding` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateFixedTextEncodingV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateFixedTextPaddingV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateIndexFallbackV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateIndexKindV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateIndexUseV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateIndexValidationStatusV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateKeyDomainV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateKind` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateLookupResultStatusV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateMonotonicity` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateSortedness` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateSourceKind` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateSourceKindV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateStatusCategoryV2` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateStorageKind` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateUniqueness` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateValidationStatus` — known C ABI type family deferred in parity docs
-- `type` `ArcadiaTioCoordinateValueDomainV2` — known C ABI type family deferred in parity docs
 - `type` `ArcadiaTioHistoricalQuerySourceKind` — known C ABI type family deferred in parity docs
 - `type` `ArcadiaTioOcbBodyKind` — OCB read/write/dictionary/plan type surface deferred
 - `type` `ArcadiaTioOcbChecksumKind` — OCB read/write/dictionary/plan type surface deferred
