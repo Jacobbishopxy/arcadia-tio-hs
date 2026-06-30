@@ -10,6 +10,26 @@ module Arcadia.Tio.TensorFile
   , releaseArrowCData
   , createStreaming
   , createStreamingWithMetadata
+  , createStreamingWithCoordinates
+  , createRandomAccessWithCoordinates
+  , createInferredWithCoordinates
+  , createWithPolicyWithCoordinates
+  , createStreamingWithCoordinatesV2
+  , createRandomAccessWithCoordinatesV2
+  , createInferredWithCoordinatesV2
+  , createWithPolicyWithCoordinatesV2
+  , createStreamingWithUniverse
+  , createRandomAccessWithUniverse
+  , createWithPolicyWithUniverse
+  , coordinateMeta
+  , loadCoordinateMeta
+  , coordinateMetaV2
+  , loadCoordinateMetaV2
+  , readAxisCoordinates
+  , readAxisCoordinatesV2
+  , coordinateDictionaryV2
+  , coordinateLookupV2
+  , coordinateLookupRangeV2
   , createRandomAccess
   , createRandomAccessWithMetadata
   , createInferred
@@ -75,6 +95,16 @@ module Arcadia.Tio.TensorFile
   , appendDenseF64
   , appendDenseI32
   , appendDenseI64
+  , appendDenseWithCoordinatesV2
+  , appendDenseF32WithCoordinatesV2
+  , appendDenseF64WithCoordinatesV2
+  , appendDenseI32WithCoordinatesV2
+  , appendDenseI64WithCoordinatesV2
+  , appendDenseWithUniverse
+  , appendDenseF32WithUniverse
+  , appendDenseF64WithUniverse
+  , appendDenseI32WithUniverse
+  , appendDenseI64WithUniverse
   , readAll
   , readAllAs
   , readAllF32
@@ -120,6 +150,27 @@ import qualified Data.Vector.Storable.Mutable as VSM
 import Arcadia.Tio.Error (Result, invalidArgument)
 import Arcadia.Tio.Internal.CApi
   ( CArcadiaTioAxisLabel(..)
+  , CArcadiaTioAxisCoordinateInput(..)
+  , CArcadiaTioAxisCoordinateMeta(..)
+  , CArcadiaTioAxisCoordinateMetaV2(..)
+  , CArcadiaTioAxisCoordinateInputV2(..)
+  , CArcadiaTioCoordinateFixedTextLayoutV2(..)
+  , CArcadiaTioCoordinateDictionaryEntryV2(..)
+  , CArcadiaTioCoordinateDictionarySummaryV2(..)
+  , CArcadiaTioCoordinateDictionaryV2(..)
+  , CArcadiaTioCoordinateExternalBindingV2(..)
+  , CArcadiaTioCoordinateIndexSourceBindingV2(..)
+  , CArcadiaTioCoordinateIndexSummaryV2(..)
+  , CArcadiaTioCoordinateValueSliceV2(..)
+  , CArcadiaTioCoordinateLookupKeyV2(..)
+  , CArcadiaTioCoordinateLookupResultV2(..)
+  , CArcadiaTioAppendCoordinateEntryV2(..)
+  , CArcadiaTioAppendCoordinateBatchV2(..)
+  , CArcadiaTioCoordinateV2Options(..)
+  , emptyCArcadiaTioCoordinateFixedTextLayoutV2
+  , emptyCArcadiaTioCoordinateV2Options
+  , emptyCArcadiaTioCoordinateLookupKeyV2
+  , emptyCArcadiaTioCoordinateLookupResultV2
   , CArcadiaTioCommitInfo(..)
   , CArcadiaTioCommitList(..)
   , CArcadiaTioAutoCompactionConfig(..)
@@ -131,6 +182,15 @@ import Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompressionConfig(..)
   , CArcadiaTioDimSpec(..)
   , CArcadiaTioEntrySelector(..)
+  , CArcadiaTioExplicitUniverseAxisTarget(..)
+  , CArcadiaTioAxisIdentityInput(..)
+  , CArcadiaTioUniverseBindingInput(..)
+  , CArcadiaTioSlotUniverseBindingInput(..)
+  , CArcadiaTioUniverseRemapInput(..)
+  , CArcadiaTioSlotUniverseRemapInput(..)
+  , CArcadiaTioCreateWithUniverseOptions(..)
+  , CArcadiaTioAppendWithUniverseOptions(..)
+  , CArcadiaTioExplicitExtentAxisTarget(..)
   , CArcadiaTioReadShapePolicyOptions(..)
   , CArcadiaTioReadWithShapePolicyOptions(..)
   , CArcadiaTioReadWithOptionsOptions(..)
@@ -174,6 +234,9 @@ import Arcadia.Tio.Internal.CApi
   , capiCompactTo
   , capiCompactionState
   , capiCreateRandomAccess
+  , capiCreateRandomAccessWithUniverse
+  , capiCreateStreamingWithUniverse
+  , capiCreateWithPolicyWithUniverse
   , capiCreateInferred
   , capiCreateInferredEx
   , capiCreateRandomAccessEx
@@ -181,6 +244,36 @@ import Arcadia.Tio.Internal.CApi
   , capiCreateStreamingEx
   , capiCreateWithPolicy
   , capiCreateWithPolicyEx
+  , capiCreateWithPolicyWithCoordinates
+  , capiCreateInferredWithCoordinates
+  , capiCreateRandomAccessWithCoordinates
+  , capiCreateStreamingWithCoordinates
+  , capiCreateWithPolicyWithCoordinatesV2
+  , capiCreateInferredWithCoordinatesV2
+  , capiCreateRandomAccessWithCoordinatesV2
+  , capiCreateStreamingWithCoordinatesV2
+  , capiCoordinateMeta
+  , capiLoadCoordinateMeta
+  , capiAxisCoordinateMetaFree
+  , capiCoordinateMetaV2
+  , capiLoadCoordinateMetaV2
+  , capiAxisCoordinateMetaV2Free
+  , capiReadAxisCoordinates
+  , capiReadAxisCoordinatesV2
+  , capiCoordinateValueSliceV2Free
+  , capiCoordinateDictionaryV2
+  , capiCoordinateDictionaryV2Free
+  , capiCoordinateLookupV2
+  , capiCoordinateLookupRangeV2
+  , capiCoordinateLookupResultV2Free
+  , capiAppendF32WithCoordinatesV2
+  , capiAppendF64WithCoordinatesV2
+  , capiAppendI32WithCoordinatesV2
+  , capiAppendI64WithCoordinatesV2
+  , capiAppendF32WithUniverse
+  , capiAppendF64WithUniverse
+  , capiAppendI32WithUniverse
+  , capiAppendI64WithUniverse
   , capiDType
   , capiDimLens
   , capiFileMetaFree
@@ -274,6 +367,17 @@ import Arcadia.Tio.Types
   , DType(..)
   , DimMeta(..)
   , EntrySelector(..)
+  , TioUuid(..)
+  , AxisIdentityMode(..)
+  , AxisIdentityInput(..)
+  , UniverseBindingInput(..)
+  , SlotUniverseBindingInput(..)
+  , UniverseRemapInput(..)
+  , SlotUniverseRemapInput(..)
+  , CreateWithUniverseOptions(..)
+  , AppendWithUniverseOptions(..)
+  , ExplicitUniverseAxisTarget(..)
+  , ExplicitExtentAxisTarget(..)
   , ReadExecutionMode(..)
   , ReadOptions(..)
   , ReadShapePolicy(..)
@@ -317,6 +421,47 @@ import Arcadia.Tio.Types
   , dtypeFromRaw
   , dtypeSizeBytes
   , dtypeToRaw
+  , AxisCoordinateInputV2(..)
+  , AxisCoordinateMeta(..)
+  , AxisCoordinateMetaV2(..)
+  , CoordinateDType(..)
+  , CoordinateDictionaryEntryV2(..)
+  , CoordinateDictionarySummaryV2(..)
+  , CoordinateDictionaryV2(..)
+  , CoordinateExternalBindingV2(..)
+  , CoordinateIndexSourceBindingV2(..)
+  , CoordinateIndexSummaryV2(..)
+  , CoordinateV2Options(..)
+  , CoordinateV2Values(..)
+  , AppendCoordinateEntryV2(..)
+  , CoordinateKeyDomainV2(..)
+  , CoordinateLookupKeyV2(..)
+  , CoordinateLookupResultV2(..)
+  , CoordinateLookupResultStatusV2(..)
+  , CoordinateValueDomainV2(..)
+  , CoordinateValueSliceV2(..)
+  , coordinateAvailabilityV2FromRaw
+  , coordinateCodeDTypeV2FromRaw
+  , coordinateDTypeFromRaw
+  , coordinateDTypeToRaw
+  , coordinateEncodingFromRaw
+  , coordinateEncodingToRaw
+  , coordinateKindFromRaw
+  , coordinateKindToRaw
+  , coordinateKeyDomainV2ToRaw
+  , coordinateLookupResultStatusV2FromRaw
+  , coordinateMonotonicityFromRaw
+  , coordinateMonotonicityToRaw
+  , coordinateSortednessFromRaw
+  , coordinateSortednessToRaw
+  , coordinateStatusCategoryV2FromRaw
+  , coordinateStorageKindFromRaw
+  , coordinateSourceKindFromRaw
+  , coordinateUniquenessFromRaw
+  , coordinateUniquenessToRaw
+  , coordinateValidationStatusFromRaw
+  , coordinateValueDomainV2FromRaw
+  , coordinateValueDomainV2ToRaw
   , headerProfileFromRaw
   )
 
@@ -363,6 +508,312 @@ createStreaming = createWith capiCreateStreaming
 -- channels, and user key/value metadata.
 createStreamingWithMetadata :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> IO (Result TensorFile)
 createStreamingWithMetadata = createWithMetadata capiCreateStreamingEx
+
+-- | Create a streaming file with additive universe-aware axis identities.
+createStreamingWithUniverse :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateWithUniverseOptions -> IO (Result TensorFile)
+createStreamingWithUniverse = createWithUniverse capiCreateStreamingWithUniverse
+
+-- | Create a random-access file with additive universe-aware axis identities.
+createRandomAccessWithUniverse :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateWithUniverseOptions -> IO (Result TensorFile)
+createRandomAccessWithUniverse = createWithUniverse capiCreateRandomAccessWithUniverse
+
+-- | Create a policy-selected file with additive universe-aware axis identities.
+createWithPolicyWithUniverse :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreatePolicyOptions -> CreateWithUniverseOptions -> IO (Result TensorFile)
+createWithPolicyWithUniverse native path payloadDType dims appendDim metadata policyOptions universeOptions = do
+  case validateCreateInputs path dims appendDim *> validateCreateMetadata (length dims) metadata *> validatePolicyOptions policyOptions *> validateCreateUniverseOptions (length dims) universeOptions of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCSizeArray (map (CSize . fromIntegral) (policyChunkAxes policyOptions)) $ \chunkAxesPtr chunkAxesLen ->
+          withWord32Array (policyTypicalQuerySizes policyOptions) $ \typicalPtr typicalLen ->
+            withCreateUniverseOptions universeOptions $ \optionsPtr -> do
+              handle <- capiCreateWithPolicyWithUniverse native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen chunkAxesPtr chunkAxesLen (storageProfileToRaw (policyStorageProfile policyOptions)) typicalPtr typicalLen optionsPtr
+              wrapCreatedHandle native handle
+
+type CreateUniverseInvoker = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CArcadiaTioCreateWithUniverseOptions -> IO (Ptr CHandle)
+
+createWithUniverse :: CreateUniverseInvoker -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateWithUniverseOptions -> IO (Result TensorFile)
+createWithUniverse createFn native path payloadDType dims appendDim metadata universeOptions = do
+  case validateCreateInputs path dims appendDim *> validateCreateMetadata (length dims) metadata *> validateCreateUniverseOptions (length dims) universeOptions of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCreateUniverseOptions universeOptions $ \optionsPtr -> do
+          handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen optionsPtr
+          wrapCreatedHandle native handle
+
+-- | Create a streaming file with Coordinate v1 descriptors.
+createStreamingWithCoordinates :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createStreamingWithCoordinates = createBasicWithCoordinates capiCreateStreamingWithCoordinates withAxisCoordinateInputArray
+
+-- | Create a random-access file with Coordinate v1 descriptors.
+createRandomAccessWithCoordinates :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createRandomAccessWithCoordinates = createBasicWithCoordinates capiCreateRandomAccessWithCoordinates withAxisCoordinateInputArray
+
+-- | Create an inferred-layout file with Coordinate v1 descriptors.
+createInferredWithCoordinates :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateInferredOptions -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createInferredWithCoordinates native path payloadDType dims appendDim metadata options coordinates =
+  createInferredWithCoordinatesImpl capiCreateInferredWithCoordinates withAxisCoordinateInputArray native path payloadDType dims appendDim metadata options coordinates
+
+-- | Create a policy-selected file with Coordinate v1 descriptors.
+createWithPolicyWithCoordinates :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreatePolicyOptions -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createWithPolicyWithCoordinates native path payloadDType dims appendDim metadata options coordinates =
+  createPolicyWithCoordinatesImpl capiCreateWithPolicyWithCoordinates withAxisCoordinateInputArray native path payloadDType dims appendDim metadata options coordinates
+
+-- | Create a streaming file with Coordinate v2 descriptors.
+createStreamingWithCoordinatesV2 :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createStreamingWithCoordinatesV2 = createBasicWithCoordinatesV2 capiCreateStreamingWithCoordinatesV2
+
+-- | Create a random-access file with Coordinate v2 descriptors.
+createRandomAccessWithCoordinatesV2 :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createRandomAccessWithCoordinatesV2 = createBasicWithCoordinatesV2 capiCreateRandomAccessWithCoordinatesV2
+
+-- | Create an inferred-layout file with Coordinate v2 descriptors.
+createInferredWithCoordinatesV2 :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateInferredOptions -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createInferredWithCoordinatesV2 native path payloadDType dims appendDim metadata options coordinates coordinateOptions =
+  createInferredWithCoordinatesV2Impl capiCreateInferredWithCoordinatesV2 native path payloadDType dims appendDim metadata options coordinates coordinateOptions
+
+-- | Create a policy-selected file with Coordinate v2 descriptors.
+createWithPolicyWithCoordinatesV2 :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreatePolicyOptions -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createWithPolicyWithCoordinatesV2 native path payloadDType dims appendDim metadata options coordinates coordinateOptions =
+  createPolicyWithCoordinatesV2Impl capiCreateWithPolicyWithCoordinatesV2 native path payloadDType dims appendDim metadata options coordinates coordinateOptions
+
+type CreateCoordinatesInvoker c = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr c -> CSize -> IO (Ptr CHandle)
+
+createBasicWithCoordinates :: CreateCoordinatesInvoker c -> ([AxisCoordinateInputV2] -> (Ptr c -> CSize -> IO (Result TensorFile)) -> IO (Result TensorFile)) -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createBasicWithCoordinates createFn withCoordinates native path payloadDType dims appendDim metadata coordinates = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCoordinates coordinates $ \coordinatesPtr coordinatesLen -> do
+          handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen coordinatesPtr coordinatesLen
+          wrapCreatedHandle native handle
+
+type CreateCoordinatesV2Invoker = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+
+createBasicWithCoordinatesV2 :: CreateCoordinatesV2Invoker -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createBasicWithCoordinatesV2 createFn native path payloadDType dims appendDim metadata coordinates coordinateOptions = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withAxisCoordinateInputV2Array coordinates $ \coordinatesPtr coordinatesLen ->
+          withCoordinateV2Options coordinateOptions $ \optionsPtr -> do
+            handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen coordinatesPtr coordinatesLen optionsPtr
+            wrapCreatedHandle native handle
+
+type CreatePolicyCoordinatesInvoker c = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> Ptr c -> CSize -> IO (Ptr CHandle)
+
+createPolicyWithCoordinatesImpl :: CreatePolicyCoordinatesInvoker c -> ([AxisCoordinateInputV2] -> (Ptr c -> CSize -> IO (Result TensorFile)) -> IO (Result TensorFile)) -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreatePolicyOptions -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createPolicyWithCoordinatesImpl createFn withCoordinates native path payloadDType dims appendDim metadata options coordinates = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates *> validatePolicyOptions options of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCSizeArray (map (CSize . fromIntegral) (policyChunkAxes options)) $ \chunkAxesPtr chunkAxesLen ->
+          withWord32Array (policyTypicalQuerySizes options) $ \typicalPtr typicalLen ->
+            withCoordinates coordinates $ \coordinatesPtr coordinatesLen -> do
+              handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen chunkAxesPtr chunkAxesLen (storageProfileToRaw (policyStorageProfile options)) typicalPtr typicalLen coordinatesPtr coordinatesLen
+              wrapCreatedHandle native handle
+
+type CreatePolicyCoordinatesV2Invoker = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+
+createPolicyWithCoordinatesV2Impl :: CreatePolicyCoordinatesV2Invoker -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreatePolicyOptions -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createPolicyWithCoordinatesV2Impl createFn native path payloadDType dims appendDim metadata options coordinates coordinateOptions = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates *> validatePolicyOptions options of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCSizeArray (map (CSize . fromIntegral) (policyChunkAxes options)) $ \chunkAxesPtr chunkAxesLen ->
+          withWord32Array (policyTypicalQuerySizes options) $ \typicalPtr typicalLen ->
+            withAxisCoordinateInputV2Array coordinates $ \coordinatesPtr coordinatesLen ->
+              withCoordinateV2Options coordinateOptions $ \optionsPtr -> do
+                handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen chunkAxesPtr chunkAxesLen (storageProfileToRaw (policyStorageProfile options)) typicalPtr typicalLen coordinatesPtr coordinatesLen optionsPtr
+                wrapCreatedHandle native handle
+
+type CreateInferredCoordinatesInvoker c = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> CInt -> CInt -> CInt -> CInt -> Ptr c -> CSize -> IO (Ptr CHandle)
+
+createInferredWithCoordinatesImpl :: CreateInferredCoordinatesInvoker c -> ([AxisCoordinateInputV2] -> (Ptr c -> CSize -> IO (Result TensorFile)) -> IO (Result TensorFile)) -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateInferredOptions -> [AxisCoordinateInputV2] -> IO (Result TensorFile)
+createInferredWithCoordinatesImpl createFn withCoordinates native path payloadDType dims appendDim metadata options coordinates = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withCoordinates coordinates $ \coordinatesPtr coordinatesLen -> do
+          handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen (storageAccessToRaw (inferredStorageAccess options)) (openPatternToRaw (inferredOpenPattern options)) (filePopulationToRaw (inferredFilePopulation options)) (metadataStabilityToRaw (inferredMetadataStability options)) coordinatesPtr coordinatesLen
+          wrapCreatedHandle native handle
+
+type CreateInferredCoordinatesV2Invoker = NativeLibrary -> CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> CInt -> CInt -> CInt -> CInt -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+
+createInferredWithCoordinatesV2Impl :: CreateInferredCoordinatesV2Invoker -> NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> CreateMetadata -> CreateInferredOptions -> [AxisCoordinateInputV2] -> CoordinateV2Options -> IO (Result TensorFile)
+createInferredWithCoordinatesV2Impl createFn native path payloadDType dims appendDim metadata options coordinates coordinateOptions = do
+  case validateCreateInputs path dims appendDim *> validateCoordinateCreateInputs dims appendDim metadata coordinates of
+    Left err -> pure (Left err)
+    Right () -> withPath path $ \cPath ->
+      withCreateCoordinateCommon dims appendDim metadata $ \kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen ->
+        withAxisCoordinateInputV2Array coordinates $ \coordinatesPtr coordinatesLen ->
+          withCoordinateV2Options coordinateOptions $ \optionsPtr -> do
+            handle <- createFn native cPath (dtypeToRaw payloadDType) kindsPtr lensPtr rankLen appendLen dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen (storageAccessToRaw (inferredStorageAccess options)) (openPatternToRaw (inferredOpenPattern options)) (filePopulationToRaw (inferredFilePopulation options)) (metadataStabilityToRaw (inferredMetadataStability options)) coordinatesPtr coordinatesLen optionsPtr
+            wrapCreatedHandle native handle
+
+withCreateCoordinateCommon :: [DimSpec] -> Int -> CreateMetadata -> (Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> IO a) -> IO a
+withCreateCoordinateCommon dims appendDim metadata action =
+  withArray (map (axisKindToRaw . dimKind) dims) $ \kindsPtr ->
+    withArray (map dimLength dims) $ \lensPtr ->
+      withOptionalCStringArray (createDimNames metadata) $ \dimNamesPtr dimNamesLen ->
+        withCStringArray (createSymbols metadata) $ \symbolsPtr symbolsLen ->
+          withCStringArray (createChannels metadata) $ \channelsPtr channelsLen ->
+            withUserKvArrays (createUserKv metadata) $ \keysPtr valuesPtr userKvLen ->
+              action kindsPtr lensPtr (CSize (fromIntegral (length dims))) (CSize (fromIntegral appendDim)) dimNamesPtr dimNamesLen symbolsPtr symbolsLen channelsPtr channelsLen keysPtr valuesPtr userKvLen
+
+wrapCreatedHandle :: NativeLibrary -> Ptr CHandle -> IO (Result TensorFile)
+wrapCreatedHandle native handle =
+  if handle == nullPtr
+    then Left <$> lastError native
+    else Right <$> wrapHandle native handle
+
+validateCoordinateCreateInputs :: [DimSpec] -> Int -> CreateMetadata -> [AxisCoordinateInputV2] -> Result ()
+validateCoordinateCreateInputs dims appendDim metadata coordinates = do
+  validateCreateMetadata (length dims) metadata
+  if hasDuplicateAxes (map axisCoordinateInputV2Axis coordinates)
+    then Left (invalidArgument "coordinate axes must be unique")
+    else do
+      mapM_ (validateRequiredString "coordinate descriptor id" . axisCoordinateInputV2DescriptorId) coordinates
+      mapM_ (validateRequiredString "coordinate name" . axisCoordinateInputV2Name) coordinates
+      mapM_ validateAxis coordinates
+ where
+  hasDuplicateAxes [] = False
+  hasDuplicateAxes (axis : axes) = axis `elem` axes || hasDuplicateAxes axes
+  validateAxis coordinate = do
+    let axis = axisCoordinateInputV2Axis coordinate
+    if axis < 0 || axis >= length dims
+      then Left (invalidArgument "coordinate axis is out of range")
+      else
+        if axis == appendDim
+          then case axisCoordinateInputV2Values coordinate of
+            CoordinateV2AppendSequenceValues _ -> Right ()
+            _ -> Left (invalidArgument "coordinate append-axis storage is deferred; use append-axis coordinate APIs")
+          else case axisCoordinateInputV2Values coordinate of
+            CoordinateV2I32 values -> validateLength axis (length values)
+            CoordinateV2I64 values -> validateLength axis (length values)
+            CoordinateV2AppendSequenceValues _ -> Left (invalidArgument "coordinate append-sequence descriptors must target the append axis")
+  validateLength axis valuesLen =
+    let expected = fromIntegral (dimLength (dims !! axis))
+     in if valuesLen == expected
+          then Right ()
+          else Left (invalidArgument "coordinate value length must match dimension length")
+
+
+withAxisCoordinateInputArray :: [AxisCoordinateInputV2] -> (Ptr CArcadiaTioAxisCoordinateInput -> CSize -> IO a) -> IO a
+withAxisCoordinateInputArray [] action = action nullPtr 0
+withAxisCoordinateInputArray coordinates action =
+  withCoordinateInputsV1 coordinates $ \raw ->
+    withArray raw $ \ptr -> action ptr (CSize (fromIntegral (length raw)))
+
+withCoordinateInputsV1 :: [AxisCoordinateInputV2] -> ([CArcadiaTioAxisCoordinateInput] -> IO a) -> IO a
+withCoordinateInputsV1 [] action = action []
+withCoordinateInputsV1 (coordinate : rest) action =
+  withCString (axisCoordinateInputV2Name coordinate) $ \namePtr ->
+    withCoordinateValues (axisCoordinateInputV2Values coordinate) $ \coordDType valuesPtr valuesLen ->
+      withCoordinateInputsV1 rest $ \restRaw ->
+        action (coordinateToCV1 namePtr coordDType valuesPtr valuesLen coordinate : restRaw)
+
+coordinateToCV1 :: CString -> CoordinateDType -> Ptr Word8 -> CSize -> AxisCoordinateInputV2 -> CArcadiaTioAxisCoordinateInput
+coordinateToCV1 namePtr coordDType valuesPtr valuesLen AxisCoordinateInputV2{axisCoordinateInputV2Axis, axisCoordinateInputV2Kind, axisCoordinateInputV2Encoding, axisCoordinateInputV2Sorted, axisCoordinateInputV2Monotonicity, axisCoordinateInputV2Uniqueness, axisCoordinateInputV2Required} =
+  CArcadiaTioAxisCoordinateInput
+    { cAxisCoordinateInputVersion = 1
+    , cAxisCoordinateInputAxis = CSize (fromIntegral axisCoordinateInputV2Axis)
+    , cAxisCoordinateInputName = namePtr
+    , cAxisCoordinateInputKind = coordinateKindToRaw axisCoordinateInputV2Kind
+    , cAxisCoordinateInputDType = coordinateDTypeToRaw coordDType
+    , cAxisCoordinateInputEncoding = coordinateEncodingToRaw axisCoordinateInputV2Encoding
+    , cAxisCoordinateInputValues = valuesPtr
+    , cAxisCoordinateInputValuesLen = valuesLen
+    , cAxisCoordinateInputSorted = coordinateSortednessToRaw axisCoordinateInputV2Sorted
+    , cAxisCoordinateInputMonotonicity = coordinateMonotonicityToRaw axisCoordinateInputV2Monotonicity
+    , cAxisCoordinateInputUniqueness = coordinateUniquenessToRaw axisCoordinateInputV2Uniqueness
+    , cAxisCoordinateInputStorageKind = 0
+    , cAxisCoordinateInputExternalSourceKind = 0
+    , cAxisCoordinateInputExternalUri = nullPtr
+    , cAxisCoordinateInputExternalDType = coordinateDTypeToRaw coordDType
+    , cAxisCoordinateInputExternalLength = fromIntegral (fromIntegralCSize valuesLen)
+    , cAxisCoordinateInputRequired = boolToWord8 axisCoordinateInputV2Required
+    }
+
+withCoordinateV2Options :: CoordinateV2Options -> (Ptr CArcadiaTioCoordinateV2Options -> IO a) -> IO a
+withCoordinateV2Options CoordinateV2Options{coordinateAllowAuthoritativeScan, coordinateIncludeDictionaryEntries, coordinateIncludeIndexSummaries, coordinateAllowExternalResolution} action =
+  alloca $ \optionsPtr -> do
+    poke optionsPtr emptyCArcadiaTioCoordinateV2Options
+      { cCoordinateV2OptionsAllowAuthoritativeScan = boolToWord8 coordinateAllowAuthoritativeScan
+      , cCoordinateV2OptionsIncludeDictionaryEntries = boolToWord8 coordinateIncludeDictionaryEntries
+      , cCoordinateV2OptionsIncludeIndexSummaries = boolToWord8 coordinateIncludeIndexSummaries
+      , cCoordinateV2OptionsAllowExternalResolution = boolToWord8 coordinateAllowExternalResolution
+      }
+    action optionsPtr
+
+withAxisCoordinateInputV2Array :: [AxisCoordinateInputV2] -> (Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> IO a) -> IO a
+withAxisCoordinateInputV2Array [] action = action nullPtr 0
+withAxisCoordinateInputV2Array coordinates action =
+  withCoordinateInputs coordinates $ \raw ->
+    withArray raw $ \ptr -> action ptr (CSize (fromIntegral (length raw)))
+
+withCoordinateInputs :: [AxisCoordinateInputV2] -> ([CArcadiaTioAxisCoordinateInputV2] -> IO a) -> IO a
+withCoordinateInputs [] action = action []
+withCoordinateInputs (coordinate : rest) action =
+  withCString (axisCoordinateInputV2DescriptorId coordinate) $ \descriptorPtr ->
+    withCString (axisCoordinateInputV2Name coordinate) $ \namePtr ->
+      withCoordinateValues (axisCoordinateInputV2Values coordinate) $ \dtype valuesPtr valuesLen ->
+        withCoordinateInputs rest $ \restRaw ->
+          action (coordinateToC descriptorPtr namePtr dtype valuesPtr valuesLen coordinate : restRaw)
+
+withCoordinateValues :: CoordinateV2Values -> (CoordinateDType -> Ptr Word8 -> CSize -> IO a) -> IO a
+withCoordinateValues values action = case values of
+  CoordinateV2I32 [] -> action CoordinateI32 nullPtr 0
+  CoordinateV2I32 xs -> withArray xs $ \ptr -> action CoordinateI32 (castPtr ptr) (CSize (fromIntegral (length xs)))
+  CoordinateV2I64 [] -> action CoordinateI64 nullPtr 0
+  CoordinateV2I64 xs -> withArray xs $ \ptr -> action CoordinateI64 (castPtr ptr) (CSize (fromIntegral (length xs)))
+  CoordinateV2AppendSequenceValues dtype -> action dtype nullPtr 0
+
+coordinateValueDomainFor :: CoordinateV2Values -> CoordinateValueDomainV2
+coordinateValueDomainFor values = case values of
+  CoordinateV2AppendSequenceValues _ -> CoordinateV2AppendSequence
+  _ -> CoordinateV2InlineNumeric
+
+coordinateFixedTextFor :: CoordinateV2Values -> CArcadiaTioCoordinateFixedTextLayoutV2
+coordinateFixedTextFor values = case values of
+  CoordinateV2AppendSequenceValues _ -> CArcadiaTioCoordinateFixedTextLayoutV2 0 0 0 0 0 0 0
+  _ -> emptyCArcadiaTioCoordinateFixedTextLayoutV2
+
+coordinateToC :: CString -> CString -> CoordinateDType -> Ptr Word8 -> CSize -> AxisCoordinateInputV2 -> CArcadiaTioAxisCoordinateInputV2
+coordinateToC descriptorPtr namePtr dtype valuesPtr valuesLen AxisCoordinateInputV2{axisCoordinateInputV2Axis, axisCoordinateInputV2Kind, axisCoordinateInputV2Values, axisCoordinateInputV2Encoding, axisCoordinateInputV2Sorted, axisCoordinateInputV2Monotonicity, axisCoordinateInputV2Uniqueness, axisCoordinateInputV2Required} =
+  CArcadiaTioAxisCoordinateInputV2
+    { cAxisCoordinateInputV2Version = 1
+    , cAxisCoordinateInputV2StructSize = 224
+    , cAxisCoordinateInputV2Axis = CSize (fromIntegral axisCoordinateInputV2Axis)
+    , cAxisCoordinateInputV2DescriptorId = descriptorPtr
+    , cAxisCoordinateInputV2Name = namePtr
+    , cAxisCoordinateInputV2Kind = coordinateKindToRaw axisCoordinateInputV2Kind
+    , cAxisCoordinateInputV2ValueDomain = coordinateValueDomainV2ToRaw (coordinateValueDomainFor axisCoordinateInputV2Values)
+    , cAxisCoordinateInputV2NumericDType = coordinateDTypeToRaw dtype
+    , cAxisCoordinateInputV2NumericEncoding = coordinateEncodingToRaw axisCoordinateInputV2Encoding
+    , cAxisCoordinateInputV2FixedText = coordinateFixedTextFor axisCoordinateInputV2Values
+    , cAxisCoordinateInputV2CodeDType = 0
+    , cAxisCoordinateInputV2Values = valuesPtr
+    , cAxisCoordinateInputV2ValuesLen = valuesLen
+    , cAxisCoordinateInputV2Dictionary = nullPtr
+    , cAxisCoordinateInputV2DictionaryEntries = nullPtr
+    , cAxisCoordinateInputV2DictionaryEntriesLen = 0
+    , cAxisCoordinateInputV2ExternalBinding = nullPtr
+    , cAxisCoordinateInputV2Sorted = coordinateSortednessToRaw axisCoordinateInputV2Sorted
+    , cAxisCoordinateInputV2Monotonicity = coordinateMonotonicityToRaw axisCoordinateInputV2Monotonicity
+    , cAxisCoordinateInputV2Uniqueness = coordinateUniquenessToRaw axisCoordinateInputV2Uniqueness
+    , cAxisCoordinateInputV2Required = boolToWord8 axisCoordinateInputV2Required
+    }
+
+boolToWord8 :: Bool -> Word8
+boolToWord8 flag = if flag then 1 else 0
+
 
 -- | Create a random-access '.tio' file through the C ABI.
 createRandomAccess :: NativeLibrary -> FilePath -> DType -> [DimSpec] -> Int -> IO (Result TensorFile)
@@ -662,6 +1113,50 @@ withWord32Array :: [Word32] -> (Ptr Word32 -> CSize -> IO a) -> IO a
 withWord32Array [] action = action nullPtr 0
 withWord32Array values action = withArray values $ \ptr -> action ptr (CSize (fromIntegral (length values)))
 
+withWord8Array :: [Word8] -> (Ptr Word8 -> CSize -> IO a) -> IO a
+withWord8Array [] action = action nullPtr 0
+withWord8Array values action = withArray values $ \ptr -> action ptr (CSize (fromIntegral (length values)))
+
+uuidBytes16 :: TioUuid -> [Word8]
+uuidBytes16 (TioUuid bytes) = take 16 (bytes <> repeat 0)
+
+validateUuid :: String -> TioUuid -> Result ()
+validateUuid label (TioUuid bytes)
+  | length bytes == 16 = Right ()
+  | otherwise = Left (invalidArgument (label <> " must contain exactly 16 bytes"))
+
+validateAxisIndex :: String -> Int -> Result ()
+validateAxisIndex label axis
+  | axis < 0 = Left (invalidArgument (label <> " axis must be non-negative"))
+  | otherwise = Right ()
+
+validateCreateUniverseOptions :: Int -> CreateWithUniverseOptions -> Result ()
+validateCreateUniverseOptions rank CreateWithUniverseOptions{createUniverseAxisIdentities} = mapM_ validateIdentity createUniverseAxisIdentities
+ where
+  validateIdentity AxisIdentityInput{axisIdentityAxis}
+    | axisIdentityAxis < 0 || axisIdentityAxis >= rank = Left (invalidArgument "universe axis identity axis is out of range")
+    | otherwise = Right ()
+
+withCreateUniverseOptions :: CreateWithUniverseOptions -> (Ptr CArcadiaTioCreateWithUniverseOptions -> IO a) -> IO a
+withCreateUniverseOptions CreateWithUniverseOptions{createUniverseAxisIdentities} action =
+  withAxisIdentityInputs createUniverseAxisIdentities $ \identitiesPtr identitiesLen ->
+    alloca $ \optionsPtr -> do
+      poke optionsPtr CArcadiaTioCreateWithUniverseOptions
+        { cCreateWithUniverseOptionsVersion = 1
+        , cCreateWithUniverseOptionsStructSize = 32
+        , cCreateWithUniverseOptionsAxisIdentities = identitiesPtr
+        , cCreateWithUniverseOptionsAxisIdentitiesLen = identitiesLen
+        }
+      action optionsPtr
+
+withAxisIdentityInputs :: [AxisIdentityInput] -> (Ptr CArcadiaTioAxisIdentityInput -> CSize -> IO a) -> IO a
+withAxisIdentityInputs [] action = action nullPtr 0
+withAxisIdentityInputs identities action = withArray (map axisIdentityToC identities) $ \ptr -> action ptr (CSize (fromIntegral (length identities)))
+
+axisIdentityToC :: AxisIdentityInput -> CArcadiaTioAxisIdentityInput
+axisIdentityToC AxisIdentityInput{axisIdentityAxis, axisIdentityMode} =
+  CArcadiaTioAxisIdentityInput 1 24 (fromIntegral axisIdentityAxis) (case axisIdentityMode of AxisIdentityExtentOnly -> 0; AxisIdentityUniverseAware -> 1)
+
 withEntrySelectors :: [EntrySelector] -> (Ptr CArcadiaTioEntrySelector -> CSize -> IO a) -> IO a
 withEntrySelectors [] action = action nullPtr 0
 withEntrySelectors selectors action = go selectors []
@@ -704,7 +1199,39 @@ withShapePolicy policy action =
           , cReadShapePolicyExplicitExtents = if null extents then nullPtr else extentsPtr
           , cReadShapePolicyExplicitExtentsLen = CSize (fromIntegral (length extents))
           }
+    ReadShapeExplicitUniverse universeAxes ->
+      withExplicitUniverseTargets universeAxes $ \universePtr universeLen ->
+        action emptyCArcadiaTioReadShapePolicyOptions
+          { cReadShapePolicyPolicy = readShapePolicyToRaw policy
+          , cReadShapePolicyExplicitUniverseAxes = castPtr universePtr
+          , cReadShapePolicyExplicitUniverseAxesLen = universeLen
+          }
+    ReadShapeExplicitUniverseAndExtents universeAxes extentAxes ->
+      withExplicitUniverseTargets universeAxes $ \universePtr universeLen ->
+        withExplicitExtentTargets extentAxes $ \extentPtr extentLen ->
+          action emptyCArcadiaTioReadShapePolicyOptions
+            { cReadShapePolicyPolicy = readShapePolicyToRaw policy
+            , cReadShapePolicyExplicitUniverseAxes = castPtr universePtr
+            , cReadShapePolicyExplicitUniverseAxesLen = universeLen
+            , cReadShapePolicyExplicitExtentAxes = castPtr extentPtr
+            , cReadShapePolicyExplicitExtentAxesLen = extentLen
+            }
     _ -> action emptyCArcadiaTioReadShapePolicyOptions{cReadShapePolicyPolicy = readShapePolicyToRaw policy}
+
+withExplicitUniverseTargets :: [ExplicitUniverseAxisTarget] -> (Ptr CArcadiaTioExplicitUniverseAxisTarget -> CSize -> IO a) -> IO a
+withExplicitUniverseTargets [] action = action nullPtr 0
+withExplicitUniverseTargets targets action = withArray (map explicitUniverseTargetToC targets) $ \ptr -> action ptr (CSize (fromIntegral (length targets)))
+
+explicitUniverseTargetToC :: ExplicitUniverseAxisTarget -> CArcadiaTioExplicitUniverseAxisTarget
+explicitUniverseTargetToC ExplicitUniverseAxisTarget{explicitUniverseAxis, explicitUniverseFamilyUuid, explicitUniverseVersionUuid, explicitUniverseLength} =
+  CArcadiaTioExplicitUniverseAxisTarget (fromIntegral explicitUniverseAxis) (uuidBytes16 explicitUniverseFamilyUuid) (uuidBytes16 explicitUniverseVersionUuid) explicitUniverseLength
+
+withExplicitExtentTargets :: [ExplicitExtentAxisTarget] -> (Ptr CArcadiaTioExplicitExtentAxisTarget -> CSize -> IO a) -> IO a
+withExplicitExtentTargets [] action = action nullPtr 0
+withExplicitExtentTargets targets action = withArray (map explicitExtentTargetToC targets) $ \ptr -> action ptr (CSize (fromIntegral (length targets)))
+
+explicitExtentTargetToC :: ExplicitExtentAxisTarget -> CArcadiaTioExplicitExtentAxisTarget
+explicitExtentTargetToC ExplicitExtentAxisTarget{explicitExtentAxis, explicitExtentLength} = CArcadiaTioExplicitExtentAxisTarget (fromIntegral explicitExtentAxis) explicitExtentLength
 
 withQueryTraceContext :: QueryTraceContext -> (Ptr CArcadiaTioQueryTraceContext -> IO a) -> IO a
 withQueryTraceContext QueryTraceContext{queryTraceRunId, queryTraceRowId, queryTraceRepeatIndex, queryTracePhase, queryTraceLanguage, queryTraceApiSurface, queryTraceOperation, queryTraceClock} action =
@@ -750,6 +1277,18 @@ readExecutionModeFromRaw (CInt raw) = case (fromIntegral raw :: Int32) of
   1 -> Right ReadParallelThreads
   _ -> Left (invalidArgument "native read report has unknown execution mode")
 
+validateReadShapePolicy :: ReadShapePolicy -> Result ()
+validateReadShapePolicy policy = case policy of
+  ReadShapeExplicitUniverse targets -> mapM_ validateUniverseTarget targets
+  ReadShapeExplicitUniverseAndExtents universeTargets extentTargets -> mapM_ validateUniverseTarget universeTargets *> mapM_ validateExtentTarget extentTargets
+  _ -> Right ()
+ where
+  validateUniverseTarget ExplicitUniverseAxisTarget{explicitUniverseAxis, explicitUniverseFamilyUuid, explicitUniverseVersionUuid} = do
+    validateAxisIndex "explicit universe target" explicitUniverseAxis
+    validateUuid "explicit universe family UUID" explicitUniverseFamilyUuid
+    validateUuid "explicit universe version UUID" explicitUniverseVersionUuid
+  validateExtentTarget ExplicitExtentAxisTarget{explicitExtentAxis} = validateAxisIndex "explicit extent target" explicitExtentAxis
+
 readShapePolicyToRaw :: ReadShapePolicy -> CInt
 readShapePolicyToRaw policy = case policy of
   ReadShapeFileEnvelope -> 0
@@ -758,6 +1297,8 @@ readShapePolicyToRaw policy = case policy of
   ReadShapeIntersection -> 3
   ReadShapeInitialRegistered -> 4
   ReadShapeExplicitExtents{} -> 5
+  ReadShapeExplicitUniverse{} -> 6
+  ReadShapeExplicitUniverseAndExtents{} -> 7
 
 validateQueryTraceContext :: QueryTraceContext -> Result ()
 validateQueryTraceContext QueryTraceContext{queryTraceRunId, queryTraceRowId, queryTracePhase, queryTraceLanguage, queryTraceApiSurface, queryTraceOperation, queryTraceClock} = do
@@ -1173,6 +1714,380 @@ readAtCommitDenseSelected TensorFile{tensorFileNative, tensorFileHandle} commitS
 
 -- | Read current visible data with selectors and execution options, returning a
 -- copied tensor and copied execution report.
+
+-- | Read Coordinate v1 metadata from an open file and copy all strings before freeing native memory.
+coordinateMeta :: TensorFile -> IO (Result [AxisCoordinateMeta])
+coordinateMeta TensorFile{tensorFileNative, tensorFileHandle} =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \metaPtrPtr ->
+      alloca $ \lenPtr -> do
+        poke metaPtrPtr nullPtr
+        poke lenPtr 0
+        status <- capiCoordinateMeta tensorFileNative handle metaPtrPtr lenPtr
+        metaPtr <- peek metaPtrPtr
+        len <- peek lenPtr
+        if status == okStatus
+          then (fmap sequence (mapM copyAxisCoordinateMeta =<< peekArray (fromIntegralCSize len) metaPtr)) `finally` freeCoordinateMetaIfNeeded tensorFileNative metaPtr len
+          else do
+            err <- lastError tensorFileNative
+            freeCoordinateMetaIfNeeded tensorFileNative metaPtr len
+            pure (Left err)
+
+-- | Load Coordinate v1 metadata from a file path without opening a mutable handle.
+loadCoordinateMeta :: NativeLibrary -> FilePath -> IO (Result [AxisCoordinateMeta])
+loadCoordinateMeta native path =
+  withCString path $ \cPath ->
+    alloca $ \metaPtrPtr ->
+      alloca $ \lenPtr -> do
+        poke metaPtrPtr nullPtr
+        poke lenPtr 0
+        status <- capiLoadCoordinateMeta native cPath metaPtrPtr lenPtr
+        metaPtr <- peek metaPtrPtr
+        len <- peek lenPtr
+        if status == okStatus
+          then (fmap sequence (mapM copyAxisCoordinateMeta =<< peekArray (fromIntegralCSize len) metaPtr)) `finally` freeCoordinateMetaIfNeeded native metaPtr len
+          else do
+            err <- lastError native
+            freeCoordinateMetaIfNeeded native metaPtr len
+            pure (Left err)
+
+
+freeCoordinateMetaIfNeeded :: NativeLibrary -> Ptr CArcadiaTioAxisCoordinateMeta -> CSize -> IO ()
+freeCoordinateMetaIfNeeded native ptr len = if ptr == nullPtr then pure () else capiAxisCoordinateMetaFree native ptr len
+
+freeCoordinateMetaV2IfNeeded :: NativeLibrary -> Ptr CArcadiaTioAxisCoordinateMetaV2 -> CSize -> IO ()
+freeCoordinateMetaV2IfNeeded native ptr len = if ptr == nullPtr then pure () else capiAxisCoordinateMetaV2Free native ptr len
+
+copyAxisCoordinateMeta :: CArcadiaTioAxisCoordinateMeta -> IO (Result AxisCoordinateMeta)
+copyAxisCoordinateMeta CArcadiaTioAxisCoordinateMeta{cAxisCoordinateMetaAxis, cAxisCoordinateMetaAxisNameSnapshot, cAxisCoordinateMetaName, cAxisCoordinateMetaKind, cAxisCoordinateMetaDType, cAxisCoordinateMetaEncoding, cAxisCoordinateMetaLength, cAxisCoordinateMetaSorted, cAxisCoordinateMetaMonotonicity, cAxisCoordinateMetaUniqueness, cAxisCoordinateMetaStorageKind, cAxisCoordinateMetaExternalSourceKind, cAxisCoordinateMetaExternalUri, cAxisCoordinateMetaRequired, cAxisCoordinateMetaValidationStatus} = do
+  axisName <- peekOptionalCString cAxisCoordinateMetaAxisNameSnapshot
+  name <- peekOptionalCString cAxisCoordinateMetaName
+  externalUri <- peekOptionalCString cAxisCoordinateMetaExternalUri
+  pure $ Right AxisCoordinateMeta
+    { axisCoordinateMetaAxis = fromIntegralCSize cAxisCoordinateMetaAxis
+    , axisCoordinateMetaAxisNameSnapshot = axisName
+    , axisCoordinateMetaName = name
+    , axisCoordinateMetaKind = coordinateKindFromRaw cAxisCoordinateMetaKind
+    , axisCoordinateMetaDType = coordinateDTypeFromRaw cAxisCoordinateMetaDType
+    , axisCoordinateMetaEncoding = coordinateEncodingFromRaw cAxisCoordinateMetaEncoding
+    , axisCoordinateMetaLength = cAxisCoordinateMetaLength
+    , axisCoordinateMetaSorted = coordinateSortednessFromRaw cAxisCoordinateMetaSorted
+    , axisCoordinateMetaMonotonicity = coordinateMonotonicityFromRaw cAxisCoordinateMetaMonotonicity
+    , axisCoordinateMetaUniqueness = coordinateUniquenessFromRaw cAxisCoordinateMetaUniqueness
+    , axisCoordinateMetaStorageKind = coordinateStorageKindFromRaw cAxisCoordinateMetaStorageKind
+    , axisCoordinateMetaExternalSourceKind = coordinateSourceKindFromRaw cAxisCoordinateMetaExternalSourceKind
+    , axisCoordinateMetaExternalUri = externalUri
+    , axisCoordinateMetaRequired = cAxisCoordinateMetaRequired /= 0
+    , axisCoordinateMetaValidationStatus = coordinateValidationStatusFromRaw cAxisCoordinateMetaValidationStatus
+    }
+
+coordinateMetaV2 :: TensorFile -> CoordinateV2Options -> IO (Result [AxisCoordinateMetaV2])
+coordinateMetaV2 TensorFile{tensorFileNative, tensorFileHandle} _options =
+  withForeignPtr tensorFileHandle $ \handle ->
+    alloca $ \metaPtrPtr ->
+      alloca $ \lenPtr -> do
+        poke metaPtrPtr nullPtr
+        poke lenPtr 0
+        status <- capiCoordinateMetaV2 tensorFileNative handle metaPtrPtr lenPtr
+        metaPtr <- peek metaPtrPtr
+        len <- peek lenPtr
+        if status == okStatus
+          then (fmap sequence (mapM copyAxisCoordinateMetaV2 =<< peekArray (fromIntegralCSize len) metaPtr)) `finally` freeCoordinateMetaV2IfNeeded tensorFileNative metaPtr len
+          else do
+            err <- lastError tensorFileNative
+            freeCoordinateMetaV2IfNeeded tensorFileNative metaPtr len
+            pure (Left err)
+
+loadCoordinateMetaV2 :: NativeLibrary -> FilePath -> IO (Result [AxisCoordinateMetaV2])
+loadCoordinateMetaV2 native path =
+  withCString path $ \cPath ->
+    alloca $ \metaPtrPtr ->
+      alloca $ \lenPtr -> do
+        poke metaPtrPtr nullPtr
+        poke lenPtr 0
+        status <- capiLoadCoordinateMetaV2 native cPath metaPtrPtr lenPtr
+        metaPtr <- peek metaPtrPtr
+        len <- peek lenPtr
+        if status == okStatus
+          then (fmap sequence (mapM copyAxisCoordinateMetaV2 =<< peekArray (fromIntegralCSize len) metaPtr)) `finally` freeCoordinateMetaV2IfNeeded native metaPtr len
+          else do
+            err <- lastError native
+            freeCoordinateMetaV2IfNeeded native metaPtr len
+            pure (Left err)
+
+copyAxisCoordinateMetaV2 :: CArcadiaTioAxisCoordinateMetaV2 -> IO (Result AxisCoordinateMetaV2)
+copyAxisCoordinateMetaV2 raw@CArcadiaTioAxisCoordinateMetaV2{cAxisCoordinateMetaV2IndexSummaries, cAxisCoordinateMetaV2IndexSummariesLen} = do
+  axisName <- peekOptionalCString (cAxisCoordinateMetaV2AxisNameSnapshot raw)
+  descriptorId <- peekOptionalCString (cAxisCoordinateMetaV2DescriptorId raw)
+  name <- peekOptionalCString (cAxisCoordinateMetaV2Name raw)
+  reason <- peekOptionalCString (cAxisCoordinateMetaV2Reason raw)
+  dictionary <- copyDictionarySummary (cAxisCoordinateMetaV2Dictionary raw)
+  external <- copyExternalBinding (cAxisCoordinateMetaV2ExternalBinding raw)
+  indexes <- mapM copyIndexSummary =<< peekArray (fromIntegralCSize cAxisCoordinateMetaV2IndexSummariesLen) cAxisCoordinateMetaV2IndexSummaries
+  pure $ AxisCoordinateMetaV2
+    <$> pure (fromIntegralCSize (cAxisCoordinateMetaV2Axis raw))
+    <*> pure axisName
+    <*> pure descriptorId
+    <*> pure (cAxisCoordinateMetaV2DescriptorRevision raw)
+    <*> pure name
+    <*> pure (coordinateKindFromRaw (cAxisCoordinateMetaV2Kind raw))
+    <*> pure (coordinateValueDomainV2FromRaw (cAxisCoordinateMetaV2ValueDomain raw))
+    <*> pure (coordinateDTypeFromRaw (cAxisCoordinateMetaV2NumericDType raw))
+    <*> pure (coordinateEncodingFromRaw (cAxisCoordinateMetaV2NumericEncoding raw))
+    <*> pure (coordinateCodeDTypeV2FromRaw (cAxisCoordinateMetaV2CodeDType raw))
+    <*> pure (cAxisCoordinateMetaV2Length raw)
+    <*> pure (coordinateSortednessFromRaw (cAxisCoordinateMetaV2Sorted raw))
+    <*> pure (coordinateMonotonicityFromRaw (cAxisCoordinateMetaV2Monotonicity raw))
+    <*> pure (coordinateUniquenessFromRaw (cAxisCoordinateMetaV2Uniqueness raw))
+    <*> pure (cAxisCoordinateMetaV2Required raw /= 0)
+    <*> pure (coordinateAvailabilityV2FromRaw (cAxisCoordinateMetaV2Availability raw))
+    <*> pure (coordinateStatusCategoryV2FromRaw (cAxisCoordinateMetaV2StatusCategory raw))
+    <*> pure reason
+    <*> dictionary
+    <*> external
+    <*> sequence indexes
+
+copyDictionarySummary :: CArcadiaTioCoordinateDictionarySummaryV2 -> IO (Result CoordinateDictionarySummaryV2)
+copyDictionarySummary CArcadiaTioCoordinateDictionarySummaryV2{cCoordinateDictionarySummaryDictionaryId, cCoordinateDictionarySummaryRevision, cCoordinateDictionarySummaryCodeDType, cCoordinateDictionarySummaryEntryCount, cCoordinateDictionarySummaryStableIdsUnique, cCoordinateDictionarySummaryDisplayLabelsUnique, cCoordinateDictionarySummaryAliasesUnique, cCoordinateDictionarySummaryCodesStableAcrossRevisions, cCoordinateDictionarySummaryContentId} = do
+  dictionaryId <- peekOptionalCString cCoordinateDictionarySummaryDictionaryId
+  contentId <- peekOptionalCString cCoordinateDictionarySummaryContentId
+  pure $ Right CoordinateDictionarySummaryV2
+    { coordinateDictionarySummaryId = dictionaryId
+    , coordinateDictionarySummaryRevision = cCoordinateDictionarySummaryRevision
+    , coordinateDictionarySummaryCodeDType = coordinateCodeDTypeV2FromRaw cCoordinateDictionarySummaryCodeDType
+    , coordinateDictionarySummaryEntryCount = cCoordinateDictionarySummaryEntryCount
+    , coordinateDictionarySummaryStableIdsUnique = cCoordinateDictionarySummaryStableIdsUnique /= 0
+    , coordinateDictionarySummaryDisplayLabelsUnique = cCoordinateDictionarySummaryDisplayLabelsUnique /= 0
+    , coordinateDictionarySummaryAliasesUnique = cCoordinateDictionarySummaryAliasesUnique /= 0
+    , coordinateDictionarySummaryCodesStableAcrossRevisions = cCoordinateDictionarySummaryCodesStableAcrossRevisions /= 0
+    , coordinateDictionarySummaryContentId = contentId
+    }
+
+copyExternalBinding :: CArcadiaTioCoordinateExternalBindingV2 -> IO (Result CoordinateExternalBindingV2)
+copyExternalBinding CArcadiaTioCoordinateExternalBindingV2{cCoordinateExternalBindingSourceKind, cCoordinateExternalBindingLogicalId, cCoordinateExternalBindingPrivacySafeDisplay, cCoordinateExternalBindingContentId, cCoordinateExternalBindingValueDomain, cCoordinateExternalBindingLength, cCoordinateExternalBindingAvailability, cCoordinateExternalBindingStatusCategory, cCoordinateExternalBindingRequired} = do
+  logicalId <- peekOptionalCString cCoordinateExternalBindingLogicalId
+  display <- peekOptionalCString cCoordinateExternalBindingPrivacySafeDisplay
+  contentId <- peekOptionalCString cCoordinateExternalBindingContentId
+  pure $ Right CoordinateExternalBindingV2
+    { coordinateExternalBindingSourceKind = coordinateSourceKindFromRaw cCoordinateExternalBindingSourceKind
+    , coordinateExternalBindingLogicalId = logicalId
+    , coordinateExternalBindingPrivacySafeDisplay = display
+    , coordinateExternalBindingContentId = contentId
+    , coordinateExternalBindingValueDomain = coordinateValueDomainV2FromRaw cCoordinateExternalBindingValueDomain
+    , coordinateExternalBindingLength = cCoordinateExternalBindingLength
+    , coordinateExternalBindingAvailability = coordinateAvailabilityV2FromRaw cCoordinateExternalBindingAvailability
+    , coordinateExternalBindingStatusCategory = coordinateStatusCategoryV2FromRaw cCoordinateExternalBindingStatusCategory
+    , coordinateExternalBindingRequired = cCoordinateExternalBindingRequired /= 0
+    }
+
+copyIndexSummary :: CArcadiaTioCoordinateIndexSummaryV2 -> IO (Result CoordinateIndexSummaryV2)
+copyIndexSummary raw = do
+  indexId <- peekOptionalCString (cCoordinateIndexSummaryIndexId raw)
+  reason <- peekOptionalCString (cCoordinateIndexSummaryReason raw)
+  source <- copyIndexSourceBinding (cCoordinateIndexSummarySourceBinding raw)
+  pure $ CoordinateIndexSummaryV2
+    <$> pure indexId
+    <*> pure (cintToInt32 (cCoordinateIndexSummaryIndexKind raw))
+    <*> pure (cintToInt32 (cCoordinateIndexSummaryKeyDomain raw))
+    <*> source
+    <*> pure (coordinateSortednessFromRaw (cCoordinateIndexSummarySorted raw))
+    <*> pure (coordinateMonotonicityFromRaw (cCoordinateIndexSummaryMonotonicity raw))
+    <*> pure (coordinateUniquenessFromRaw (cCoordinateIndexSummaryUniqueness raw))
+    <*> pure (cCoordinateIndexSummaryFormatVersion raw)
+    <*> pure (cCoordinateIndexSummaryBuildVersion raw)
+    <*> pure (cintToInt32 (cCoordinateIndexSummaryValidationStatus raw))
+    <*> pure (cintToInt32 (cCoordinateIndexSummaryFallback raw))
+    <*> pure (cintToInt32 (cCoordinateIndexSummarySelectedUse raw))
+    <*> pure (cCoordinateIndexSummaryRequired raw /= 0)
+    <*> pure reason
+
+copyIndexSourceBinding :: CArcadiaTioCoordinateIndexSourceBindingV2 -> IO (Result CoordinateIndexSourceBindingV2)
+copyIndexSourceBinding raw = do
+  descriptorId <- peekOptionalCString (cCoordinateIndexSourceDescriptorId raw)
+  valueObjectId <- peekOptionalCString (cCoordinateIndexSourceValueObjectId raw)
+  dictionaryId <- peekOptionalCString (cCoordinateIndexSourceDictionaryId raw)
+  dictionaryContentId <- peekOptionalCString (cCoordinateIndexSourceDictionaryContentId raw)
+  externalLogicalId <- peekOptionalCString (cCoordinateIndexSourceExternalLogicalId raw)
+  externalContentId <- peekOptionalCString (cCoordinateIndexSourceExternalContentId raw)
+  rootId <- peekOptionalCString (cCoordinateIndexSourceRootId raw)
+  pure $ Right CoordinateIndexSourceBindingV2
+    { coordinateIndexSourceDescriptorId = descriptorId
+    , coordinateIndexSourceDescriptorRevision = cCoordinateIndexSourceDescriptorRevision raw
+    , coordinateIndexSourceValueDomain = coordinateValueDomainV2FromRaw (cCoordinateIndexSourceValueDomain raw)
+    , coordinateIndexSourceValueObjectId = valueObjectId
+    , coordinateIndexSourceDictionaryId = dictionaryId
+    , coordinateIndexSourceDictionaryRevision = cCoordinateIndexSourceDictionaryRevision raw
+    , coordinateIndexSourceDictionaryContentId = dictionaryContentId
+    , coordinateIndexSourceExternalSourceKind = coordinateSourceKindFromRaw (cCoordinateIndexSourceExternalSourceKind raw)
+    , coordinateIndexSourceExternalLogicalId = externalLogicalId
+    , coordinateIndexSourceExternalContentId = externalContentId
+    , coordinateIndexSourceRootId = rootId
+    , coordinateIndexSourceAxis = fromIntegralCSize (cCoordinateIndexSourceAxis raw)
+    , coordinateIndexSourceRootExtent = cCoordinateIndexSourceRootExtent raw
+    , coordinateIndexSourceAppendStart = cCoordinateIndexSourceAppendStart raw
+    , coordinateIndexSourceAppendCount = cCoordinateIndexSourceAppendCount raw
+    }
+
+-- | Read Coordinate v1 inline values as an owned tensor. Native tensor memory is always freed.
+readAxisCoordinates :: TensorFile -> Int -> IO (Result SomeTensor)
+readAxisCoordinates file@TensorFile{tensorFileNative} axis
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise = readTensor file $ \handle outPtr -> capiReadAxisCoordinates tensorFileNative handle (CSize (fromIntegral axis)) outPtr
+
+readAxisCoordinatesV2 :: TensorFile -> Int -> CoordinateV2Options -> IO (Result CoordinateValueSliceV2)
+readAxisCoordinatesV2 TensorFile{tensorFileNative, tensorFileHandle} axis options
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        withCoordinateV2Options options $ \optionsPtr ->
+          alloca $ \valuesPtr -> do
+            poke valuesPtr (CArcadiaTioCoordinateValueSliceV2 1 112 0 0 0 0 nullPtr 0 0 0 0 0 nullPtr)
+            status <- capiReadAxisCoordinatesV2 tensorFileNative handle (CSize (fromIntegral axis)) optionsPtr valuesPtr
+            if status == okStatus
+              then (peek valuesPtr >>= copyCoordinateValueSlice) `finally` capiCoordinateValueSliceV2Free tensorFileNative valuesPtr
+              else do
+                err <- lastError tensorFileNative
+                capiCoordinateValueSliceV2Free tensorFileNative valuesPtr
+                pure (Left err)
+
+copyCoordinateValueSlice :: CArcadiaTioCoordinateValueSliceV2 -> IO (Result CoordinateValueSliceV2)
+copyCoordinateValueSlice raw = do
+  reason <- peekOptionalCString (cCoordinateValueSliceReason raw)
+  let bytesLen = fromIntegralCSize (cCoordinateValueSliceLen raw) * max 0 (fromIntegralCSize (cCoordinateValueSliceElementSize raw))
+  bytes <- if cCoordinateValueSliceData raw == nullPtr || bytesLen <= 0 then pure [] else peekArray bytesLen (cCoordinateValueSliceData raw)
+  pure $ Right CoordinateValueSliceV2
+    { coordinateValueSliceDomain = coordinateValueDomainV2FromRaw (cCoordinateValueSliceValueDomain raw)
+    , coordinateValueSliceNumericDType = coordinateDTypeFromRaw (cCoordinateValueSliceNumericDType raw)
+    , coordinateValueSliceNumericEncoding = coordinateEncodingFromRaw (cCoordinateValueSliceNumericEncoding raw)
+    , coordinateValueSliceCodeDType = coordinateCodeDTypeV2FromRaw (cCoordinateValueSliceCodeDType raw)
+    , coordinateValueSliceBytes = bytes
+    , coordinateValueSliceLen = fromIntegralCSize (cCoordinateValueSliceLen raw)
+    , coordinateValueSliceElementSize = fromIntegralCSize (cCoordinateValueSliceElementSize raw)
+    , coordinateValueSliceFixedTextWidth = fromIntegralCSize (cCoordinateValueSliceFixedTextWidth raw)
+    , coordinateValueSliceAvailability = coordinateAvailabilityV2FromRaw (cCoordinateValueSliceAvailability raw)
+    , coordinateValueSliceStatusCategory = coordinateStatusCategoryV2FromRaw (cCoordinateValueSliceStatusCategory raw)
+    , coordinateValueSliceReason = reason
+    }
+
+coordinateDictionaryV2 :: TensorFile -> Int -> CoordinateV2Options -> IO (Result CoordinateDictionaryV2)
+coordinateDictionaryV2 TensorFile{tensorFileNative, tensorFileHandle} axis options
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise =
+      withForeignPtr tensorFileHandle $ \handle ->
+        withCoordinateV2Options options $ \optionsPtr ->
+          alloca $ \dictionaryPtr -> do
+            poke dictionaryPtr (CArcadiaTioCoordinateDictionaryV2 1 160 emptyDictionarySummary nullPtr 0 0 nullPtr)
+            status <- capiCoordinateDictionaryV2 tensorFileNative handle (CSize (fromIntegral axis)) optionsPtr dictionaryPtr
+            if status == okStatus
+              then (peek dictionaryPtr >>= copyCoordinateDictionary) `finally` capiCoordinateDictionaryV2Free tensorFileNative dictionaryPtr
+              else do
+                err <- lastError tensorFileNative
+                capiCoordinateDictionaryV2Free tensorFileNative dictionaryPtr
+                pure (Left err)
+ where
+  emptyDictionarySummary = CArcadiaTioCoordinateDictionarySummaryV2 1 80 nullPtr 0 0 0 0 0 0 0 nullPtr
+
+copyCoordinateDictionary :: CArcadiaTioCoordinateDictionaryV2 -> IO (Result CoordinateDictionaryV2)
+copyCoordinateDictionary raw = do
+  summary <- copyDictionarySummary (cCoordinateDictionarySummary raw)
+  entries <- mapM copyDictionaryEntry =<< peekArray (fromIntegralCSize (cCoordinateDictionaryEntriesLen raw)) (cCoordinateDictionaryEntries raw)
+  reason <- peekOptionalCString (cCoordinateDictionaryReason raw)
+  pure $ CoordinateDictionaryV2 <$> summary <*> sequence entries <*> pure (coordinateStatusCategoryV2FromRaw (cCoordinateDictionaryStatusCategory raw)) <*> pure reason
+
+copyDictionaryEntry :: CArcadiaTioCoordinateDictionaryEntryV2 -> IO (Result CoordinateDictionaryEntryV2)
+copyDictionaryEntry raw = do
+  stableId <- peekOptionalCString (cCoordinateDictionaryEntryStableId raw)
+  display <- peekOptionalCString (cCoordinateDictionaryEntryDisplayLabel raw)
+  aliases <- peekCStringArray (cCoordinateDictionaryEntryAliases raw) (cCoordinateDictionaryEntryAliasesLen raw)
+  pure $ Right CoordinateDictionaryEntryV2
+    { coordinateDictionaryEntryCode = cCoordinateDictionaryEntryCode raw
+    , coordinateDictionaryEntryStableId = stableId
+    , coordinateDictionaryEntryDisplayLabel = display
+    , coordinateDictionaryEntryAliases = aliases
+    }
+
+peekCStringArray :: Ptr CString -> CSize -> IO [String]
+peekCStringArray ptr len
+  | ptr == nullPtr || len == 0 = pure []
+  | otherwise = mapM peekCString =<< peekArray (fromIntegralCSize len) ptr
+
+cintToInt32 :: CInt -> Int32
+cintToInt32 (CInt raw) = raw
+
+-- | Perform an exact Coordinate v2 lookup and copy the native result carrier.
+coordinateLookupV2 :: TensorFile -> Int -> CoordinateLookupKeyV2 -> CoordinateV2Options -> IO (Result CoordinateLookupResultV2)
+coordinateLookupV2 TensorFile{tensorFileNative, tensorFileHandle} axis key options
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise = withValidatedLookupKey key $ \withKey ->
+      withForeignPtr tensorFileHandle $ \handle ->
+        withKey $ \keyPtr ->
+          withCoordinateV2Options options $ \optionsPtr ->
+            alloca $ \resultPtr -> do
+              poke resultPtr emptyCArcadiaTioCoordinateLookupResultV2
+              status <- capiCoordinateLookupV2 tensorFileNative handle (CSize (fromIntegral axis)) keyPtr optionsPtr resultPtr
+              finishCoordinateLookup tensorFileNative status resultPtr
+
+-- | Perform a half-open Coordinate v2 range lookup and copy the native result carrier.
+coordinateLookupRangeV2 :: TensorFile -> Int -> CoordinateLookupKeyV2 -> CoordinateLookupKeyV2 -> CoordinateV2Options -> IO (Result CoordinateLookupResultV2)
+coordinateLookupRangeV2 TensorFile{tensorFileNative, tensorFileHandle} axis lower upper options
+  | axis < 0 = pure (Left (invalidArgument "coordinate axis must be non-negative"))
+  | otherwise = withValidatedLookupKey lower $ \withLower ->
+      withValidatedLookupKey upper $ \withUpper ->
+        withForeignPtr tensorFileHandle $ \handle ->
+          withLower $ \lowerPtr ->
+            withUpper $ \upperPtr ->
+              withCoordinateV2Options options $ \optionsPtr ->
+                alloca $ \resultPtr -> do
+                  poke resultPtr emptyCArcadiaTioCoordinateLookupResultV2
+                  status <- capiCoordinateLookupRangeV2 tensorFileNative handle (CSize (fromIntegral axis)) lowerPtr upperPtr optionsPtr resultPtr
+                  finishCoordinateLookup tensorFileNative status resultPtr
+
+withValidatedLookupKey :: CoordinateLookupKeyV2 -> (((Ptr CArcadiaTioCoordinateLookupKeyV2 -> IO (Result CoordinateLookupResultV2)) -> IO (Result CoordinateLookupResultV2)) -> IO (Result CoordinateLookupResultV2)) -> IO (Result CoordinateLookupResultV2)
+withValidatedLookupKey key action =
+  case validateLookupKey key of
+    Left err -> pure (Left err)
+    Right () -> action (withCoordinateLookupKey key)
+
+validateLookupKey :: CoordinateLookupKeyV2 -> Result ()
+validateLookupKey key = case key of
+  CoordinateLookupKeyText _ value -> validateString "coordinate lookup text" value
+  CoordinateLookupKeyBytes _ _ width | width < 0 -> Left (invalidArgument "coordinate lookup fixed-text width must be non-negative")
+  _ -> Right ()
+
+withCoordinateLookupKey :: CoordinateLookupKeyV2 -> (Ptr CArcadiaTioCoordinateLookupKeyV2 -> IO a) -> IO a
+withCoordinateLookupKey key action = case key of
+  CoordinateLookupKeyI32 value -> pokeLookup emptyCArcadiaTioCoordinateLookupKeyV2{cCoordinateLookupKeyDomain = coordinateKeyDomainV2ToRaw CoordinateKeyI32, cCoordinateLookupKeyI32Value = value}
+  CoordinateLookupKeyI64 value -> pokeLookup emptyCArcadiaTioCoordinateLookupKeyV2{cCoordinateLookupKeyDomain = coordinateKeyDomainV2ToRaw CoordinateKeyI64, cCoordinateLookupKeyI64Value = value}
+  CoordinateLookupKeyDictionaryCode value -> pokeLookup emptyCArcadiaTioCoordinateLookupKeyV2{cCoordinateLookupKeyDomain = coordinateKeyDomainV2ToRaw CoordinateKeyDictionaryCode, cCoordinateLookupKeyCodeValue = value}
+  CoordinateLookupKeyText domain value -> withCString value $ \textPtr -> pokeLookup emptyCArcadiaTioCoordinateLookupKeyV2{cCoordinateLookupKeyDomain = coordinateKeyDomainV2ToRaw domain, cCoordinateLookupKeyText = textPtr}
+  CoordinateLookupKeyBytes domain bytes width -> withWord8Array bytes $ \bytesPtr bytesLen -> pokeLookup emptyCArcadiaTioCoordinateLookupKeyV2{cCoordinateLookupKeyDomain = coordinateKeyDomainV2ToRaw domain, cCoordinateLookupKeyBytes = bytesPtr, cCoordinateLookupKeyBytesLen = bytesLen, cCoordinateLookupKeyFixedTextWidth = CSize (fromIntegral width)}
+ where
+  pokeLookup raw = alloca $ \keyPtr -> poke keyPtr raw >> action keyPtr
+
+finishCoordinateLookup :: NativeLibrary -> CInt -> Ptr CArcadiaTioCoordinateLookupResultV2 -> IO (Result CoordinateLookupResultV2)
+finishCoordinateLookup native status resultPtr =
+  ( if status == okStatus
+      then peek resultPtr >>= copyCoordinateLookupResult
+      else Left <$> lastError native
+  ) `finally` capiCoordinateLookupResultV2Free native resultPtr
+
+copyCoordinateLookupResult :: CArcadiaTioCoordinateLookupResultV2 -> IO (Result CoordinateLookupResultV2)
+copyCoordinateLookupResult raw = do
+  reason <- peekOptionalCString (cCoordinateLookupResultReason raw)
+  positions <- if cCoordinateLookupResultPositions raw == nullPtr || cCoordinateLookupResultPositionsLen raw == 0 then pure [] else peekArray (fromIntegralCSize (cCoordinateLookupResultPositionsLen raw)) (cCoordinateLookupResultPositions raw)
+  let status = coordinateLookupResultStatusV2FromRaw (cCoordinateLookupResultStatus raw)
+      uniquePosition = if status == CoordinateLookupUniqueV2 then Just (cCoordinateLookupResultUniquePosition raw) else Nothing
+      rangeValue = if status == CoordinateLookupRangeV2 then Just (cCoordinateLookupResultRangeStart raw, cCoordinateLookupResultRangeEnd raw) else Nothing
+  pure $ Right CoordinateLookupResultV2
+    { coordinateLookupStatus = status
+    , coordinateLookupStatusCategory = coordinateStatusCategoryV2FromRaw (cCoordinateLookupResultStatusCategory raw)
+    , coordinateLookupUniquePosition = uniquePosition
+    , coordinateLookupRange = rangeValue
+    , coordinateLookupPositions = positions
+    , coordinateLookupAvailability = coordinateAvailabilityV2FromRaw (cCoordinateLookupResultAvailability raw)
+    , coordinateLookupReason = reason
+    }
+
 readWithOptions :: TensorFile -> [EntrySelector] -> ReadOptions -> IO (Result (SomeTensor, ReadExecutionReport))
 readWithOptions file@TensorFile{tensorFileNative} selectors options =
   withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
@@ -1191,18 +2106,22 @@ readWithOptionsDense file@TensorFile{tensorFileNative} selectors options fillVal
 -- | Read current visible data with an explicit shape policy.
 readWithShapePolicy :: TensorFile -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> IO (Result (SomeTensor, ReadExecutionReport))
 readWithShapePolicy file@TensorFile{tensorFileNative} selectors options policy =
-  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
-    withShapeReadOptions options policy $ \optionsPtr ->
-      readTensorWithReport file $ \handle tensorPtr reportPtr ->
-        capiReadWithShapePolicy tensorFileNative handle selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+  case validateReadShapePolicy policy of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withShapeReadOptions options policy $ \optionsPtr ->
+        readTensorWithReport file $ \handle tensorPtr reportPtr ->
+          capiReadWithShapePolicy tensorFileNative handle selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
 
 -- | Dense variant of 'readWithShapePolicy'.
 readWithShapePolicyDense :: TensorFile -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> Double -> IO (Result (SomeDenseRead, ReadExecutionReport))
 readWithShapePolicyDense file@TensorFile{tensorFileNative} selectors options policy fillValue =
-  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
-    withShapeReadOptions options policy $ \optionsPtr ->
-      readDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
-        capiReadWithShapePolicyDense tensorFileNative handle selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+  case validateReadShapePolicy policy of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withShapeReadOptions options policy $ \optionsPtr ->
+        readDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+          capiReadWithShapePolicyDense tensorFileNative handle selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
 
 -- | Attributed current read that also returns native query-trace JSON.
 readWithOptionsAttributed :: TensorFile -> [EntrySelector] -> ReadOptions -> QueryTraceContext -> IO (Result (SomeTensor, ReadExecutionReport, QueryTraceJson))
@@ -1263,18 +2182,22 @@ readAtCommitWithOptionsDense file@TensorFile{tensorFileNative} commitSeqValue se
 -- | Historical read with an explicit shape policy.
 readAtCommitWithShapePolicy :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> IO (Result (SomeTensor, HistoricalReadExecutionReport))
 readAtCommitWithShapePolicy file@TensorFile{tensorFileNative} commitSeqValue selectors options policy =
-  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
-    withShapeReadOptions options policy $ \optionsPtr ->
-      readHistoricalTensorWithReport file $ \handle tensorPtr reportPtr ->
-        capiReadAtCommitWithShapePolicy tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
+  case validateReadShapePolicy policy of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withShapeReadOptions options policy $ \optionsPtr ->
+        readHistoricalTensorWithReport file $ \handle tensorPtr reportPtr ->
+          capiReadAtCommitWithShapePolicy tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr tensorPtr reportPtr
 
 -- | Dense historical read with an explicit shape policy.
 readAtCommitWithShapePolicyDense :: TensorFile -> Word64 -> [EntrySelector] -> ReadOptions -> ReadShapePolicy -> Double -> IO (Result (SomeDenseRead, HistoricalReadExecutionReport))
 readAtCommitWithShapePolicyDense file@TensorFile{tensorFileNative} commitSeqValue selectors options policy fillValue =
-  withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
-    withShapeReadOptions options policy $ \optionsPtr ->
-      readHistoricalDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
-        capiReadAtCommitWithShapePolicyDense tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
+  case validateReadShapePolicy policy of
+    Left err -> pure (Left err)
+    Right () -> withEntrySelectors selectors $ \selectorsPtr selectorsLen ->
+      withShapeReadOptions options policy $ \optionsPtr ->
+        readHistoricalDenseWithReport file $ \handle tensorPtr maskPtr reportPtr ->
+          capiReadAtCommitWithShapePolicyDense tensorFileNative handle commitSeqValue selectorsPtr selectorsLen optionsPtr fillValue tensorPtr maskPtr reportPtr
 
 -- | Read by Python-style index items and return the native lowering report.
 readIndex :: TensorFile -> [ReadIndexItem] -> IO (Result (SomeTensor, ReadIndexReport))
@@ -1644,6 +2567,204 @@ peekRequiredCString :: CString -> IO String
 peekRequiredCString ptr
   | ptr == nullPtr = pure ""
   | otherwise = peekCString ptr
+
+-- | Append a dense tensor with universe slot bindings.
+appendDenseWithUniverse :: forall a. TioElement a => TensorFile -> Tensor a -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendDenseWithUniverse file@TensorFile{tensorFileNative} tensor@Tensor{tensorShape, tensorValues} options = do
+  case validateTensor tensor *> validateAppendUniverseOptions options of
+    Left err -> pure (Left err)
+    Right () -> withForeignPtr (tensorFileHandle file) $ \handle ->
+      VS.unsafeWith tensorValues $ \valuesPtr ->
+        withArray tensorShape $ \shapePtr ->
+          withAppendUniverseOptions options $ \optionsPtr ->
+            alloca $ \startPtr ->
+              alloca $ \endPtr -> do
+                status <- case elementDType (Proxy :: Proxy a) of
+                  F32 -> capiAppendF32WithUniverse tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank optionsPtr startPtr endPtr
+                  F64 -> capiAppendF64WithUniverse tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank optionsPtr startPtr endPtr
+                  I32 -> capiAppendI32WithUniverse tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank optionsPtr startPtr endPtr
+                  I64 -> capiAppendI64WithUniverse tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank optionsPtr startPtr endPtr
+                if status == okStatus
+                  then AppendRange <$> peek startPtr <*> peek endPtr >>= pure . Right
+                  else Left <$> lastError tensorFileNative
+ where
+  tensorRank = CSize (fromIntegral (length tensorShape))
+
+appendDenseF32WithUniverse :: TensorFile -> [Word64] -> VS.Vector Float -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendDenseF32WithUniverse file shape values options = appendUniverseVector file shape values options
+
+appendDenseF64WithUniverse :: TensorFile -> [Word64] -> VS.Vector Double -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendDenseF64WithUniverse file shape values options = appendUniverseVector file shape values options
+
+appendDenseI32WithUniverse :: TensorFile -> [Word64] -> VS.Vector Int32 -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendDenseI32WithUniverse file shape values options = appendUniverseVector file shape values options
+
+appendDenseI64WithUniverse :: TensorFile -> [Word64] -> VS.Vector Int64 -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendDenseI64WithUniverse file shape values options = appendUniverseVector file shape values options
+
+appendUniverseVector :: TioElement a => TensorFile -> [Word64] -> VS.Vector a -> AppendWithUniverseOptions -> IO (Result AppendRange)
+appendUniverseVector file shape values options = case tensorFromVector shape values of
+  Left err -> pure (Left err)
+  Right tensor -> appendDenseWithUniverse file tensor options
+
+validateAppendUniverseOptions :: AppendWithUniverseOptions -> Result ()
+validateAppendUniverseOptions AppendWithUniverseOptions{appendUniverseSlots, appendUniverseRemapSlots} = do
+  mapM_ validateSlot appendUniverseSlots
+  mapM_ validateRemapSlot appendUniverseRemapSlots
+ where
+  validateSlot (SlotUniverseBindingInput axes) = mapM_ validateBinding axes
+  validateBinding UniverseBindingInput{universeBindingAxis, universeBindingFamilyUuid, universeBindingVersionUuid} = do
+    validateAxisIndex "universe binding" universeBindingAxis
+    validateUuid "universe binding family UUID" universeBindingFamilyUuid
+    validateUuid "universe binding version UUID" universeBindingVersionUuid
+  validateRemapSlot (SlotUniverseRemapInput axes) = mapM_ validateRemap axes
+  validateRemap UniverseRemapInput{universeRemapAxis, universeRemapTargetFamilyUuid, universeRemapTargetVersionUuid} = do
+    validateAxisIndex "universe remap" universeRemapAxis
+    validateUuid "universe remap family UUID" universeRemapTargetFamilyUuid
+    validateUuid "universe remap version UUID" universeRemapTargetVersionUuid
+
+withAppendUniverseOptions :: AppendWithUniverseOptions -> (Ptr CArcadiaTioAppendWithUniverseOptions -> IO a) -> IO a
+withAppendUniverseOptions AppendWithUniverseOptions{appendUniverseSlots, appendUniverseRemapSlots} action =
+  withSlotUniverseBindingInputs appendUniverseSlots $ \slotsPtr slotsLen ->
+    withSlotUniverseRemapInputs appendUniverseRemapSlots $ \remapPtr remapLen ->
+      alloca $ \optionsPtr -> do
+        poke optionsPtr CArcadiaTioAppendWithUniverseOptions
+          { cAppendWithUniverseOptionsVersion = 1
+          , cAppendWithUniverseOptionsStructSize = 48
+          , cAppendWithUniverseOptionsSlots = slotsPtr
+          , cAppendWithUniverseOptionsSlotsLen = slotsLen
+          , cAppendWithUniverseOptionsRemapSlots = remapPtr
+          , cAppendWithUniverseOptionsRemapSlotsLen = remapLen
+          }
+        action optionsPtr
+
+withSlotUniverseBindingInputs :: [SlotUniverseBindingInput] -> (Ptr CArcadiaTioSlotUniverseBindingInput -> CSize -> IO a) -> IO a
+withSlotUniverseBindingInputs slots action = go slots []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action (if null acc then nullPtr else ptr) (CSize (fromIntegral (length acc)))
+  go (SlotUniverseBindingInput axes : rest) acc =
+    withArray (map universeBindingToC axes) $ \axesPtr ->
+      go rest (CArcadiaTioSlotUniverseBindingInput (if null axes then nullPtr else axesPtr) (CSize (fromIntegral (length axes))) : acc)
+
+universeBindingToC :: UniverseBindingInput -> CArcadiaTioUniverseBindingInput
+universeBindingToC UniverseBindingInput{universeBindingAxis, universeBindingFamilyUuid, universeBindingVersionUuid, universeBindingLength} =
+  CArcadiaTioUniverseBindingInput (fromIntegral universeBindingAxis) (uuidBytes16 universeBindingFamilyUuid) (uuidBytes16 universeBindingVersionUuid) universeBindingLength
+
+withSlotUniverseRemapInputs :: [SlotUniverseRemapInput] -> (Ptr CArcadiaTioSlotUniverseRemapInput -> CSize -> IO a) -> IO a
+withSlotUniverseRemapInputs slots action = go slots []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action (if null acc then nullPtr else ptr) (CSize (fromIntegral (length acc)))
+  go (SlotUniverseRemapInput axes : rest) acc =
+    withUniverseRemapInputs axes $ \axesPtr axesLen ->
+      go rest (CArcadiaTioSlotUniverseRemapInput axesPtr axesLen : acc)
+
+withUniverseRemapInputs :: [UniverseRemapInput] -> (Ptr CArcadiaTioUniverseRemapInput -> CSize -> IO a) -> IO a
+withUniverseRemapInputs remaps action = go remaps []
+ where
+  go [] acc = withArray (reverse acc) $ \ptr -> action (if null acc then nullPtr else ptr) (CSize (fromIntegral (length acc)))
+  go (remap : rest) acc =
+    withArray (universeRemapSourceToTarget remap) $ \mapPtr ->
+      go rest (universeRemapToC (if null (universeRemapSourceToTarget remap) then nullPtr else mapPtr) remap : acc)
+
+universeRemapToC :: Ptr Word64 -> UniverseRemapInput -> CArcadiaTioUniverseRemapInput
+universeRemapToC mapPtr UniverseRemapInput{universeRemapAxis, universeRemapTargetFamilyUuid, universeRemapTargetVersionUuid, universeRemapTargetLength, universeRemapSourceToTarget} =
+  CArcadiaTioUniverseRemapInput 1 80 (fromIntegral universeRemapAxis) (uuidBytes16 universeRemapTargetFamilyUuid) (uuidBytes16 universeRemapTargetVersionUuid) universeRemapTargetLength mapPtr (CSize (fromIntegral (length universeRemapSourceToTarget)))
+
+-- | Append a dense tensor with Coordinate v2 append-axis batches. Payload and
+-- coordinate buffers are borrowed only for the duration of the C call.
+appendDenseWithCoordinatesV2 :: forall a. TioElement a => TensorFile -> Tensor a -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendDenseWithCoordinatesV2 file@TensorFile{tensorFileNative} tensor@Tensor{tensorShape, tensorValues} coordinates = do
+  case validateTensor tensor *> validateAppendCoordinateEntries coordinates of
+    Left err -> pure (Left err)
+    Right () -> withForeignPtr (tensorFileHandle file) $ \handle ->
+      VS.unsafeWith tensorValues $ \valuesPtr ->
+        withArray tensorShape $ \shapePtr ->
+          withAppendCoordinateBatch coordinates $ \coordinateBatchPtr ->
+            alloca $ \startPtr ->
+              alloca $ \endPtr -> do
+                status <- case elementDType (Proxy :: Proxy a) of
+                  F32 -> capiAppendF32WithCoordinatesV2 tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank coordinateBatchPtr startPtr endPtr
+                  F64 -> capiAppendF64WithCoordinatesV2 tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank coordinateBatchPtr startPtr endPtr
+                  I32 -> capiAppendI32WithCoordinatesV2 tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank coordinateBatchPtr startPtr endPtr
+                  I64 -> capiAppendI64WithCoordinatesV2 tensorFileNative handle (castPtr valuesPtr) shapePtr tensorRank coordinateBatchPtr startPtr endPtr
+                if status == okStatus
+                  then AppendRange <$> peek startPtr <*> peek endPtr >>= pure . Right
+                  else Left <$> lastError tensorFileNative
+ where
+  tensorRank = CSize (fromIntegral (length tensorShape))
+
+appendDenseF32WithCoordinatesV2 :: TensorFile -> [Word64] -> VS.Vector Float -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendDenseF32WithCoordinatesV2 file shape values coordinates = appendVectorWithCoordinates file shape values coordinates
+
+appendDenseF64WithCoordinatesV2 :: TensorFile -> [Word64] -> VS.Vector Double -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendDenseF64WithCoordinatesV2 file shape values coordinates = appendVectorWithCoordinates file shape values coordinates
+
+appendDenseI32WithCoordinatesV2 :: TensorFile -> [Word64] -> VS.Vector Int32 -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendDenseI32WithCoordinatesV2 file shape values coordinates = appendVectorWithCoordinates file shape values coordinates
+
+appendDenseI64WithCoordinatesV2 :: TensorFile -> [Word64] -> VS.Vector Int64 -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendDenseI64WithCoordinatesV2 file shape values coordinates = appendVectorWithCoordinates file shape values coordinates
+
+appendVectorWithCoordinates :: TioElement a => TensorFile -> [Word64] -> VS.Vector a -> [AppendCoordinateEntryV2] -> IO (Result AppendRange)
+appendVectorWithCoordinates file shape values coordinates = case tensorFromVector shape values of
+  Left err -> pure (Left err)
+  Right tensor -> appendDenseWithCoordinatesV2 file tensor coordinates
+
+validateAppendCoordinateEntries :: [AppendCoordinateEntryV2] -> Result ()
+validateAppendCoordinateEntries coordinates = mapM_ validateEntry coordinates
+ where
+  validateEntry AppendCoordinateEntryV2{appendCoordinateEntryAxis, appendCoordinateEntryDescriptorId, appendCoordinateEntryName}
+    | appendCoordinateEntryAxis < 0 = Left (invalidArgument "append coordinate axis must be non-negative")
+    | otherwise = do
+        validateRequiredString "append coordinate descriptor id" appendCoordinateEntryDescriptorId
+        validateRequiredString "append coordinate name" appendCoordinateEntryName
+
+withAppendCoordinateBatch :: [AppendCoordinateEntryV2] -> (Ptr CArcadiaTioAppendCoordinateBatchV2 -> IO a) -> IO a
+withAppendCoordinateBatch coordinates action =
+  withAppendCoordinateEntries coordinates $ \entriesPtr entriesLen ->
+    alloca $ \batchPtr -> do
+      poke batchPtr CArcadiaTioAppendCoordinateBatchV2
+        { cAppendCoordinateBatchVersion = 1
+        , cAppendCoordinateBatchStructSize = 64
+        , cAppendCoordinateBatchEntries = entriesPtr
+        , cAppendCoordinateBatchEntriesLen = entriesLen
+        }
+      action batchPtr
+
+withAppendCoordinateEntries :: [AppendCoordinateEntryV2] -> (Ptr CArcadiaTioAppendCoordinateEntryV2 -> CSize -> IO a) -> IO a
+withAppendCoordinateEntries [] action = action nullPtr 0
+withAppendCoordinateEntries coordinates action =
+  withAppendCoordinateEntriesRaw coordinates $ \raw ->
+    withArray raw $ \entriesPtr -> action entriesPtr (CSize (fromIntegral (length raw)))
+
+withAppendCoordinateEntriesRaw :: [AppendCoordinateEntryV2] -> ([CArcadiaTioAppendCoordinateEntryV2] -> IO a) -> IO a
+withAppendCoordinateEntriesRaw [] action = action []
+withAppendCoordinateEntriesRaw (entry : rest) action =
+  withCString (appendCoordinateEntryDescriptorId entry) $ \descriptorPtr ->
+    withCString (appendCoordinateEntryName entry) $ \namePtr ->
+      withCoordinateValues (appendCoordinateEntryValues entry) $ \dtype valuesPtr valuesLen ->
+        withAppendCoordinateEntriesRaw rest $ \restRaw ->
+          action (appendCoordinateEntryToC descriptorPtr namePtr dtype valuesPtr valuesLen entry : restRaw)
+
+appendCoordinateEntryToC :: CString -> CString -> CoordinateDType -> Ptr Word8 -> CSize -> AppendCoordinateEntryV2 -> CArcadiaTioAppendCoordinateEntryV2
+appendCoordinateEntryToC descriptorPtr namePtr dtype valuesPtr valuesLen AppendCoordinateEntryV2{appendCoordinateEntryAxis, appendCoordinateEntryEncoding} =
+  CArcadiaTioAppendCoordinateEntryV2
+    { cAppendCoordinateEntryVersion = 1
+    , cAppendCoordinateEntryStructSize = 120
+    , cAppendCoordinateEntryAxis = CSize (fromIntegral appendCoordinateEntryAxis)
+    , cAppendCoordinateEntryDescriptorId = descriptorPtr
+    , cAppendCoordinateEntryName = namePtr
+    , cAppendCoordinateEntryValueDomain = coordinateValueDomainV2ToRaw CoordinateV2InlineNumeric
+    , cAppendCoordinateEntryNumericDType = coordinateDTypeToRaw dtype
+    , cAppendCoordinateEntryNumericEncoding = coordinateEncodingToRaw appendCoordinateEntryEncoding
+    , cAppendCoordinateEntryCodeDType = 0
+    , cAppendCoordinateEntryValues = valuesPtr
+    , cAppendCoordinateEntryCount = valuesLen
+    , cAppendCoordinateEntryElementSize = CSize (case dtype of CoordinateI32 -> 4; CoordinateI64 -> 8; _ -> 0)
+    , cAppendCoordinateEntryFixedTextWidth = 0
+    , cAppendCoordinateEntryDictionaryEntries = nullPtr
+    , cAppendCoordinateEntryDictionaryEntriesLen = 0
+    }
 
 -- | Append a dense tensor. The tensor payload is borrowed only for the duration
 -- of the C call.

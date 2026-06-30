@@ -18,6 +18,17 @@ module Arcadia.Tio
   , releaseArrowCData
   , createStreaming
   , createStreamingWithMetadata
+  , createStreamingWithCoordinates
+  , createRandomAccessWithCoordinates
+  , createInferredWithCoordinates
+  , createWithPolicyWithCoordinates
+  , createStreamingWithCoordinatesV2
+  , createRandomAccessWithCoordinatesV2
+  , createInferredWithCoordinatesV2
+  , createWithPolicyWithCoordinatesV2
+  , createStreamingWithUniverse
+  , createRandomAccessWithUniverse
+  , createWithPolicyWithUniverse
   , createRandomAccess
   , createRandomAccessWithMetadata
   , createInferred
@@ -33,6 +44,15 @@ module Arcadia.Tio
   , chunkPlan
   , filePath
   , loadMeta
+  , coordinateMeta
+  , loadCoordinateMeta
+  , coordinateMetaV2
+  , loadCoordinateMetaV2
+  , readAxisCoordinates
+  , readAxisCoordinatesV2
+  , coordinateDictionaryV2
+  , coordinateLookupV2
+  , coordinateLookupRangeV2
   , setDimName
   , setSymbols
   , setChannels
@@ -83,6 +103,16 @@ module Arcadia.Tio
   , appendDenseF64
   , appendDenseI32
   , appendDenseI64
+  , appendDenseWithCoordinatesV2
+  , appendDenseF32WithCoordinatesV2
+  , appendDenseF64WithCoordinatesV2
+  , appendDenseI32WithCoordinatesV2
+  , appendDenseI64WithCoordinatesV2
+  , appendDenseWithUniverse
+  , appendDenseF32WithUniverse
+  , appendDenseF64WithUniverse
+  , appendDenseI32WithUniverse
+  , appendDenseI64WithUniverse
   , readAll
   , readAllAs
   , readAllF32

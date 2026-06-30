@@ -46,8 +46,10 @@ Implemented:
 - copied access to `arcadia_tio_last_error_code` and
   `arcadia_tio_last_error_message`;
 - create streaming, random-access, inferred, and policy-selected `.tio` files,
-  including optional dim names, symbols, channels, and user key/value metadata on
-  supported create paths;
+  including optional dim names, symbols, channels, user key/value metadata, and
+  coordinate descriptors on supported create paths;
+- create streaming, random-access, and policy-selected `.tio` files with
+  universe-aware axis identity options;
 - open `.tio` files;
 - close native handles through a `ForeignPtr` finalizer, with explicit `close`;
 - query/set write-forward compression configuration;
@@ -57,6 +59,8 @@ Implemented:
 - expose metadata setter wrappers that return the native C ABI status (currently
   unsupported by the V4-only runtime where the native library says so);
 - append dense `f32`, `f64`, `i32`, and `i64` tensors;
+- append dense `f32`, `f64`, `i32`, and `i64` tensors with Coordinate v2
+  append-axis batches and with universe slot bindings/remaps;
 - analyze and append sparse-intent `f32`, `f64`, `i32`, and `i64` payloads,
   including exact integer sparse predicates through the C ABI V2 sparse rule;
 - read all values into Haskell-owned `Vector.Storable` buffers;
@@ -64,9 +68,11 @@ Implemented:
 - read axis ranges/takes/one-index slices, append-entry ranges/takes, and scalar values;
 - read full and selector-bearing retained commit snapshots, including dense
   materialization with mask;
-- read with execution options, shape policies, copied read execution reports,
-  attributed query-trace JSON, historical option reports, and Python-style
-  read-index lowering reports;
+- read with execution options, shape policies (including explicit-universe
+  targets), copied read execution reports, attributed query-trace JSON,
+  historical option reports, and Python-style read-index lowering reports;
+- read Coordinate v1/v2 metadata and values, Coordinate v2 dictionaries, and
+  Coordinate v2 exact/range lookup result carriers;
 - query/set index-checkpoint cadence, surfacing native unsupported status where
   the V4 runtime does not implement it;
 - inspect head/list commits and shallow compaction stats;
@@ -85,8 +91,9 @@ Not yet supported:
 
 - parsing `.tio` or `.ocb` in Haskell;
 - OCB write/read-batch/dictionary/summary APIs beyond minimal open/metadata/close;
-- coordinate APIs, retained-history/detailed compaction/reform/diagnostic report
-  families, Python/NumPy interop, or C++ helpers;
+- legacy coordinate index/range helpers, richer coordinate fixed-text/dictionary
+  authoring ergonomics, retained-history/detailed compaction/reform/diagnostic
+  report families, Python/NumPy interop, or C++ helpers;
 - macOS/Windows native-library lookup;
 - native library vendoring, publishing, signing, or release assets.
 
@@ -134,7 +141,8 @@ The test suite skips when neither `ARCADIA_TIO_CAPI_LIB` nor
 project-local `.test-output/*.tio` files, checks dense `f32`/`f64`/`i32`/`i64`
 roundtrips, random-access create, sparse-intent append, compaction helpers,
 metadata queries, selector reads, option/report reads, read-index, mutation and
-Arrow ownership wrappers, dense-mask reads, and removes generated files:
+Arrow ownership wrappers, dense-mask reads, coordinate create/read/lookup/append
+smokes, universe create/append/explicit-read smokes, and removes generated files:
 
 ```sh
 cabal test all

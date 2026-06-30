@@ -12,6 +12,28 @@ module Arcadia.Tio.Internal.CApi
   , lastError
   , CHandle
   , COcbFile
+  , CArcadiaTioAxisCoordinateInput(..)
+  , CArcadiaTioAxisCoordinateMeta(..)
+  , CArcadiaTioAxisCoordinateMetaV2(..)
+  , CArcadiaTioAxisCoordinateInputV2(..)
+  , CArcadiaTioCoordinateFixedTextLayoutV2(..)
+  , CArcadiaTioCoordinateDictionarySummaryV2(..)
+  , CArcadiaTioCoordinateExternalBindingV2(..)
+  , CArcadiaTioCoordinateIndexSourceBindingV2(..)
+  , CArcadiaTioCoordinateIndexSummaryV2(..)
+  , CArcadiaTioCoordinateDictionaryEntryV2(..)
+  , CArcadiaTioCoordinateDictionaryV2(..)
+  , CArcadiaTioCoordinateValueSliceV2(..)
+  , CArcadiaTioCoordinateLookupKeyV2(..)
+  , CArcadiaTioCoordinateLookupResultV2(..)
+  , CArcadiaTioAppendCoordinateEntryV2(..)
+  , CArcadiaTioAppendCoordinateBatchV2(..)
+  , CArcadiaTioCoordinateV2Options(..)
+  , emptyCArcadiaTioCoordinateFixedTextLayoutV2
+  , emptyCArcadiaTioCoordinateDictionarySummaryV2
+  , emptyCArcadiaTioCoordinateV2Options
+  , emptyCArcadiaTioCoordinateLookupKeyV2
+  , emptyCArcadiaTioCoordinateLookupResultV2
   , CArcadiaTioTensor(..)
   , emptyCArcadiaTioTensor
   , CArcadiaTioMask(..)
@@ -25,6 +47,15 @@ module Arcadia.Tio.Internal.CApi
   , CArcadiaTioCompressionConfig(..)
   , compressionConfigStructSize
   , CArcadiaTioEntrySelector(..)
+  , CArcadiaTioExplicitUniverseAxisTarget(..)
+  , CArcadiaTioAxisIdentityInput(..)
+  , CArcadiaTioUniverseBindingInput(..)
+  , CArcadiaTioSlotUniverseBindingInput(..)
+  , CArcadiaTioUniverseRemapInput(..)
+  , CArcadiaTioSlotUniverseRemapInput(..)
+  , CArcadiaTioCreateWithUniverseOptions(..)
+  , CArcadiaTioAppendWithUniverseOptions(..)
+  , CArcadiaTioExplicitExtentAxisTarget(..)
   , CArcadiaTioReadShapePolicyOptions(..)
   , CArcadiaTioReadWithShapePolicyOptions(..)
   , CArcadiaTioReadWithOptionsOptions(..)
@@ -68,10 +99,43 @@ module Arcadia.Tio.Internal.CApi
   , capiCreateStreamingEx
   , capiCreateRandomAccess
   , capiCreateRandomAccessEx
+  , capiCreateRandomAccessWithUniverse
+  , capiCreateStreamingWithUniverse
+  , capiCreateWithPolicyWithUniverse
   , capiCreateInferred
   , capiCreateInferredEx
   , capiCreateWithPolicy
   , capiCreateWithPolicyEx
+  , capiCreateWithPolicyWithCoordinates
+  , capiCreateInferredWithCoordinates
+  , capiCreateRandomAccessWithCoordinates
+  , capiCreateStreamingWithCoordinates
+  , capiCreateWithPolicyWithCoordinatesV2
+  , capiCreateInferredWithCoordinatesV2
+  , capiCreateRandomAccessWithCoordinatesV2
+  , capiCreateStreamingWithCoordinatesV2
+  , capiCoordinateMeta
+  , capiLoadCoordinateMeta
+  , capiAxisCoordinateMetaFree
+  , capiCoordinateMetaV2
+  , capiLoadCoordinateMetaV2
+  , capiAxisCoordinateMetaV2Free
+  , capiReadAxisCoordinates
+  , capiReadAxisCoordinatesV2
+  , capiCoordinateValueSliceV2Free
+  , capiCoordinateDictionaryV2
+  , capiCoordinateDictionaryV2Free
+  , capiCoordinateLookupV2
+  , capiCoordinateLookupRangeV2
+  , capiCoordinateLookupResultV2Free
+  , capiAppendF32WithCoordinatesV2
+  , capiAppendF64WithCoordinatesV2
+  , capiAppendI32WithCoordinatesV2
+  , capiAppendI64WithCoordinatesV2
+  , capiAppendF32WithUniverse
+  , capiAppendF64WithUniverse
+  , capiAppendI32WithUniverse
+  , capiAppendI64WithUniverse
   , capiOpen
   , capiClose
   , capiAppendF32WithRange
@@ -163,7 +227,9 @@ import Data.Int (Int32, Int64)
 import Data.Word (Word8, Word32, Word64)
 import Foreign.C.String (CString, peekCString)
 import Foreign.C.Types (CFloat, CInt(..), CSize(..))
-import Foreign.Ptr (FunPtr, Ptr, nullFunPtr, nullPtr)
+import Foreign.Ptr (FunPtr, Ptr, nullFunPtr, nullPtr, plusPtr)
+import Foreign.Marshal.Array (pokeArray)
+import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Storable (Storable(..))
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
@@ -188,6 +254,659 @@ data CHandle
 
 -- | Opaque C OCB selected-snapshot handle.
 data COcbFile
+
+
+-- | Raw Coordinate v1 create input.
+data CArcadiaTioAxisCoordinateInput = CArcadiaTioAxisCoordinateInput
+  { cAxisCoordinateInputVersion :: Word32
+  , cAxisCoordinateInputAxis :: CSize
+  , cAxisCoordinateInputName :: CString
+  , cAxisCoordinateInputKind :: CInt
+  , cAxisCoordinateInputDType :: CInt
+  , cAxisCoordinateInputEncoding :: CInt
+  , cAxisCoordinateInputValues :: Ptr Word8
+  , cAxisCoordinateInputValuesLen :: CSize
+  , cAxisCoordinateInputSorted :: CInt
+  , cAxisCoordinateInputMonotonicity :: CInt
+  , cAxisCoordinateInputUniqueness :: CInt
+  , cAxisCoordinateInputStorageKind :: CInt
+  , cAxisCoordinateInputExternalSourceKind :: CInt
+  , cAxisCoordinateInputExternalUri :: CString
+  , cAxisCoordinateInputExternalDType :: CInt
+  , cAxisCoordinateInputExternalLength :: Word64
+  , cAxisCoordinateInputRequired :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAxisCoordinateInput where
+  sizeOf _ = 120
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioAxisCoordinateInput <$> peekByteOff ptr 0 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 36 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 68 <*> peekByteOff ptr 72 <*> peekByteOff ptr 76 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAxisCoordinateInputVersion v)
+    pokeByteOff ptr 8 (120 :: CSize)
+    pokeByteOff ptr 16 (cAxisCoordinateInputAxis v)
+    pokeByteOff ptr 24 (cAxisCoordinateInputName v)
+    pokeByteOff ptr 32 (cAxisCoordinateInputKind v)
+    pokeByteOff ptr 36 (cAxisCoordinateInputDType v)
+    pokeByteOff ptr 40 (cAxisCoordinateInputEncoding v)
+    pokeByteOff ptr 48 (cAxisCoordinateInputValues v)
+    pokeByteOff ptr 56 (cAxisCoordinateInputValuesLen v)
+    pokeByteOff ptr 64 (cAxisCoordinateInputSorted v)
+    pokeByteOff ptr 68 (cAxisCoordinateInputMonotonicity v)
+    pokeByteOff ptr 72 (cAxisCoordinateInputUniqueness v)
+    pokeByteOff ptr 76 (cAxisCoordinateInputStorageKind v)
+    pokeByteOff ptr 80 (cAxisCoordinateInputExternalSourceKind v)
+    pokeByteOff ptr 88 (cAxisCoordinateInputExternalUri v)
+    pokeByteOff ptr 96 (cAxisCoordinateInputExternalDType v)
+    pokeByteOff ptr 104 (cAxisCoordinateInputExternalLength v)
+    pokeByteOff ptr 112 (cAxisCoordinateInputRequired v)
+
+-- | Raw Coordinate v1 metadata item returned by the C ABI.
+data CArcadiaTioAxisCoordinateMeta = CArcadiaTioAxisCoordinateMeta
+  { cAxisCoordinateMetaVersion :: Word32
+  , cAxisCoordinateMetaAxis :: CSize
+  , cAxisCoordinateMetaAxisNameSnapshot :: CString
+  , cAxisCoordinateMetaName :: CString
+  , cAxisCoordinateMetaKind :: CInt
+  , cAxisCoordinateMetaDType :: CInt
+  , cAxisCoordinateMetaEncoding :: CInt
+  , cAxisCoordinateMetaLength :: Word64
+  , cAxisCoordinateMetaSorted :: CInt
+  , cAxisCoordinateMetaMonotonicity :: CInt
+  , cAxisCoordinateMetaUniqueness :: CInt
+  , cAxisCoordinateMetaStorageKind :: CInt
+  , cAxisCoordinateMetaExternalSourceKind :: CInt
+  , cAxisCoordinateMetaExternalUri :: CString
+  , cAxisCoordinateMetaRequired :: Word8
+  , cAxisCoordinateMetaValidationStatus :: CInt
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAxisCoordinateMeta where
+  sizeOf _ = 104
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr =
+    CArcadiaTioAxisCoordinateMeta
+      <$> peekByteOff ptr 0
+      <*> peekByteOff ptr 16
+      <*> peekByteOff ptr 24
+      <*> peekByteOff ptr 32
+      <*> peekByteOff ptr 40
+      <*> peekByteOff ptr 44
+      <*> peekByteOff ptr 48
+      <*> peekByteOff ptr 56
+      <*> peekByteOff ptr 64
+      <*> peekByteOff ptr 68
+      <*> peekByteOff ptr 72
+      <*> peekByteOff ptr 76
+      <*> peekByteOff ptr 80
+      <*> peekByteOff ptr 88
+      <*> peekByteOff ptr 96
+      <*> peekByteOff ptr 100
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAxisCoordinateMetaVersion v)
+    pokeByteOff ptr 16 (cAxisCoordinateMetaAxis v)
+    pokeByteOff ptr 24 (cAxisCoordinateMetaAxisNameSnapshot v)
+    pokeByteOff ptr 32 (cAxisCoordinateMetaName v)
+    pokeByteOff ptr 40 (cAxisCoordinateMetaKind v)
+    pokeByteOff ptr 44 (cAxisCoordinateMetaDType v)
+    pokeByteOff ptr 48 (cAxisCoordinateMetaEncoding v)
+    pokeByteOff ptr 56 (cAxisCoordinateMetaLength v)
+    pokeByteOff ptr 64 (cAxisCoordinateMetaSorted v)
+    pokeByteOff ptr 68 (cAxisCoordinateMetaMonotonicity v)
+    pokeByteOff ptr 72 (cAxisCoordinateMetaUniqueness v)
+    pokeByteOff ptr 76 (cAxisCoordinateMetaStorageKind v)
+    pokeByteOff ptr 80 (cAxisCoordinateMetaExternalSourceKind v)
+    pokeByteOff ptr 88 (cAxisCoordinateMetaExternalUri v)
+    pokeByteOff ptr 96 (cAxisCoordinateMetaRequired v)
+    pokeByteOff ptr 100 (cAxisCoordinateMetaValidationStatus v)
+
+-- | Raw Coordinate v2 fixed-text layout.
+data CArcadiaTioCoordinateFixedTextLayoutV2 = CArcadiaTioCoordinateFixedTextLayoutV2
+  { cCoordinateFixedTextVersion :: Word32
+  , cCoordinateFixedTextStructSize :: CSize
+  , cCoordinateFixedTextWidth :: CSize
+  , cCoordinateFixedTextEncoding :: CInt
+  , cCoordinateFixedTextPadding :: CInt
+  , cCoordinateFixedTextRejectOverWidth :: Word8
+  , cCoordinateFixedTextRejectNonAscii :: Word8
+  }
+  deriving (Eq, Show)
+
+emptyCArcadiaTioCoordinateFixedTextLayoutV2 :: CArcadiaTioCoordinateFixedTextLayoutV2
+emptyCArcadiaTioCoordinateFixedTextLayoutV2 = CArcadiaTioCoordinateFixedTextLayoutV2 1 56 0 0 0 0 0
+
+instance Storable CArcadiaTioCoordinateFixedTextLayoutV2 where
+  sizeOf _ = 56
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateFixedTextLayoutV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 33
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateFixedTextVersion v)
+    pokeByteOff ptr 8 (cCoordinateFixedTextStructSize v)
+    pokeByteOff ptr 16 (cCoordinateFixedTextWidth v)
+    pokeByteOff ptr 24 (cCoordinateFixedTextEncoding v)
+    pokeByteOff ptr 28 (cCoordinateFixedTextPadding v)
+    pokeByteOff ptr 32 (cCoordinateFixedTextRejectOverWidth v)
+    pokeByteOff ptr 33 (cCoordinateFixedTextRejectNonAscii v)
+
+data CArcadiaTioCoordinateDictionarySummaryV2 = CArcadiaTioCoordinateDictionarySummaryV2
+  { cCoordinateDictionarySummaryVersion :: Word32
+  , cCoordinateDictionarySummaryStructSize :: CSize
+  , cCoordinateDictionarySummaryDictionaryId :: CString
+  , cCoordinateDictionarySummaryRevision :: Word64
+  , cCoordinateDictionarySummaryCodeDType :: CInt
+  , cCoordinateDictionarySummaryEntryCount :: Word64
+  , cCoordinateDictionarySummaryStableIdsUnique :: Word8
+  , cCoordinateDictionarySummaryDisplayLabelsUnique :: Word8
+  , cCoordinateDictionarySummaryAliasesUnique :: Word8
+  , cCoordinateDictionarySummaryCodesStableAcrossRevisions :: Word8
+  , cCoordinateDictionarySummaryContentId :: CString
+  }
+  deriving (Eq, Show)
+
+emptyCArcadiaTioCoordinateDictionarySummaryV2 :: CArcadiaTioCoordinateDictionarySummaryV2
+emptyCArcadiaTioCoordinateDictionarySummaryV2 = CArcadiaTioCoordinateDictionarySummaryV2 1 80 nullPtr 0 0 0 0 0 0 0 nullPtr
+
+instance Storable CArcadiaTioCoordinateDictionarySummaryV2 where
+  sizeOf _ = 80
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateDictionarySummaryV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 49 <*> peekByteOff ptr 50 <*> peekByteOff ptr 51 <*> peekByteOff ptr 56
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateDictionarySummaryVersion v)
+    pokeByteOff ptr 8 (cCoordinateDictionarySummaryStructSize v)
+    pokeByteOff ptr 16 (cCoordinateDictionarySummaryDictionaryId v)
+    pokeByteOff ptr 24 (cCoordinateDictionarySummaryRevision v)
+    pokeByteOff ptr 32 (cCoordinateDictionarySummaryCodeDType v)
+    pokeByteOff ptr 40 (cCoordinateDictionarySummaryEntryCount v)
+    pokeByteOff ptr 48 (cCoordinateDictionarySummaryStableIdsUnique v)
+    pokeByteOff ptr 49 (cCoordinateDictionarySummaryDisplayLabelsUnique v)
+    pokeByteOff ptr 50 (cCoordinateDictionarySummaryAliasesUnique v)
+    pokeByteOff ptr 51 (cCoordinateDictionarySummaryCodesStableAcrossRevisions v)
+    pokeByteOff ptr 56 (cCoordinateDictionarySummaryContentId v)
+
+data CArcadiaTioCoordinateExternalBindingV2 = CArcadiaTioCoordinateExternalBindingV2
+  { cCoordinateExternalBindingVersion :: Word32
+  , cCoordinateExternalBindingStructSize :: CSize
+  , cCoordinateExternalBindingSourceKind :: CInt
+  , cCoordinateExternalBindingLogicalId :: CString
+  , cCoordinateExternalBindingPrivacySafeDisplay :: CString
+  , cCoordinateExternalBindingContentId :: CString
+  , cCoordinateExternalBindingValueDomain :: CInt
+  , cCoordinateExternalBindingLength :: Word64
+  , cCoordinateExternalBindingAvailability :: CInt
+  , cCoordinateExternalBindingStatusCategory :: CInt
+  , cCoordinateExternalBindingRequired :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateExternalBindingV2 where
+  sizeOf _ = 96
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateExternalBindingV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 68 <*> peekByteOff ptr 72
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateExternalBindingVersion v)
+    pokeByteOff ptr 8 (cCoordinateExternalBindingStructSize v)
+    pokeByteOff ptr 16 (cCoordinateExternalBindingSourceKind v)
+    pokeByteOff ptr 24 (cCoordinateExternalBindingLogicalId v)
+    pokeByteOff ptr 32 (cCoordinateExternalBindingPrivacySafeDisplay v)
+    pokeByteOff ptr 40 (cCoordinateExternalBindingContentId v)
+    pokeByteOff ptr 48 (cCoordinateExternalBindingValueDomain v)
+    pokeByteOff ptr 56 (cCoordinateExternalBindingLength v)
+    pokeByteOff ptr 64 (cCoordinateExternalBindingAvailability v)
+    pokeByteOff ptr 68 (cCoordinateExternalBindingStatusCategory v)
+    pokeByteOff ptr 72 (cCoordinateExternalBindingRequired v)
+
+data CArcadiaTioCoordinateIndexSourceBindingV2 = CArcadiaTioCoordinateIndexSourceBindingV2
+  { cCoordinateIndexSourceVersion :: Word32
+  , cCoordinateIndexSourceStructSize :: CSize
+  , cCoordinateIndexSourceDescriptorId :: CString
+  , cCoordinateIndexSourceDescriptorRevision :: Word64
+  , cCoordinateIndexSourceValueDomain :: CInt
+  , cCoordinateIndexSourceValueObjectId :: CString
+  , cCoordinateIndexSourceDictionaryId :: CString
+  , cCoordinateIndexSourceDictionaryRevision :: Word64
+  , cCoordinateIndexSourceDictionaryContentId :: CString
+  , cCoordinateIndexSourceExternalSourceKind :: CInt
+  , cCoordinateIndexSourceExternalLogicalId :: CString
+  , cCoordinateIndexSourceExternalContentId :: CString
+  , cCoordinateIndexSourceRootId :: CString
+  , cCoordinateIndexSourceAxis :: CSize
+  , cCoordinateIndexSourceRootExtent :: Word64
+  , cCoordinateIndexSourceAppendStart :: Word64
+  , cCoordinateIndexSourceAppendCount :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateIndexSourceBindingV2 where
+  sizeOf _ = 168
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateIndexSourceBindingV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 128
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateIndexSourceVersion v)
+    pokeByteOff ptr 8 (cCoordinateIndexSourceStructSize v)
+    pokeByteOff ptr 16 (cCoordinateIndexSourceDescriptorId v)
+    pokeByteOff ptr 24 (cCoordinateIndexSourceDescriptorRevision v)
+    pokeByteOff ptr 32 (cCoordinateIndexSourceValueDomain v)
+    pokeByteOff ptr 40 (cCoordinateIndexSourceValueObjectId v)
+    pokeByteOff ptr 48 (cCoordinateIndexSourceDictionaryId v)
+    pokeByteOff ptr 56 (cCoordinateIndexSourceDictionaryRevision v)
+    pokeByteOff ptr 64 (cCoordinateIndexSourceDictionaryContentId v)
+    pokeByteOff ptr 72 (cCoordinateIndexSourceExternalSourceKind v)
+    pokeByteOff ptr 80 (cCoordinateIndexSourceExternalLogicalId v)
+    pokeByteOff ptr 88 (cCoordinateIndexSourceExternalContentId v)
+    pokeByteOff ptr 96 (cCoordinateIndexSourceRootId v)
+    pokeByteOff ptr 104 (cCoordinateIndexSourceAxis v)
+    pokeByteOff ptr 112 (cCoordinateIndexSourceRootExtent v)
+    pokeByteOff ptr 120 (cCoordinateIndexSourceAppendStart v)
+    pokeByteOff ptr 128 (cCoordinateIndexSourceAppendCount v)
+
+data CArcadiaTioCoordinateIndexSummaryV2 = CArcadiaTioCoordinateIndexSummaryV2
+  { cCoordinateIndexSummaryVersion :: Word32
+  , cCoordinateIndexSummaryStructSize :: CSize
+  , cCoordinateIndexSummaryIndexId :: CString
+  , cCoordinateIndexSummaryIndexKind :: CInt
+  , cCoordinateIndexSummaryKeyDomain :: CInt
+  , cCoordinateIndexSummarySourceBinding :: CArcadiaTioCoordinateIndexSourceBindingV2
+  , cCoordinateIndexSummarySorted :: CInt
+  , cCoordinateIndexSummaryMonotonicity :: CInt
+  , cCoordinateIndexSummaryUniqueness :: CInt
+  , cCoordinateIndexSummaryFormatVersion :: Word32
+  , cCoordinateIndexSummaryBuildVersion :: Word32
+  , cCoordinateIndexSummaryValidationStatus :: CInt
+  , cCoordinateIndexSummaryFallback :: CInt
+  , cCoordinateIndexSummarySelectedUse :: CInt
+  , cCoordinateIndexSummaryRequired :: Word8
+  , cCoordinateIndexSummaryReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateIndexSummaryV2 where
+  sizeOf _ = 264
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateIndexSummaryV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 200 <*> peekByteOff ptr 204 <*> peekByteOff ptr 208 <*> peekByteOff ptr 212 <*> peekByteOff ptr 216 <*> peekByteOff ptr 220 <*> peekByteOff ptr 224 <*> peekByteOff ptr 228 <*> peekByteOff ptr 232 <*> peekByteOff ptr 240
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateIndexSummaryVersion v)
+    pokeByteOff ptr 8 (cCoordinateIndexSummaryStructSize v)
+    pokeByteOff ptr 16 (cCoordinateIndexSummaryIndexId v)
+    pokeByteOff ptr 24 (cCoordinateIndexSummaryIndexKind v)
+    pokeByteOff ptr 28 (cCoordinateIndexSummaryKeyDomain v)
+    pokeByteOff ptr 32 (cCoordinateIndexSummarySourceBinding v)
+    pokeByteOff ptr 200 (cCoordinateIndexSummarySorted v)
+    pokeByteOff ptr 204 (cCoordinateIndexSummaryMonotonicity v)
+    pokeByteOff ptr 208 (cCoordinateIndexSummaryUniqueness v)
+    pokeByteOff ptr 212 (cCoordinateIndexSummaryFormatVersion v)
+    pokeByteOff ptr 216 (cCoordinateIndexSummaryBuildVersion v)
+    pokeByteOff ptr 220 (cCoordinateIndexSummaryValidationStatus v)
+    pokeByteOff ptr 224 (cCoordinateIndexSummaryFallback v)
+    pokeByteOff ptr 228 (cCoordinateIndexSummarySelectedUse v)
+    pokeByteOff ptr 232 (cCoordinateIndexSummaryRequired v)
+    pokeByteOff ptr 240 (cCoordinateIndexSummaryReason v)
+
+data CArcadiaTioCoordinateDictionaryEntryV2 = CArcadiaTioCoordinateDictionaryEntryV2
+  { cCoordinateDictionaryEntryVersion :: Word32
+  , cCoordinateDictionaryEntryStructSize :: CSize
+  , cCoordinateDictionaryEntryCode :: Word64
+  , cCoordinateDictionaryEntryStableId :: CString
+  , cCoordinateDictionaryEntryDisplayLabel :: CString
+  , cCoordinateDictionaryEntryAliases :: Ptr CString
+  , cCoordinateDictionaryEntryAliasesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateDictionaryEntryV2 where
+  sizeOf _ = 72
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateDictionaryEntryV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateDictionaryEntryVersion v)
+    pokeByteOff ptr 8 (cCoordinateDictionaryEntryStructSize v)
+    pokeByteOff ptr 16 (cCoordinateDictionaryEntryCode v)
+    pokeByteOff ptr 24 (cCoordinateDictionaryEntryStableId v)
+    pokeByteOff ptr 32 (cCoordinateDictionaryEntryDisplayLabel v)
+    pokeByteOff ptr 40 (cCoordinateDictionaryEntryAliases v)
+    pokeByteOff ptr 48 (cCoordinateDictionaryEntryAliasesLen v)
+
+data CArcadiaTioCoordinateDictionaryV2 = CArcadiaTioCoordinateDictionaryV2
+  { cCoordinateDictionaryVersion :: Word32
+  , cCoordinateDictionaryStructSize :: CSize
+  , cCoordinateDictionarySummary :: CArcadiaTioCoordinateDictionarySummaryV2
+  , cCoordinateDictionaryEntries :: Ptr CArcadiaTioCoordinateDictionaryEntryV2
+  , cCoordinateDictionaryEntriesLen :: CSize
+  , cCoordinateDictionaryStatusCategory :: CInt
+  , cCoordinateDictionaryReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateDictionaryV2 where
+  sizeOf _ = 160
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateDictionaryV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 96 <*> peekByteOff ptr 104 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateDictionaryVersion v)
+    pokeByteOff ptr 8 (cCoordinateDictionaryStructSize v)
+    pokeByteOff ptr 16 (cCoordinateDictionarySummary v)
+    pokeByteOff ptr 96 (cCoordinateDictionaryEntries v)
+    pokeByteOff ptr 104 (cCoordinateDictionaryEntriesLen v)
+    pokeByteOff ptr 112 (cCoordinateDictionaryStatusCategory v)
+    pokeByteOff ptr 120 (cCoordinateDictionaryReason v)
+
+data CArcadiaTioCoordinateValueSliceV2 = CArcadiaTioCoordinateValueSliceV2
+  { cCoordinateValueSliceVersion :: Word32
+  , cCoordinateValueSliceStructSize :: CSize
+  , cCoordinateValueSliceValueDomain :: CInt
+  , cCoordinateValueSliceNumericDType :: CInt
+  , cCoordinateValueSliceNumericEncoding :: CInt
+  , cCoordinateValueSliceCodeDType :: CInt
+  , cCoordinateValueSliceData :: Ptr Word8
+  , cCoordinateValueSliceLen :: CSize
+  , cCoordinateValueSliceElementSize :: CSize
+  , cCoordinateValueSliceFixedTextWidth :: CSize
+  , cCoordinateValueSliceAvailability :: CInt
+  , cCoordinateValueSliceStatusCategory :: CInt
+  , cCoordinateValueSliceReason :: CString
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCoordinateValueSliceV2 where
+  sizeOf _ = 112
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateValueSliceV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 68 <*> peekByteOff ptr 72
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateValueSliceVersion v)
+    pokeByteOff ptr 8 (cCoordinateValueSliceStructSize v)
+    pokeByteOff ptr 16 (cCoordinateValueSliceValueDomain v)
+    pokeByteOff ptr 20 (cCoordinateValueSliceNumericDType v)
+    pokeByteOff ptr 24 (cCoordinateValueSliceNumericEncoding v)
+    pokeByteOff ptr 28 (cCoordinateValueSliceCodeDType v)
+    pokeByteOff ptr 32 (cCoordinateValueSliceData v)
+    pokeByteOff ptr 40 (cCoordinateValueSliceLen v)
+    pokeByteOff ptr 48 (cCoordinateValueSliceElementSize v)
+    pokeByteOff ptr 56 (cCoordinateValueSliceFixedTextWidth v)
+    pokeByteOff ptr 64 (cCoordinateValueSliceAvailability v)
+    pokeByteOff ptr 68 (cCoordinateValueSliceStatusCategory v)
+    pokeByteOff ptr 72 (cCoordinateValueSliceReason v)
+
+
+data CArcadiaTioCoordinateLookupKeyV2 = CArcadiaTioCoordinateLookupKeyV2
+  { cCoordinateLookupKeyVersion :: Word32
+  , cCoordinateLookupKeyStructSize :: CSize
+  , cCoordinateLookupKeyDomain :: CInt
+  , cCoordinateLookupKeyI32Value :: Int32
+  , cCoordinateLookupKeyI64Value :: Int64
+  , cCoordinateLookupKeyCodeValue :: Word64
+  , cCoordinateLookupKeyBytes :: Ptr Word8
+  , cCoordinateLookupKeyBytesLen :: CSize
+  , cCoordinateLookupKeyFixedTextWidth :: CSize
+  , cCoordinateLookupKeyText :: CString
+  }
+  deriving (Eq, Show)
+
+emptyCArcadiaTioCoordinateLookupKeyV2 :: CArcadiaTioCoordinateLookupKeyV2
+emptyCArcadiaTioCoordinateLookupKeyV2 = CArcadiaTioCoordinateLookupKeyV2 1 104 0 0 0 0 nullPtr 0 0 nullPtr
+
+instance Storable CArcadiaTioCoordinateLookupKeyV2 where
+  sizeOf _ = 104
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateLookupKeyV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateLookupKeyVersion v)
+    pokeByteOff ptr 8 (cCoordinateLookupKeyStructSize v)
+    pokeByteOff ptr 16 (cCoordinateLookupKeyDomain v)
+    pokeByteOff ptr 20 (cCoordinateLookupKeyI32Value v)
+    pokeByteOff ptr 24 (cCoordinateLookupKeyI64Value v)
+    pokeByteOff ptr 32 (cCoordinateLookupKeyCodeValue v)
+    pokeByteOff ptr 40 (cCoordinateLookupKeyBytes v)
+    pokeByteOff ptr 48 (cCoordinateLookupKeyBytesLen v)
+    pokeByteOff ptr 56 (cCoordinateLookupKeyFixedTextWidth v)
+    pokeByteOff ptr 64 (cCoordinateLookupKeyText v)
+
+data CArcadiaTioCoordinateLookupResultV2 = CArcadiaTioCoordinateLookupResultV2
+  { cCoordinateLookupResultVersion :: Word32
+  , cCoordinateLookupResultStructSize :: CSize
+  , cCoordinateLookupResultStatus :: CInt
+  , cCoordinateLookupResultStatusCategory :: CInt
+  , cCoordinateLookupResultUniquePosition :: Word32
+  , cCoordinateLookupResultRangeStart :: Word32
+  , cCoordinateLookupResultRangeEnd :: Word32
+  , cCoordinateLookupResultPositions :: Ptr Word32
+  , cCoordinateLookupResultPositionsLen :: CSize
+  , cCoordinateLookupResultAvailability :: CInt
+  , cCoordinateLookupResultReason :: CString
+  }
+  deriving (Eq, Show)
+
+emptyCArcadiaTioCoordinateLookupResultV2 :: CArcadiaTioCoordinateLookupResultV2
+emptyCArcadiaTioCoordinateLookupResultV2 = CArcadiaTioCoordinateLookupResultV2 1 104 0 0 0 0 0 nullPtr 0 0 nullPtr
+
+instance Storable CArcadiaTioCoordinateLookupResultV2 where
+  sizeOf _ = 104
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateLookupResultV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 20 <*> peekByteOff ptr 24 <*> peekByteOff ptr 28 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateLookupResultVersion v)
+    pokeByteOff ptr 8 (cCoordinateLookupResultStructSize v)
+    pokeByteOff ptr 16 (cCoordinateLookupResultStatus v)
+    pokeByteOff ptr 20 (cCoordinateLookupResultStatusCategory v)
+    pokeByteOff ptr 24 (cCoordinateLookupResultUniquePosition v)
+    pokeByteOff ptr 28 (cCoordinateLookupResultRangeStart v)
+    pokeByteOff ptr 32 (cCoordinateLookupResultRangeEnd v)
+    pokeByteOff ptr 40 (cCoordinateLookupResultPositions v)
+    pokeByteOff ptr 48 (cCoordinateLookupResultPositionsLen v)
+    pokeByteOff ptr 56 (cCoordinateLookupResultAvailability v)
+    pokeByteOff ptr 64 (cCoordinateLookupResultReason v)
+
+data CArcadiaTioAppendCoordinateEntryV2 = CArcadiaTioAppendCoordinateEntryV2
+  { cAppendCoordinateEntryVersion :: Word32
+  , cAppendCoordinateEntryStructSize :: CSize
+  , cAppendCoordinateEntryAxis :: CSize
+  , cAppendCoordinateEntryDescriptorId :: CString
+  , cAppendCoordinateEntryName :: CString
+  , cAppendCoordinateEntryValueDomain :: CInt
+  , cAppendCoordinateEntryNumericDType :: CInt
+  , cAppendCoordinateEntryNumericEncoding :: CInt
+  , cAppendCoordinateEntryCodeDType :: CInt
+  , cAppendCoordinateEntryValues :: Ptr Word8
+  , cAppendCoordinateEntryCount :: CSize
+  , cAppendCoordinateEntryElementSize :: CSize
+  , cAppendCoordinateEntryFixedTextWidth :: CSize
+  , cAppendCoordinateEntryDictionaryEntries :: Ptr CArcadiaTioCoordinateDictionaryEntryV2
+  , cAppendCoordinateEntryDictionaryEntriesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAppendCoordinateEntryV2 where
+  sizeOf _ = 120
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioAppendCoordinateEntryV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44 <*> peekByteOff ptr 48 <*> peekByteOff ptr 52 <*> peekByteOff ptr 56 <*> peekByteOff ptr 64 <*> peekByteOff ptr 72 <*> peekByteOff ptr 80 <*> peekByteOff ptr 88 <*> peekByteOff ptr 96
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAppendCoordinateEntryVersion v)
+    pokeByteOff ptr 8 (cAppendCoordinateEntryStructSize v)
+    pokeByteOff ptr 16 (cAppendCoordinateEntryAxis v)
+    pokeByteOff ptr 24 (cAppendCoordinateEntryDescriptorId v)
+    pokeByteOff ptr 32 (cAppendCoordinateEntryName v)
+    pokeByteOff ptr 40 (cAppendCoordinateEntryValueDomain v)
+    pokeByteOff ptr 44 (cAppendCoordinateEntryNumericDType v)
+    pokeByteOff ptr 48 (cAppendCoordinateEntryNumericEncoding v)
+    pokeByteOff ptr 52 (cAppendCoordinateEntryCodeDType v)
+    pokeByteOff ptr 56 (cAppendCoordinateEntryValues v)
+    pokeByteOff ptr 64 (cAppendCoordinateEntryCount v)
+    pokeByteOff ptr 72 (cAppendCoordinateEntryElementSize v)
+    pokeByteOff ptr 80 (cAppendCoordinateEntryFixedTextWidth v)
+    pokeByteOff ptr 88 (cAppendCoordinateEntryDictionaryEntries v)
+    pokeByteOff ptr 96 (cAppendCoordinateEntryDictionaryEntriesLen v)
+
+data CArcadiaTioAppendCoordinateBatchV2 = CArcadiaTioAppendCoordinateBatchV2
+  { cAppendCoordinateBatchVersion :: Word32
+  , cAppendCoordinateBatchStructSize :: CSize
+  , cAppendCoordinateBatchEntries :: Ptr CArcadiaTioAppendCoordinateEntryV2
+  , cAppendCoordinateBatchEntriesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAppendCoordinateBatchV2 where
+  sizeOf _ = 64
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioAppendCoordinateBatchV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAppendCoordinateBatchVersion v)
+    pokeByteOff ptr 8 (cAppendCoordinateBatchStructSize v)
+    pokeByteOff ptr 16 (cAppendCoordinateBatchEntries v)
+    pokeByteOff ptr 24 (cAppendCoordinateBatchEntriesLen v)
+
+data CArcadiaTioCoordinateV2Options = CArcadiaTioCoordinateV2Options
+  { cCoordinateV2OptionsVersion :: Word32
+  , cCoordinateV2OptionsStructSize :: CSize
+  , cCoordinateV2OptionsAllowAuthoritativeScan :: Word8
+  , cCoordinateV2OptionsIncludeDictionaryEntries :: Word8
+  , cCoordinateV2OptionsIncludeIndexSummaries :: Word8
+  , cCoordinateV2OptionsAllowExternalResolution :: Word8
+  }
+  deriving (Eq, Show)
+
+emptyCArcadiaTioCoordinateV2Options :: CArcadiaTioCoordinateV2Options
+emptyCArcadiaTioCoordinateV2Options = CArcadiaTioCoordinateV2Options 1 56 0 0 0 0
+
+instance Storable CArcadiaTioCoordinateV2Options where
+  sizeOf _ = 56
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioCoordinateV2Options <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 17 <*> peekByteOff ptr 18 <*> peekByteOff ptr 19
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCoordinateV2OptionsVersion v)
+    pokeByteOff ptr 8 (cCoordinateV2OptionsStructSize v)
+    pokeByteOff ptr 16 (cCoordinateV2OptionsAllowAuthoritativeScan v)
+    pokeByteOff ptr 17 (cCoordinateV2OptionsIncludeDictionaryEntries v)
+    pokeByteOff ptr 18 (cCoordinateV2OptionsIncludeIndexSummaries v)
+    pokeByteOff ptr 19 (cCoordinateV2OptionsAllowExternalResolution v)
+
+data CArcadiaTioAxisCoordinateInputV2 = CArcadiaTioAxisCoordinateInputV2
+  { cAxisCoordinateInputV2Version :: Word32
+  , cAxisCoordinateInputV2StructSize :: CSize
+  , cAxisCoordinateInputV2Axis :: CSize
+  , cAxisCoordinateInputV2DescriptorId :: CString
+  , cAxisCoordinateInputV2Name :: CString
+  , cAxisCoordinateInputV2Kind :: CInt
+  , cAxisCoordinateInputV2ValueDomain :: CInt
+  , cAxisCoordinateInputV2NumericDType :: CInt
+  , cAxisCoordinateInputV2NumericEncoding :: CInt
+  , cAxisCoordinateInputV2FixedText :: CArcadiaTioCoordinateFixedTextLayoutV2
+  , cAxisCoordinateInputV2CodeDType :: CInt
+  , cAxisCoordinateInputV2Values :: Ptr Word8
+  , cAxisCoordinateInputV2ValuesLen :: CSize
+  , cAxisCoordinateInputV2Dictionary :: Ptr CArcadiaTioCoordinateDictionarySummaryV2
+  , cAxisCoordinateInputV2DictionaryEntries :: Ptr CArcadiaTioCoordinateDictionaryEntryV2
+  , cAxisCoordinateInputV2DictionaryEntriesLen :: CSize
+  , cAxisCoordinateInputV2ExternalBinding :: Ptr CArcadiaTioCoordinateExternalBindingV2
+  , cAxisCoordinateInputV2Sorted :: CInt
+  , cAxisCoordinateInputV2Monotonicity :: CInt
+  , cAxisCoordinateInputV2Uniqueness :: CInt
+  , cAxisCoordinateInputV2Required :: Word8
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAxisCoordinateInputV2 where
+  sizeOf _ = 224
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioAxisCoordinateInputV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 44 <*> peekByteOff ptr 48 <*> peekByteOff ptr 52 <*> peekByteOff ptr 56 <*> peekByteOff ptr 112 <*> peekByteOff ptr 120 <*> peekByteOff ptr 128 <*> peekByteOff ptr 136 <*> peekByteOff ptr 144 <*> peekByteOff ptr 152 <*> peekByteOff ptr 160 <*> peekByteOff ptr 168 <*> peekByteOff ptr 172 <*> peekByteOff ptr 176 <*> peekByteOff ptr 180
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAxisCoordinateInputV2Version v)
+    pokeByteOff ptr 8 (cAxisCoordinateInputV2StructSize v)
+    pokeByteOff ptr 16 (cAxisCoordinateInputV2Axis v)
+    pokeByteOff ptr 24 (cAxisCoordinateInputV2DescriptorId v)
+    pokeByteOff ptr 32 (cAxisCoordinateInputV2Name v)
+    pokeByteOff ptr 40 (cAxisCoordinateInputV2Kind v)
+    pokeByteOff ptr 44 (cAxisCoordinateInputV2ValueDomain v)
+    pokeByteOff ptr 48 (cAxisCoordinateInputV2NumericDType v)
+    pokeByteOff ptr 52 (cAxisCoordinateInputV2NumericEncoding v)
+    pokeByteOff ptr 56 (cAxisCoordinateInputV2FixedText v)
+    pokeByteOff ptr 112 (cAxisCoordinateInputV2CodeDType v)
+    pokeByteOff ptr 120 (cAxisCoordinateInputV2Values v)
+    pokeByteOff ptr 128 (cAxisCoordinateInputV2ValuesLen v)
+    pokeByteOff ptr 136 (cAxisCoordinateInputV2Dictionary v)
+    pokeByteOff ptr 144 (cAxisCoordinateInputV2DictionaryEntries v)
+    pokeByteOff ptr 152 (cAxisCoordinateInputV2DictionaryEntriesLen v)
+    pokeByteOff ptr 160 (cAxisCoordinateInputV2ExternalBinding v)
+    pokeByteOff ptr 168 (cAxisCoordinateInputV2Sorted v)
+    pokeByteOff ptr 172 (cAxisCoordinateInputV2Monotonicity v)
+    pokeByteOff ptr 176 (cAxisCoordinateInputV2Uniqueness v)
+    pokeByteOff ptr 180 (cAxisCoordinateInputV2Required v)
+
+data CArcadiaTioAxisCoordinateMetaV2 = CArcadiaTioAxisCoordinateMetaV2
+  { cAxisCoordinateMetaV2Version :: Word32
+  , cAxisCoordinateMetaV2StructSize :: CSize
+  , cAxisCoordinateMetaV2Axis :: CSize
+  , cAxisCoordinateMetaV2AxisNameSnapshot :: CString
+  , cAxisCoordinateMetaV2DescriptorId :: CString
+  , cAxisCoordinateMetaV2DescriptorRevision :: Word64
+  , cAxisCoordinateMetaV2Name :: CString
+  , cAxisCoordinateMetaV2Kind :: CInt
+  , cAxisCoordinateMetaV2ValueDomain :: CInt
+  , cAxisCoordinateMetaV2NumericDType :: CInt
+  , cAxisCoordinateMetaV2NumericEncoding :: CInt
+  , cAxisCoordinateMetaV2FixedText :: CArcadiaTioCoordinateFixedTextLayoutV2
+  , cAxisCoordinateMetaV2CodeDType :: CInt
+  , cAxisCoordinateMetaV2Length :: Word64
+  , cAxisCoordinateMetaV2Sorted :: CInt
+  , cAxisCoordinateMetaV2Monotonicity :: CInt
+  , cAxisCoordinateMetaV2Uniqueness :: CInt
+  , cAxisCoordinateMetaV2Required :: Word8
+  , cAxisCoordinateMetaV2Availability :: CInt
+  , cAxisCoordinateMetaV2StatusCategory :: CInt
+  , cAxisCoordinateMetaV2Reason :: CString
+  , cAxisCoordinateMetaV2Dictionary :: CArcadiaTioCoordinateDictionarySummaryV2
+  , cAxisCoordinateMetaV2ExternalBinding :: CArcadiaTioCoordinateExternalBindingV2
+  , cAxisCoordinateMetaV2IndexSummaries :: Ptr CArcadiaTioCoordinateIndexSummaryV2
+  , cAxisCoordinateMetaV2IndexSummariesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAxisCoordinateMetaV2 where
+  sizeOf _ = 408
+  alignment _ = alignment (undefined :: Ptr ())
+  peek ptr = CArcadiaTioAxisCoordinateMetaV2 <$> peekByteOff ptr 0 <*> peekByteOff ptr 8 <*> peekByteOff ptr 16 <*> peekByteOff ptr 24 <*> peekByteOff ptr 32 <*> peekByteOff ptr 40 <*> peekByteOff ptr 48 <*> peekByteOff ptr 56 <*> peekByteOff ptr 60 <*> peekByteOff ptr 64 <*> peekByteOff ptr 68 <*> peekByteOff ptr 72 <*> peekByteOff ptr 128 <*> peekByteOff ptr 136 <*> peekByteOff ptr 144 <*> peekByteOff ptr 148 <*> peekByteOff ptr 152 <*> peekByteOff ptr 156 <*> peekByteOff ptr 164 <*> peekByteOff ptr 168 <*> peekByteOff ptr 176 <*> peekByteOff ptr 184 <*> peekByteOff ptr 264 <*> peekByteOff ptr 360 <*> peekByteOff ptr 368
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAxisCoordinateMetaV2Version v)
+    pokeByteOff ptr 8 (cAxisCoordinateMetaV2StructSize v)
+    pokeByteOff ptr 16 (cAxisCoordinateMetaV2Axis v)
+    pokeByteOff ptr 24 (cAxisCoordinateMetaV2AxisNameSnapshot v)
+    pokeByteOff ptr 32 (cAxisCoordinateMetaV2DescriptorId v)
+    pokeByteOff ptr 40 (cAxisCoordinateMetaV2DescriptorRevision v)
+    pokeByteOff ptr 48 (cAxisCoordinateMetaV2Name v)
+    pokeByteOff ptr 56 (cAxisCoordinateMetaV2Kind v)
+    pokeByteOff ptr 60 (cAxisCoordinateMetaV2ValueDomain v)
+    pokeByteOff ptr 64 (cAxisCoordinateMetaV2NumericDType v)
+    pokeByteOff ptr 68 (cAxisCoordinateMetaV2NumericEncoding v)
+    pokeByteOff ptr 72 (cAxisCoordinateMetaV2FixedText v)
+    pokeByteOff ptr 128 (cAxisCoordinateMetaV2CodeDType v)
+    pokeByteOff ptr 136 (cAxisCoordinateMetaV2Length v)
+    pokeByteOff ptr 144 (cAxisCoordinateMetaV2Sorted v)
+    pokeByteOff ptr 148 (cAxisCoordinateMetaV2Monotonicity v)
+    pokeByteOff ptr 152 (cAxisCoordinateMetaV2Uniqueness v)
+    pokeByteOff ptr 156 (cAxisCoordinateMetaV2Required v)
+    pokeByteOff ptr 164 (cAxisCoordinateMetaV2Availability v)
+    pokeByteOff ptr 168 (cAxisCoordinateMetaV2StatusCategory v)
+    pokeByteOff ptr 176 (cAxisCoordinateMetaV2Reason v)
+    pokeByteOff ptr 184 (cAxisCoordinateMetaV2Dictionary v)
+    pokeByteOff ptr 264 (cAxisCoordinateMetaV2ExternalBinding v)
+    pokeByteOff ptr 360 (cAxisCoordinateMetaV2IndexSummaries v)
+    pokeByteOff ptr 368 (cAxisCoordinateMetaV2IndexSummariesLen v)
 
 -- | Minimal raw tensor struct matching the Linux C ABI layout.
 --
@@ -477,6 +1196,179 @@ readIndexReportStructSize = 32
 
 historicalReadExecutionReportStructSize :: CSize
 historicalReadExecutionReportStructSize = 96
+
+
+-- | Raw explicit-universe read target.
+data CArcadiaTioExplicitUniverseAxisTarget = CArcadiaTioExplicitUniverseAxisTarget
+  { cExplicitUniverseAxisTargetAxis :: Word32
+  , cExplicitUniverseAxisTargetFamilyUuid :: [Word8]
+  , cExplicitUniverseAxisTargetVersionUuid :: [Word8]
+  , cExplicitUniverseAxisTargetLength :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioExplicitUniverseAxisTarget where
+  sizeOf _ = 48
+  alignment _ = alignment (undefined :: Word64)
+  peek _ = fail "CArcadiaTioExplicitUniverseAxisTarget.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cExplicitUniverseAxisTargetAxis v)
+    pokeArray (ptr `plusPtr` 4) (take 16 (cExplicitUniverseAxisTargetFamilyUuid v <> repeat 0))
+    pokeArray (ptr `plusPtr` 20) (take 16 (cExplicitUniverseAxisTargetVersionUuid v <> repeat 0))
+    pokeByteOff ptr 40 (cExplicitUniverseAxisTargetLength v)
+
+data CArcadiaTioExplicitExtentAxisTarget = CArcadiaTioExplicitExtentAxisTarget
+  { cExplicitExtentAxisTargetAxis :: Word32
+  , cExplicitExtentAxisTargetLength :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioExplicitExtentAxisTarget where
+  sizeOf _ = 16
+  alignment _ = alignment (undefined :: Word64)
+  peek _ = fail "CArcadiaTioExplicitExtentAxisTarget.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cExplicitExtentAxisTargetAxis v)
+    pokeByteOff ptr 8 (cExplicitExtentAxisTargetLength v)
+
+data CArcadiaTioAxisIdentityInput = CArcadiaTioAxisIdentityInput
+  { cAxisIdentityInputVersion :: Word32
+  , cAxisIdentityInputStructSize :: CSize
+  , cAxisIdentityInputAxis :: Word32
+  , cAxisIdentityInputMode :: CInt
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAxisIdentityInput where
+  sizeOf _ = 24
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioAxisIdentityInput.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAxisIdentityInputVersion v)
+    pokeByteOff ptr 8 (cAxisIdentityInputStructSize v)
+    pokeByteOff ptr 16 (cAxisIdentityInputAxis v)
+    pokeByteOff ptr 20 (cAxisIdentityInputMode v)
+
+data CArcadiaTioUniverseBindingInput = CArcadiaTioUniverseBindingInput
+  { cUniverseBindingInputAxis :: Word32
+  , cUniverseBindingInputFamilyUuid :: [Word8]
+  , cUniverseBindingInputVersionUuid :: [Word8]
+  , cUniverseBindingInputLength :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioUniverseBindingInput where
+  sizeOf _ = 48
+  alignment _ = alignment (undefined :: Word64)
+  peek _ = fail "CArcadiaTioUniverseBindingInput.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cUniverseBindingInputAxis v)
+    pokeArray (ptr `plusPtr` 4) (take 16 (cUniverseBindingInputFamilyUuid v <> repeat 0))
+    pokeArray (ptr `plusPtr` 20) (take 16 (cUniverseBindingInputVersionUuid v <> repeat 0))
+    pokeByteOff ptr 40 (cUniverseBindingInputLength v)
+
+data CArcadiaTioSlotUniverseBindingInput = CArcadiaTioSlotUniverseBindingInput
+  { cSlotUniverseBindingInputAxes :: Ptr CArcadiaTioUniverseBindingInput
+  , cSlotUniverseBindingInputAxesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioSlotUniverseBindingInput where
+  sizeOf _ = 16
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioSlotUniverseBindingInput.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cSlotUniverseBindingInputAxes v)
+    pokeByteOff ptr 8 (cSlotUniverseBindingInputAxesLen v)
+
+data CArcadiaTioUniverseRemapInput = CArcadiaTioUniverseRemapInput
+  { cUniverseRemapInputVersion :: Word32
+  , cUniverseRemapInputStructSize :: CSize
+  , cUniverseRemapInputAxis :: Word32
+  , cUniverseRemapInputTargetFamilyUuid :: [Word8]
+  , cUniverseRemapInputTargetVersionUuid :: [Word8]
+  , cUniverseRemapInputTargetLength :: Word64
+  , cUniverseRemapInputSourceToTarget :: Ptr Word64
+  , cUniverseRemapInputSourceToTargetLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioUniverseRemapInput where
+  sizeOf _ = 80
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioUniverseRemapInput.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cUniverseRemapInputVersion v)
+    pokeByteOff ptr 8 (cUniverseRemapInputStructSize v)
+    pokeByteOff ptr 16 (cUniverseRemapInputAxis v)
+    pokeArray (ptr `plusPtr` 20) (take 16 (cUniverseRemapInputTargetFamilyUuid v <> repeat 0))
+    pokeArray (ptr `plusPtr` 36) (take 16 (cUniverseRemapInputTargetVersionUuid v <> repeat 0))
+    pokeByteOff ptr 56 (cUniverseRemapInputTargetLength v)
+    pokeByteOff ptr 64 (cUniverseRemapInputSourceToTarget v)
+    pokeByteOff ptr 72 (cUniverseRemapInputSourceToTargetLen v)
+
+data CArcadiaTioSlotUniverseRemapInput = CArcadiaTioSlotUniverseRemapInput
+  { cSlotUniverseRemapInputAxes :: Ptr CArcadiaTioUniverseRemapInput
+  , cSlotUniverseRemapInputAxesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioSlotUniverseRemapInput where
+  sizeOf _ = 16
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioSlotUniverseRemapInput.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cSlotUniverseRemapInputAxes v)
+    pokeByteOff ptr 8 (cSlotUniverseRemapInputAxesLen v)
+
+data CArcadiaTioCreateWithUniverseOptions = CArcadiaTioCreateWithUniverseOptions
+  { cCreateWithUniverseOptionsVersion :: Word32
+  , cCreateWithUniverseOptionsStructSize :: CSize
+  , cCreateWithUniverseOptionsAxisIdentities :: Ptr CArcadiaTioAxisIdentityInput
+  , cCreateWithUniverseOptionsAxisIdentitiesLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioCreateWithUniverseOptions where
+  sizeOf _ = 32
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioCreateWithUniverseOptions.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cCreateWithUniverseOptionsVersion v)
+    pokeByteOff ptr 8 (cCreateWithUniverseOptionsStructSize v)
+    pokeByteOff ptr 16 (cCreateWithUniverseOptionsAxisIdentities v)
+    pokeByteOff ptr 24 (cCreateWithUniverseOptionsAxisIdentitiesLen v)
+
+data CArcadiaTioAppendWithUniverseOptions = CArcadiaTioAppendWithUniverseOptions
+  { cAppendWithUniverseOptionsVersion :: Word32
+  , cAppendWithUniverseOptionsStructSize :: CSize
+  , cAppendWithUniverseOptionsSlots :: Ptr CArcadiaTioSlotUniverseBindingInput
+  , cAppendWithUniverseOptionsSlotsLen :: CSize
+  , cAppendWithUniverseOptionsRemapSlots :: Ptr CArcadiaTioSlotUniverseRemapInput
+  , cAppendWithUniverseOptionsRemapSlotsLen :: CSize
+  }
+  deriving (Eq, Show)
+
+instance Storable CArcadiaTioAppendWithUniverseOptions where
+  sizeOf _ = 48
+  alignment _ = alignment (undefined :: Ptr ())
+  peek _ = fail "CArcadiaTioAppendWithUniverseOptions.peek is not implemented"
+  poke ptr v = do
+    fillBytes ptr 0 (sizeOf v)
+    pokeByteOff ptr 0 (cAppendWithUniverseOptionsVersion v)
+    pokeByteOff ptr 8 (cAppendWithUniverseOptionsStructSize v)
+    pokeByteOff ptr 16 (cAppendWithUniverseOptionsSlots v)
+    pokeByteOff ptr 24 (cAppendWithUniverseOptionsSlotsLen v)
+    pokeByteOff ptr 32 (cAppendWithUniverseOptionsRemapSlots v)
+    pokeByteOff ptr 40 (cAppendWithUniverseOptionsRemapSlotsLen v)
 
 -- | Raw read shape-policy options matching @ArcadiaTioReadShapePolicyOptions@.
 data CArcadiaTioReadShapePolicyOptions = CArcadiaTioReadShapePolicyOptions
@@ -1149,13 +2041,38 @@ type AbiVersionFn = IO Word32
 type CreateStreamingFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> IO (Ptr CHandle)
 type CreateRandomAccessFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> IO (Ptr CHandle)
 type CreateExFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> IO (Ptr CHandle)
+type CreateWithUniverseFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CArcadiaTioCreateWithUniverseOptions -> IO (Ptr CHandle)
 type CreateInferredFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> CInt -> CInt -> CInt -> CInt -> IO (Ptr CHandle)
 type CreateInferredExFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> CInt -> CInt -> CInt -> CInt -> IO (Ptr CHandle)
 type CreateWithPolicyFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> IO (Ptr CHandle)
 type CreateWithPolicyExFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> IO (Ptr CHandle)
+type CreateWithPolicyUniverseFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> Ptr CArcadiaTioCreateWithUniverseOptions -> IO (Ptr CHandle)
+
+type CreateWithPolicyWithCoordinatesFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> Ptr CArcadiaTioAxisCoordinateInput -> CSize -> IO (Ptr CHandle)
+type CreateInferredWithCoordinatesFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> CInt -> CInt -> CInt -> CInt -> Ptr CArcadiaTioAxisCoordinateInput -> CSize -> IO (Ptr CHandle)
+type CreateStreamingWithCoordinatesFn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CArcadiaTioAxisCoordinateInput -> CSize -> IO (Ptr CHandle)
+type CreateWithPolicyWithCoordinatesV2Fn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CSize -> CSize -> CInt -> Ptr Word32 -> CSize -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+type CreateInferredWithCoordinatesV2Fn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> CInt -> CInt -> CInt -> CInt -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+type CreateStreamingWithCoordinatesV2Fn = CString -> CInt -> Ptr CInt -> Ptr Word32 -> CSize -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> CSize -> Ptr CString -> Ptr CString -> CSize -> Ptr CArcadiaTioAxisCoordinateInputV2 -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> IO (Ptr CHandle)
+type CoordinateMetaFn = Ptr CHandle -> Ptr (Ptr CArcadiaTioAxisCoordinateMeta) -> Ptr CSize -> IO CInt
+type LoadCoordinateMetaFn = CString -> Ptr (Ptr CArcadiaTioAxisCoordinateMeta) -> Ptr CSize -> IO CInt
+type AxisCoordinateMetaFreeFn = Ptr CArcadiaTioAxisCoordinateMeta -> CSize -> IO ()
+type CoordinateMetaV2Fn = Ptr CHandle -> Ptr (Ptr CArcadiaTioAxisCoordinateMetaV2) -> Ptr CSize -> IO CInt
+type LoadCoordinateMetaV2Fn = CString -> Ptr (Ptr CArcadiaTioAxisCoordinateMetaV2) -> Ptr CSize -> IO CInt
+type AxisCoordinateMetaV2FreeFn = Ptr CArcadiaTioAxisCoordinateMetaV2 -> CSize -> IO ()
+type ReadAxisCoordinatesFn = Ptr CHandle -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type ReadAxisCoordinatesV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateValueSliceV2 -> IO CInt
+type CoordinateValueSliceV2FreeFn = Ptr CArcadiaTioCoordinateValueSliceV2 -> IO ()
+type CoordinateDictionaryV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateDictionaryV2 -> IO CInt
+type CoordinateDictionaryV2FreeFn = Ptr CArcadiaTioCoordinateDictionaryV2 -> IO ()
+type CoordinateLookupV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateLookupKeyV2 -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateLookupResultV2 -> IO CInt
+type CoordinateLookupRangeV2Fn = Ptr CHandle -> CSize -> Ptr CArcadiaTioCoordinateLookupKeyV2 -> Ptr CArcadiaTioCoordinateLookupKeyV2 -> Ptr CArcadiaTioCoordinateV2Options -> Ptr CArcadiaTioCoordinateLookupResultV2 -> IO CInt
+type CoordinateLookupResultV2FreeFn = Ptr CArcadiaTioCoordinateLookupResultV2 -> IO ()
+type AppendWithCoordinatesV2Fn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioAppendCoordinateBatchV2 -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type OpenFn = CString -> IO (Ptr CHandle)
 type CloseFn = Ptr CHandle -> IO ()
 type AppendF32WithRangeFn = Ptr CHandle -> Ptr CFloat -> Ptr Word64 -> CSize -> Ptr Word32 -> Ptr Word32 -> IO CInt
+type AppendWithUniverseFn a = Ptr CHandle -> Ptr a -> Ptr Word64 -> CSize -> Ptr CArcadiaTioAppendWithUniverseOptions -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type AppendF64WithRangeFn = Ptr CHandle -> Ptr Double -> Ptr Word64 -> CSize -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type AppendI32WithRangeFn = Ptr CHandle -> Ptr Int32 -> Ptr Word64 -> CSize -> Ptr Word32 -> Ptr Word32 -> IO CInt
 type AppendI64WithRangeFn = Ptr CHandle -> Ptr Int64 -> Ptr Word64 -> CSize -> Ptr Word32 -> Ptr Word32 -> IO CInt
@@ -1238,13 +2155,44 @@ foreign import ccall safe "dynamic" mkAbiVersion :: FunPtr AbiVersionFn -> AbiVe
 foreign import ccall safe "dynamic" mkCreateStreaming :: FunPtr CreateStreamingFn -> CreateStreamingFn
 foreign import ccall safe "dynamic" mkCreateRandomAccess :: FunPtr CreateRandomAccessFn -> CreateRandomAccessFn
 foreign import ccall safe "dynamic" mkCreateEx :: FunPtr CreateExFn -> CreateExFn
+foreign import ccall safe "dynamic" mkCreateWithUniverse :: FunPtr CreateWithUniverseFn -> CreateWithUniverseFn
 foreign import ccall safe "dynamic" mkCreateInferred :: FunPtr CreateInferredFn -> CreateInferredFn
 foreign import ccall safe "dynamic" mkCreateInferredEx :: FunPtr CreateInferredExFn -> CreateInferredExFn
 foreign import ccall safe "dynamic" mkCreateWithPolicy :: FunPtr CreateWithPolicyFn -> CreateWithPolicyFn
 foreign import ccall safe "dynamic" mkCreateWithPolicyEx :: FunPtr CreateWithPolicyExFn -> CreateWithPolicyExFn
+foreign import ccall safe "dynamic" mkCreateWithPolicyUniverse :: FunPtr CreateWithPolicyUniverseFn -> CreateWithPolicyUniverseFn
+
+foreign import ccall safe "dynamic" mkCreateWithPolicyWithCoordinates :: FunPtr CreateWithPolicyWithCoordinatesFn -> CreateWithPolicyWithCoordinatesFn
+foreign import ccall safe "dynamic" mkCreateInferredWithCoordinates :: FunPtr CreateInferredWithCoordinatesFn -> CreateInferredWithCoordinatesFn
+foreign import ccall safe "dynamic" mkCreateStreamingWithCoordinates :: FunPtr CreateStreamingWithCoordinatesFn -> CreateStreamingWithCoordinatesFn
+foreign import ccall safe "dynamic" mkCreateWithPolicyWithCoordinatesV2 :: FunPtr CreateWithPolicyWithCoordinatesV2Fn -> CreateWithPolicyWithCoordinatesV2Fn
+foreign import ccall safe "dynamic" mkCreateInferredWithCoordinatesV2 :: FunPtr CreateInferredWithCoordinatesV2Fn -> CreateInferredWithCoordinatesV2Fn
+foreign import ccall safe "dynamic" mkCreateStreamingWithCoordinatesV2 :: FunPtr CreateStreamingWithCoordinatesV2Fn -> CreateStreamingWithCoordinatesV2Fn
+foreign import ccall safe "dynamic" mkCoordinateMeta :: FunPtr CoordinateMetaFn -> CoordinateMetaFn
+foreign import ccall safe "dynamic" mkLoadCoordinateMeta :: FunPtr LoadCoordinateMetaFn -> LoadCoordinateMetaFn
+foreign import ccall safe "dynamic" mkAxisCoordinateMetaFree :: FunPtr AxisCoordinateMetaFreeFn -> AxisCoordinateMetaFreeFn
+foreign import ccall safe "dynamic" mkCoordinateMetaV2 :: FunPtr CoordinateMetaV2Fn -> CoordinateMetaV2Fn
+foreign import ccall safe "dynamic" mkLoadCoordinateMetaV2 :: FunPtr LoadCoordinateMetaV2Fn -> LoadCoordinateMetaV2Fn
+foreign import ccall safe "dynamic" mkAxisCoordinateMetaV2Free :: FunPtr AxisCoordinateMetaV2FreeFn -> AxisCoordinateMetaV2FreeFn
+foreign import ccall safe "dynamic" mkReadAxisCoordinates :: FunPtr ReadAxisCoordinatesFn -> ReadAxisCoordinatesFn
+foreign import ccall safe "dynamic" mkReadAxisCoordinatesV2 :: FunPtr ReadAxisCoordinatesV2Fn -> ReadAxisCoordinatesV2Fn
+foreign import ccall safe "dynamic" mkCoordinateValueSliceV2Free :: FunPtr CoordinateValueSliceV2FreeFn -> CoordinateValueSliceV2FreeFn
+foreign import ccall safe "dynamic" mkCoordinateDictionaryV2 :: FunPtr CoordinateDictionaryV2Fn -> CoordinateDictionaryV2Fn
+foreign import ccall safe "dynamic" mkCoordinateDictionaryV2Free :: FunPtr CoordinateDictionaryV2FreeFn -> CoordinateDictionaryV2FreeFn
+foreign import ccall safe "dynamic" mkCoordinateLookupV2 :: FunPtr CoordinateLookupV2Fn -> CoordinateLookupV2Fn
+foreign import ccall safe "dynamic" mkCoordinateLookupRangeV2 :: FunPtr CoordinateLookupRangeV2Fn -> CoordinateLookupRangeV2Fn
+foreign import ccall safe "dynamic" mkCoordinateLookupResultV2Free :: FunPtr CoordinateLookupResultV2FreeFn -> CoordinateLookupResultV2FreeFn
+foreign import ccall safe "dynamic" mkAppendF32WithCoordinatesV2 :: FunPtr (AppendWithCoordinatesV2Fn CFloat) -> AppendWithCoordinatesV2Fn CFloat
+foreign import ccall safe "dynamic" mkAppendF64WithCoordinatesV2 :: FunPtr (AppendWithCoordinatesV2Fn Double) -> AppendWithCoordinatesV2Fn Double
+foreign import ccall safe "dynamic" mkAppendI32WithCoordinatesV2 :: FunPtr (AppendWithCoordinatesV2Fn Int32) -> AppendWithCoordinatesV2Fn Int32
+foreign import ccall safe "dynamic" mkAppendI64WithCoordinatesV2 :: FunPtr (AppendWithCoordinatesV2Fn Int64) -> AppendWithCoordinatesV2Fn Int64
 foreign import ccall safe "dynamic" mkOpen :: FunPtr OpenFn -> OpenFn
 foreign import ccall safe "dynamic" mkClose :: FunPtr CloseFn -> CloseFn
 foreign import ccall safe "dynamic" mkAppendF32WithRange :: FunPtr AppendF32WithRangeFn -> AppendF32WithRangeFn
+foreign import ccall safe "dynamic" mkAppendF32WithUniverse :: FunPtr (AppendWithUniverseFn CFloat) -> AppendWithUniverseFn CFloat
+foreign import ccall safe "dynamic" mkAppendF64WithUniverse :: FunPtr (AppendWithUniverseFn Double) -> AppendWithUniverseFn Double
+foreign import ccall safe "dynamic" mkAppendI32WithUniverse :: FunPtr (AppendWithUniverseFn Int32) -> AppendWithUniverseFn Int32
+foreign import ccall safe "dynamic" mkAppendI64WithUniverse :: FunPtr (AppendWithUniverseFn Int64) -> AppendWithUniverseFn Int64
 foreign import ccall safe "dynamic" mkAppendF64WithRange :: FunPtr AppendF64WithRangeFn -> AppendF64WithRangeFn
 foreign import ccall safe "dynamic" mkAppendI32WithRange :: FunPtr AppendI32WithRangeFn -> AppendI32WithRangeFn
 foreign import ccall safe "dynamic" mkAppendI64WithRange :: FunPtr AppendI64WithRangeFn -> AppendI64WithRangeFn
@@ -1338,10 +2286,43 @@ data NativeLibrary = NativeLibrary
   , nativeCreateStreamingEx :: CreateExFn
   , nativeCreateRandomAccess :: CreateRandomAccessFn
   , nativeCreateRandomAccessEx :: CreateExFn
+  , nativeCreateRandomAccessWithUniverse :: CreateWithUniverseFn
+  , nativeCreateStreamingWithUniverse :: CreateWithUniverseFn
+  , nativeCreateWithPolicyWithUniverse :: CreateWithPolicyUniverseFn
   , nativeCreateInferred :: CreateInferredFn
   , nativeCreateInferredEx :: CreateInferredExFn
   , nativeCreateWithPolicy :: CreateWithPolicyFn
   , nativeCreateWithPolicyEx :: CreateWithPolicyExFn
+  , nativeCreateWithPolicyWithCoordinates :: CreateWithPolicyWithCoordinatesFn
+  , nativeCreateInferredWithCoordinates :: CreateInferredWithCoordinatesFn
+  , nativeCreateRandomAccessWithCoordinates :: CreateStreamingWithCoordinatesFn
+  , nativeCreateStreamingWithCoordinates :: CreateStreamingWithCoordinatesFn
+  , nativeCreateWithPolicyWithCoordinatesV2 :: CreateWithPolicyWithCoordinatesV2Fn
+  , nativeCreateInferredWithCoordinatesV2 :: CreateInferredWithCoordinatesV2Fn
+  , nativeCreateRandomAccessWithCoordinatesV2 :: CreateStreamingWithCoordinatesV2Fn
+  , nativeCreateStreamingWithCoordinatesV2 :: CreateStreamingWithCoordinatesV2Fn
+  , nativeCoordinateMeta :: CoordinateMetaFn
+  , nativeLoadCoordinateMeta :: LoadCoordinateMetaFn
+  , nativeAxisCoordinateMetaFree :: AxisCoordinateMetaFreeFn
+  , nativeCoordinateMetaV2 :: CoordinateMetaV2Fn
+  , nativeLoadCoordinateMetaV2 :: LoadCoordinateMetaV2Fn
+  , nativeAxisCoordinateMetaV2Free :: AxisCoordinateMetaV2FreeFn
+  , nativeReadAxisCoordinates :: ReadAxisCoordinatesFn
+  , nativeReadAxisCoordinatesV2 :: ReadAxisCoordinatesV2Fn
+  , nativeCoordinateValueSliceV2Free :: CoordinateValueSliceV2FreeFn
+  , nativeCoordinateDictionaryV2 :: CoordinateDictionaryV2Fn
+  , nativeCoordinateDictionaryV2Free :: CoordinateDictionaryV2FreeFn
+  , nativeCoordinateLookupV2 :: CoordinateLookupV2Fn
+  , nativeCoordinateLookupRangeV2 :: CoordinateLookupRangeV2Fn
+  , nativeCoordinateLookupResultV2Free :: CoordinateLookupResultV2FreeFn
+  , nativeAppendF32WithCoordinatesV2 :: AppendWithCoordinatesV2Fn CFloat
+  , nativeAppendF64WithCoordinatesV2 :: AppendWithCoordinatesV2Fn Double
+  , nativeAppendI32WithCoordinatesV2 :: AppendWithCoordinatesV2Fn Int32
+  , nativeAppendI64WithCoordinatesV2 :: AppendWithCoordinatesV2Fn Int64
+  , nativeAppendF32WithUniverse :: AppendWithUniverseFn CFloat
+  , nativeAppendF64WithUniverse :: AppendWithUniverseFn Double
+  , nativeAppendI32WithUniverse :: AppendWithUniverseFn Int32
+  , nativeAppendI64WithUniverse :: AppendWithUniverseFn Int64
   , nativeOpen :: OpenFn
   , nativeClose :: CloseFn
   , nativeAppendF32WithRange :: AppendF32WithRangeFn
@@ -1492,13 +2473,46 @@ loadUnchecked path = do
   nativeCreateStreamingEx <- mkCreateEx <$> dlsym dl "arcadia_tio_create_streaming_ex"
   nativeCreateRandomAccess <- mkCreateRandomAccess <$> dlsym dl "arcadia_tio_create_random_access"
   nativeCreateRandomAccessEx <- mkCreateEx <$> dlsym dl "arcadia_tio_create_random_access_ex"
+  nativeCreateRandomAccessWithUniverse <- mkCreateWithUniverse <$> dlsym dl "arcadia_tio_create_random_access_with_universe"
+  nativeCreateStreamingWithUniverse <- mkCreateWithUniverse <$> dlsym dl "arcadia_tio_create_streaming_with_universe"
   nativeCreateInferred <- mkCreateInferred <$> dlsym dl "arcadia_tio_create_inferred"
   nativeCreateInferredEx <- mkCreateInferredEx <$> dlsym dl "arcadia_tio_create_inferred_ex"
   nativeCreateWithPolicy <- mkCreateWithPolicy <$> dlsym dl "arcadia_tio_create_with_policy"
   nativeCreateWithPolicyEx <- mkCreateWithPolicyEx <$> dlsym dl "arcadia_tio_create_with_policy_ex"
+  nativeCreateWithPolicyWithUniverse <- mkCreateWithPolicyUniverse <$> dlsym dl "arcadia_tio_create_with_policy_with_universe"
+  nativeCreateWithPolicyWithCoordinates <- mkCreateWithPolicyWithCoordinates <$> dlsym dl "arcadia_tio_create_with_policy_with_coordinates"
+  nativeCreateInferredWithCoordinates <- mkCreateInferredWithCoordinates <$> dlsym dl "arcadia_tio_create_inferred_with_coordinates"
+  nativeCreateRandomAccessWithCoordinates <- mkCreateStreamingWithCoordinates <$> dlsym dl "arcadia_tio_create_random_access_with_coordinates"
+  nativeCreateStreamingWithCoordinates <- mkCreateStreamingWithCoordinates <$> dlsym dl "arcadia_tio_create_streaming_with_coordinates"
+  nativeCreateWithPolicyWithCoordinatesV2 <- mkCreateWithPolicyWithCoordinatesV2 <$> dlsym dl "arcadia_tio_create_with_policy_with_coordinates_v2"
+  nativeCreateInferredWithCoordinatesV2 <- mkCreateInferredWithCoordinatesV2 <$> dlsym dl "arcadia_tio_create_inferred_with_coordinates_v2"
+  nativeCreateRandomAccessWithCoordinatesV2 <- mkCreateStreamingWithCoordinatesV2 <$> dlsym dl "arcadia_tio_create_random_access_with_coordinates_v2"
+  nativeCreateStreamingWithCoordinatesV2 <- mkCreateStreamingWithCoordinatesV2 <$> dlsym dl "arcadia_tio_create_streaming_with_coordinates_v2"
+  nativeCoordinateMeta <- mkCoordinateMeta <$> dlsym dl "arcadia_tio_coordinate_meta"
+  nativeLoadCoordinateMeta <- mkLoadCoordinateMeta <$> dlsym dl "arcadia_tio_load_coordinate_meta"
+  nativeAxisCoordinateMetaFree <- mkAxisCoordinateMetaFree <$> dlsym dl "arcadia_tio_axis_coordinate_meta_free"
+  nativeCoordinateMetaV2 <- mkCoordinateMetaV2 <$> dlsym dl "arcadia_tio_coordinate_meta_v2"
+  nativeLoadCoordinateMetaV2 <- mkLoadCoordinateMetaV2 <$> dlsym dl "arcadia_tio_load_coordinate_meta_v2"
+  nativeAxisCoordinateMetaV2Free <- mkAxisCoordinateMetaV2Free <$> dlsym dl "arcadia_tio_axis_coordinate_meta_v2_free"
+  nativeReadAxisCoordinates <- mkReadAxisCoordinates <$> dlsym dl "arcadia_tio_read_axis_coordinates"
+  nativeReadAxisCoordinatesV2 <- mkReadAxisCoordinatesV2 <$> dlsym dl "arcadia_tio_read_axis_coordinates_v2"
+  nativeCoordinateValueSliceV2Free <- mkCoordinateValueSliceV2Free <$> dlsym dl "arcadia_tio_coordinate_value_slice_v2_free"
+  nativeCoordinateDictionaryV2 <- mkCoordinateDictionaryV2 <$> dlsym dl "arcadia_tio_coordinate_dictionary_v2"
+  nativeCoordinateDictionaryV2Free <- mkCoordinateDictionaryV2Free <$> dlsym dl "arcadia_tio_coordinate_dictionary_v2_free"
+  nativeCoordinateLookupV2 <- mkCoordinateLookupV2 <$> dlsym dl "arcadia_tio_coordinate_lookup_v2"
+  nativeCoordinateLookupRangeV2 <- mkCoordinateLookupRangeV2 <$> dlsym dl "arcadia_tio_coordinate_lookup_range_v2"
+  nativeCoordinateLookupResultV2Free <- mkCoordinateLookupResultV2Free <$> dlsym dl "arcadia_tio_coordinate_lookup_result_v2_free"
+  nativeAppendF32WithCoordinatesV2 <- mkAppendF32WithCoordinatesV2 <$> dlsym dl "arcadia_tio_append_f32_with_coordinates_v2"
+  nativeAppendF64WithCoordinatesV2 <- mkAppendF64WithCoordinatesV2 <$> dlsym dl "arcadia_tio_append_f64_with_coordinates_v2"
+  nativeAppendI32WithCoordinatesV2 <- mkAppendI32WithCoordinatesV2 <$> dlsym dl "arcadia_tio_append_i32_with_coordinates_v2"
+  nativeAppendI64WithCoordinatesV2 <- mkAppendI64WithCoordinatesV2 <$> dlsym dl "arcadia_tio_append_i64_with_coordinates_v2"
   nativeOpen <- mkOpen <$> dlsym dl "arcadia_tio_open"
   nativeClose <- mkClose <$> dlsym dl "arcadia_tio_close"
   nativeAppendF32WithRange <- mkAppendF32WithRange <$> dlsym dl "arcadia_tio_append_f32_with_range"
+  nativeAppendF32WithUniverse <- mkAppendF32WithUniverse <$> dlsym dl "arcadia_tio_append_f32_with_universe"
+  nativeAppendF64WithUniverse <- mkAppendF64WithUniverse <$> dlsym dl "arcadia_tio_append_f64_with_universe"
+  nativeAppendI32WithUniverse <- mkAppendI32WithUniverse <$> dlsym dl "arcadia_tio_append_i32_with_universe"
+  nativeAppendI64WithUniverse <- mkAppendI64WithUniverse <$> dlsym dl "arcadia_tio_append_i64_with_universe"
   nativeAppendF64WithRange <- mkAppendF64WithRange <$> dlsym dl "arcadia_tio_append_f64_with_range"
   nativeAppendI32WithRange <- mkAppendI32WithRange <$> dlsym dl "arcadia_tio_append_i32_with_range"
   nativeAppendI64WithRange <- mkAppendI64WithRange <$> dlsym dl "arcadia_tio_append_i64_with_range"
@@ -1590,10 +2604,43 @@ loadUnchecked path = do
       , nativeCreateStreamingEx
       , nativeCreateRandomAccess
       , nativeCreateRandomAccessEx
+      , nativeCreateRandomAccessWithUniverse
+      , nativeCreateStreamingWithUniverse
+      , nativeCreateWithPolicyWithUniverse
       , nativeCreateInferred
       , nativeCreateInferredEx
       , nativeCreateWithPolicy
       , nativeCreateWithPolicyEx
+      , nativeCreateWithPolicyWithCoordinates
+      , nativeCreateInferredWithCoordinates
+      , nativeCreateRandomAccessWithCoordinates
+      , nativeCreateStreamingWithCoordinates
+      , nativeCreateWithPolicyWithCoordinatesV2
+      , nativeCreateInferredWithCoordinatesV2
+      , nativeCreateRandomAccessWithCoordinatesV2
+      , nativeCreateStreamingWithCoordinatesV2
+      , nativeCoordinateMeta
+      , nativeLoadCoordinateMeta
+      , nativeAxisCoordinateMetaFree
+      , nativeCoordinateMetaV2
+      , nativeLoadCoordinateMetaV2
+      , nativeAxisCoordinateMetaV2Free
+      , nativeReadAxisCoordinates
+      , nativeReadAxisCoordinatesV2
+      , nativeCoordinateValueSliceV2Free
+      , nativeCoordinateDictionaryV2
+      , nativeCoordinateDictionaryV2Free
+      , nativeCoordinateLookupV2
+      , nativeCoordinateLookupRangeV2
+      , nativeCoordinateLookupResultV2Free
+      , nativeAppendF32WithCoordinatesV2
+      , nativeAppendF64WithCoordinatesV2
+      , nativeAppendI32WithCoordinatesV2
+      , nativeAppendI64WithCoordinatesV2
+      , nativeAppendF32WithUniverse
+      , nativeAppendF64WithUniverse
+      , nativeAppendI32WithUniverse
+      , nativeAppendI64WithUniverse
       , nativeOpen
       , nativeClose
       , nativeAppendF32WithRange
@@ -1708,6 +2755,12 @@ capiCreateRandomAccess NativeLibrary{nativeCreateRandomAccess} = nativeCreateRan
 capiCreateRandomAccessEx :: NativeLibrary -> CreateExFn
 capiCreateRandomAccessEx NativeLibrary{nativeCreateRandomAccessEx} = nativeCreateRandomAccessEx
 
+capiCreateRandomAccessWithUniverse :: NativeLibrary -> CreateWithUniverseFn
+capiCreateRandomAccessWithUniverse NativeLibrary{nativeCreateRandomAccessWithUniverse} = nativeCreateRandomAccessWithUniverse
+
+capiCreateStreamingWithUniverse :: NativeLibrary -> CreateWithUniverseFn
+capiCreateStreamingWithUniverse NativeLibrary{nativeCreateStreamingWithUniverse} = nativeCreateStreamingWithUniverse
+
 capiCreateInferred :: NativeLibrary -> CreateInferredFn
 capiCreateInferred NativeLibrary{nativeCreateInferred} = nativeCreateInferred
 
@@ -1720,6 +2773,88 @@ capiCreateWithPolicy NativeLibrary{nativeCreateWithPolicy} = nativeCreateWithPol
 capiCreateWithPolicyEx :: NativeLibrary -> CreateWithPolicyExFn
 capiCreateWithPolicyEx NativeLibrary{nativeCreateWithPolicyEx} = nativeCreateWithPolicyEx
 
+capiCreateWithPolicyWithUniverse :: NativeLibrary -> CreateWithPolicyUniverseFn
+capiCreateWithPolicyWithUniverse NativeLibrary{nativeCreateWithPolicyWithUniverse} = nativeCreateWithPolicyWithUniverse
+
+
+capiCreateWithPolicyWithCoordinates :: NativeLibrary -> CreateWithPolicyWithCoordinatesFn
+capiCreateWithPolicyWithCoordinates NativeLibrary{nativeCreateWithPolicyWithCoordinates} = nativeCreateWithPolicyWithCoordinates
+
+capiCreateInferredWithCoordinates :: NativeLibrary -> CreateInferredWithCoordinatesFn
+capiCreateInferredWithCoordinates NativeLibrary{nativeCreateInferredWithCoordinates} = nativeCreateInferredWithCoordinates
+
+capiCreateRandomAccessWithCoordinates :: NativeLibrary -> CreateStreamingWithCoordinatesFn
+capiCreateRandomAccessWithCoordinates NativeLibrary{nativeCreateRandomAccessWithCoordinates} = nativeCreateRandomAccessWithCoordinates
+
+capiCreateStreamingWithCoordinates :: NativeLibrary -> CreateStreamingWithCoordinatesFn
+capiCreateStreamingWithCoordinates NativeLibrary{nativeCreateStreamingWithCoordinates} = nativeCreateStreamingWithCoordinates
+
+capiCreateWithPolicyWithCoordinatesV2 :: NativeLibrary -> CreateWithPolicyWithCoordinatesV2Fn
+capiCreateWithPolicyWithCoordinatesV2 NativeLibrary{nativeCreateWithPolicyWithCoordinatesV2} = nativeCreateWithPolicyWithCoordinatesV2
+
+capiCreateInferredWithCoordinatesV2 :: NativeLibrary -> CreateInferredWithCoordinatesV2Fn
+capiCreateInferredWithCoordinatesV2 NativeLibrary{nativeCreateInferredWithCoordinatesV2} = nativeCreateInferredWithCoordinatesV2
+
+capiCreateRandomAccessWithCoordinatesV2 :: NativeLibrary -> CreateStreamingWithCoordinatesV2Fn
+capiCreateRandomAccessWithCoordinatesV2 NativeLibrary{nativeCreateRandomAccessWithCoordinatesV2} = nativeCreateRandomAccessWithCoordinatesV2
+
+capiCreateStreamingWithCoordinatesV2 :: NativeLibrary -> CreateStreamingWithCoordinatesV2Fn
+capiCreateStreamingWithCoordinatesV2 NativeLibrary{nativeCreateStreamingWithCoordinatesV2} = nativeCreateStreamingWithCoordinatesV2
+
+capiCoordinateMeta :: NativeLibrary -> CoordinateMetaFn
+capiCoordinateMeta NativeLibrary{nativeCoordinateMeta} = nativeCoordinateMeta
+
+capiLoadCoordinateMeta :: NativeLibrary -> LoadCoordinateMetaFn
+capiLoadCoordinateMeta NativeLibrary{nativeLoadCoordinateMeta} = nativeLoadCoordinateMeta
+
+capiAxisCoordinateMetaFree :: NativeLibrary -> AxisCoordinateMetaFreeFn
+capiAxisCoordinateMetaFree NativeLibrary{nativeAxisCoordinateMetaFree} = nativeAxisCoordinateMetaFree
+
+capiCoordinateMetaV2 :: NativeLibrary -> CoordinateMetaV2Fn
+capiCoordinateMetaV2 NativeLibrary{nativeCoordinateMetaV2} = nativeCoordinateMetaV2
+
+capiLoadCoordinateMetaV2 :: NativeLibrary -> LoadCoordinateMetaV2Fn
+capiLoadCoordinateMetaV2 NativeLibrary{nativeLoadCoordinateMetaV2} = nativeLoadCoordinateMetaV2
+
+capiAxisCoordinateMetaV2Free :: NativeLibrary -> AxisCoordinateMetaV2FreeFn
+capiAxisCoordinateMetaV2Free NativeLibrary{nativeAxisCoordinateMetaV2Free} = nativeAxisCoordinateMetaV2Free
+
+capiReadAxisCoordinates :: NativeLibrary -> ReadAxisCoordinatesFn
+capiReadAxisCoordinates NativeLibrary{nativeReadAxisCoordinates} = nativeReadAxisCoordinates
+
+capiReadAxisCoordinatesV2 :: NativeLibrary -> ReadAxisCoordinatesV2Fn
+capiReadAxisCoordinatesV2 NativeLibrary{nativeReadAxisCoordinatesV2} = nativeReadAxisCoordinatesV2
+
+capiCoordinateValueSliceV2Free :: NativeLibrary -> CoordinateValueSliceV2FreeFn
+capiCoordinateValueSliceV2Free NativeLibrary{nativeCoordinateValueSliceV2Free} = nativeCoordinateValueSliceV2Free
+
+capiCoordinateDictionaryV2 :: NativeLibrary -> CoordinateDictionaryV2Fn
+capiCoordinateDictionaryV2 NativeLibrary{nativeCoordinateDictionaryV2} = nativeCoordinateDictionaryV2
+
+capiCoordinateDictionaryV2Free :: NativeLibrary -> CoordinateDictionaryV2FreeFn
+capiCoordinateDictionaryV2Free NativeLibrary{nativeCoordinateDictionaryV2Free} = nativeCoordinateDictionaryV2Free
+
+capiCoordinateLookupV2 :: NativeLibrary -> CoordinateLookupV2Fn
+capiCoordinateLookupV2 NativeLibrary{nativeCoordinateLookupV2} = nativeCoordinateLookupV2
+
+capiCoordinateLookupRangeV2 :: NativeLibrary -> CoordinateLookupRangeV2Fn
+capiCoordinateLookupRangeV2 NativeLibrary{nativeCoordinateLookupRangeV2} = nativeCoordinateLookupRangeV2
+
+capiCoordinateLookupResultV2Free :: NativeLibrary -> CoordinateLookupResultV2FreeFn
+capiCoordinateLookupResultV2Free NativeLibrary{nativeCoordinateLookupResultV2Free} = nativeCoordinateLookupResultV2Free
+
+capiAppendF32WithCoordinatesV2 :: NativeLibrary -> AppendWithCoordinatesV2Fn CFloat
+capiAppendF32WithCoordinatesV2 NativeLibrary{nativeAppendF32WithCoordinatesV2} = nativeAppendF32WithCoordinatesV2
+
+capiAppendF64WithCoordinatesV2 :: NativeLibrary -> AppendWithCoordinatesV2Fn Double
+capiAppendF64WithCoordinatesV2 NativeLibrary{nativeAppendF64WithCoordinatesV2} = nativeAppendF64WithCoordinatesV2
+
+capiAppendI32WithCoordinatesV2 :: NativeLibrary -> AppendWithCoordinatesV2Fn Int32
+capiAppendI32WithCoordinatesV2 NativeLibrary{nativeAppendI32WithCoordinatesV2} = nativeAppendI32WithCoordinatesV2
+
+capiAppendI64WithCoordinatesV2 :: NativeLibrary -> AppendWithCoordinatesV2Fn Int64
+capiAppendI64WithCoordinatesV2 NativeLibrary{nativeAppendI64WithCoordinatesV2} = nativeAppendI64WithCoordinatesV2
+
 capiOpen :: NativeLibrary -> OpenFn
 capiOpen NativeLibrary{nativeOpen} = nativeOpen
 
@@ -1731,6 +2866,18 @@ capiAppendF32WithRange NativeLibrary{nativeAppendF32WithRange} = nativeAppendF32
 
 capiAppendF64WithRange :: NativeLibrary -> AppendF64WithRangeFn
 capiAppendF64WithRange NativeLibrary{nativeAppendF64WithRange} = nativeAppendF64WithRange
+
+capiAppendF32WithUniverse :: NativeLibrary -> AppendWithUniverseFn CFloat
+capiAppendF32WithUniverse NativeLibrary{nativeAppendF32WithUniverse} = nativeAppendF32WithUniverse
+
+capiAppendF64WithUniverse :: NativeLibrary -> AppendWithUniverseFn Double
+capiAppendF64WithUniverse NativeLibrary{nativeAppendF64WithUniverse} = nativeAppendF64WithUniverse
+
+capiAppendI32WithUniverse :: NativeLibrary -> AppendWithUniverseFn Int32
+capiAppendI32WithUniverse NativeLibrary{nativeAppendI32WithUniverse} = nativeAppendI32WithUniverse
+
+capiAppendI64WithUniverse :: NativeLibrary -> AppendWithUniverseFn Int64
+capiAppendI64WithUniverse NativeLibrary{nativeAppendI64WithUniverse} = nativeAppendI64WithUniverse
 
 capiAppendI32WithRange :: NativeLibrary -> AppendI32WithRangeFn
 capiAppendI32WithRange NativeLibrary{nativeAppendI32WithRange} = nativeAppendI32WithRange

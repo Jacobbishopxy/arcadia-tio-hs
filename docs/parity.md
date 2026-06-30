@@ -38,9 +38,9 @@ blockers remain visible and can be promoted to a hard failure with
 
 Current local header snapshot used while adding this gate:
 
-- wrapped: 146
+- wrapped: 205
 - intentionally not applicable: 20
-- deferred blockers: 238
+- deferred blockers: 179
 - unknown/unmapped: 0
 
 These counts are an inventory baseline, not a packaging, support, or deployment statement.
@@ -78,8 +78,8 @@ Legend:
 | Tensor helper operations | ✅ Rust tensor ops | ❌ | Could add Haskell-owned tensor helpers independent of native ABI. |
 | Sparse-intent append/analyze | ✅ | ✅ | `SparseRule` ADTs plus `analyzeSparseAppend*` / `appendSparse*` wrappers use the C ABI V2 sparse rule and copy native analysis reasons. |
 | Signed integer sparse exact predicates | ✅ | ✅ | `SparsePredicateEqualI32` / `SparsePredicateEqualI64` are exposed and tested through V2 sparse rule calls. |
-| Coordinate metadata/create/read/lookup | ✅ | ❌ | Large surface; should be later than basic metadata/selectors. |
-| Universe-aware authoring/reads | ✅ | ❌ | Deferred. |
+| Coordinate metadata/create/read/lookup | ✅ | ⚠️ partial | Coordinate v1/v2 metadata/read/dictionary, v2 lookup/range lookup, coordinate-aware create variants, and append-axis v2 dense append bindings are exposed. Native append-sequence numeric value reads currently report unsupported-domain status; legacy coordinate index/range helpers and richer fixed-text/dictionary authoring remain deferred. |
+| Universe-aware authoring/reads | ✅ | ⚠️ partial | Streaming/random-access/policy create with universe axis identities, dense append with universe slot bindings/remaps, UUID/binding/remap ADTs, and explicit-universe shape-policy reads are exposed. No inferred-with-universe C ABI exists. |
 | Commit history: head/list/read-at-commit | ✅ | ✅ | `headCommit`, `listCommits`, full/selector-bearing historical reads, dense variants, and historical option/report variants are exposed. |
 | Revert/pop rollback markers | ✅ | ⚠️ partial | `pop`, `popBatched`, and `revertCommit` wrappers surface native status; broader tests for supported/unsupported layout states remain missing. |
 | Rewrite / rewrite-slice / clear-block | ✅ | ⚠️ partial | `rewriteF32`/`rewriteF64`, slice variants, and `clearBlocks` are exposed with Haskell validation; native V4 may still report unsupported/invalid for current runtime layouts. |
@@ -102,7 +102,7 @@ deferred blockers by either adding wrappers or documenting why they are truly
 not applicable to the Haskell C-ABI wrapper boundary.
 
 1. Add retained-history compaction, reform, and detailed diagnostics/accounting report wrappers.
-2. Add coordinate metadata/read/lookup wrappers.
+2. Expand coordinate parity beyond the current partial surface: legacy coordinate index/range helpers, fixed-text/dictionary append authoring ergonomics, and richer index status typing.
 3. Expand OCB beyond minimal open/metadata/close: create/append, dictionaries,
    row-group summaries, read requests/outcomes, cleanup, and structured OCB errors.
 6. Add CI/hygiene checks once the public repo is ready: `cabal build all`,

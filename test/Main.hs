@@ -2,7 +2,8 @@ module Main (main) where
 
 import Control.Monad (unless)
 import Data.Int (Int32, Int64)
-import Data.Word (Word64)
+import Data.Bits ((.|.), shiftL)
+import Data.Word (Word8, Word64)
 import qualified Data.Vector.Storable as VS
 import System.Directory (createDirectoryIfMissing, doesFileExist, removeFile)
 import System.Environment (lookupEnv)
@@ -32,6 +33,10 @@ main = do
   testCompactionHelpers native
   testInferredAndPolicyCreate native
   testMetadataRichCreateSettersAndScalar native
+  testCoordinateMetadataValueReads native
+  testCoordinateCreateValidationAndVariants native
+  testAppendAxisCoordinateBatches native
+  testUniverseAuthoringAndReads native
 
   putStrLn "PASS: dense .tio lifecycle/read parity smoke through libarcadia_tio_capi.so"
 
@@ -379,6 +384,257 @@ testMetadataRichCreateSettersAndScalar native = do
   assertEqual "metadata rich user kv" [("source", "haskell-test")] (map (\item -> (userKvKey item, userKvValue item)) (fileMetaUserKv meta))
   cleanup path
 
+
+testCoordinateMetadataValueReads :: NativeLibrary -> IO ()
+testCoordinateMetadataValueReads native = do
+  assertEqual "coordinate kind timestamp raw" CoordinateTimestamp (coordinateKindFromRaw 3)
+  assertEqual "coordinate encoding epoch ns raw" CoordinateEncodingEpochNanoseconds (coordinateEncodingFromRaw 6)
+  assertEqual "coordinate monotonicity raw" CoordinateStrictlyIncreasing (coordinateMonotonicityFromRaw 2)
+  assertEqual "coordinate availability unavailable raw" CoordinateUnavailableV2 (coordinateAvailabilityV2FromRaw 4)
+  assertEqual "coordinate status unsupported-domain raw" CoordinateStatusUnsupportedDomainV2 (coordinateStatusCategoryV2FromRaw 2)
+  let path = ".test-output" </> "coordinate-v2-metadata-values.tio"
+  cleanup path
+  file <- unwrap "createStreamingWithCoordinatesV2" =<< createStreamingWithCoordinatesV2 native path F32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata [channelCoordinate] defaultCoordinateV2Options{coordinateIncludeIndexSummaries = True}
+
+  metaV2 <- unwrap "coordinateMetaV2" =<< coordinateMetaV2 file defaultCoordinateV2Options{coordinateIncludeIndexSummaries = True}
+  assertEqual "coordinate meta v2 len" 1 (length metaV2)
+  let firstMeta = head metaV2
+  assertEqual "coordinate meta v2 axis" 1 (axisCoordinateMetaV2Axis firstMeta)
+  assertEqual "coordinate meta v2 descriptor" (Just "channel-v2") (axisCoordinateMetaV2DescriptorId firstMeta)
+  assertEqual "coordinate meta v2 length" 2 (axisCoordinateMetaV2Length firstMeta)
+  assertEqual "coordinate meta v2 dtype" CoordinateI32 (axisCoordinateMetaV2NumericDType firstMeta)
+  assertEqual "coordinate meta v2 availability" CoordinateAvailableV2 (axisCoordinateMetaV2Availability firstMeta)
+
+  loadedMetaV2 <- unwrap "loadCoordinateMetaV2" =<< loadCoordinateMetaV2 native path
+  assertEqual "load coordinate meta v2 descriptor" (map axisCoordinateMetaV2DescriptorId metaV2) (map axisCoordinateMetaV2DescriptorId loadedMetaV2)
+
+  valuesV2 <- unwrap "readAxisCoordinatesV2" =<< readAxisCoordinatesV2 file 1 defaultCoordinateV2Options
+  assertEqual "coordinate values v2 len" 2 (coordinateValueSliceLen valuesV2)
+  assertEqual "coordinate values v2 element size" 4 (coordinateValueSliceElementSize valuesV2)
+  assertEqual "coordinate values v2 decoded" [10, 20] (decodeI32LE (coordinateValueSliceBytes valuesV2))
+
+  dictionary <- unwrap "coordinateDictionaryV2" =<< coordinateDictionaryV2 file 1 defaultCoordinateV2Options{coordinateIncludeDictionaryEntries = True}
+  assertEqual "coordinate dictionary status is visible" CoordinateStatusUnsupportedDomainV2 (coordinateDictionaryStatusCategory dictionary)
+
+  close file
+
+  let emptyAxisPath = ".test-output" </> "coordinate-v2-empty-axis.tio"
+  cleanup emptyAxisPath
+  assertErrorCode "coordinate append-axis storage deferred" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native emptyAxisPath F32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata [emptyAxisCoordinate] defaultCoordinateV2Options
+
+  let pathV1 = ".test-output" </> "coordinate-v1-values.tio"
+  cleanup pathV1
+  fileV1 <- unwrap "createStreamingWithCoordinates" =<< createStreamingWithCoordinates native pathV1 F32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata [channelCoordinate]
+  metaV1 <- unwrap "coordinateMeta" =<< coordinateMeta fileV1
+  assertEqual "coordinate meta v1 len" 1 (length metaV1)
+  loadedMetaV1 <- unwrap "loadCoordinateMeta" =<< loadCoordinateMeta native pathV1
+  assertEqual "load coordinate meta v1 name" (map axisCoordinateMetaName metaV1) (map axisCoordinateMetaName loadedMetaV1)
+  v1Tensor <- unwrapSomeI32 "readAxisCoordinates v1 tensor" =<< readAxisCoordinates fileV1 1
+  assertEqual "coordinate values v1 shape" [2] (tensorShape v1Tensor)
+  assertEqual "coordinate values v1" (VS.fromList [10, 20]) (tensorValues v1Tensor)
+  close fileV1
+
+  cleanup path
+  cleanup pathV1
+ where
+  channelCoordinate =
+    AxisCoordinateInputV2
+      { axisCoordinateInputV2Axis = 1
+      , axisCoordinateInputV2DescriptorId = "channel-v2"
+      , axisCoordinateInputV2Name = "channel"
+      , axisCoordinateInputV2Kind = CoordinateLabelId
+      , axisCoordinateInputV2Values = CoordinateV2I32 [10, 20]
+      , axisCoordinateInputV2Encoding = CoordinateEncodingPlain
+      , axisCoordinateInputV2Sorted = CoordinateSortedAscending
+      , axisCoordinateInputV2Monotonicity = CoordinateStrictlyIncreasing
+      , axisCoordinateInputV2Uniqueness = CoordinateUnique
+      , axisCoordinateInputV2Required = True
+      }
+  emptyAxisCoordinate =
+    AxisCoordinateInputV2
+      { axisCoordinateInputV2Axis = 0
+      , axisCoordinateInputV2DescriptorId = "time-empty-v2"
+      , axisCoordinateInputV2Name = "time"
+      , axisCoordinateInputV2Kind = CoordinateTimestamp
+      , axisCoordinateInputV2Values = CoordinateV2I64 []
+      , axisCoordinateInputV2Encoding = CoordinateEncodingEpochNanoseconds
+      , axisCoordinateInputV2Sorted = CoordinateSortedAscending
+      , axisCoordinateInputV2Monotonicity = CoordinateStrictlyIncreasing
+      , axisCoordinateInputV2Uniqueness = CoordinateUnique
+      , axisCoordinateInputV2Required = True
+      }
+
+testCoordinateCreateValidationAndVariants :: NativeLibrary -> IO ()
+testCoordinateCreateValidationAndVariants native = do
+  let dims2 = [dim AxisTime 1, dim AxisChannel 2]
+      coord = channelCoordinateStep2 "channel-create" "channel" [10, 20]
+
+  let randomPath = ".test-output" </> "coordinate-v2-random-create.tio"
+  cleanup randomPath
+  randomFile <- unwrap "createRandomAccessWithCoordinatesV2" =<< createRandomAccessWithCoordinatesV2 native randomPath F32 dims2 0 emptyCreateMetadata [coord] defaultCoordinateV2Options
+  randomValues <- unwrap "random coordinate values" =<< readAxisCoordinatesV2 randomFile 1 defaultCoordinateV2Options
+  assertEqual "random coordinate values" [10, 20] (decodeI32LE (coordinateValueSliceBytes randomValues))
+  exactLookup <- unwrap "coordinate exact lookup" =<< coordinateLookupV2 randomFile 1 (CoordinateLookupKeyI32 20) defaultCoordinateV2Options{coordinateAllowAuthoritativeScan = True}
+  assertEqual "coordinate exact lookup status" CoordinateLookupUniqueV2 (coordinateLookupStatus exactLookup)
+  assertEqual "coordinate exact lookup position" (Just 1) (coordinateLookupUniquePosition exactLookup)
+  missingLookup <- unwrap "coordinate missing lookup" =<< coordinateLookupV2 randomFile 1 (CoordinateLookupKeyI32 99) defaultCoordinateV2Options{coordinateAllowAuthoritativeScan = True}
+  assertEqual "coordinate missing lookup status" CoordinateLookupMissingV2 (coordinateLookupStatus missingLookup)
+  rangeLookup <- unwrap "coordinate range lookup" =<< coordinateLookupRangeV2 randomFile 1 (CoordinateLookupKeyI32 10) (CoordinateLookupKeyI32 21) defaultCoordinateV2Options{coordinateAllowAuthoritativeScan = True}
+  assertEqual "coordinate range lookup status" CoordinateLookupRangeV2 (coordinateLookupStatus rangeLookup)
+  assertEqual "coordinate range lookup range" (Just (0, 2)) (coordinateLookupRange rangeLookup)
+  close randomFile
+
+  let inferredPath = ".test-output" </> "coordinate-v2-inferred-create.tio"
+  cleanup inferredPath
+  inferredFile <- unwrap "createInferredWithCoordinatesV2" =<< createInferredWithCoordinatesV2 native inferredPath F32 dims2 0 emptyCreateMetadata defaultCreateInferredOptions [coord{axisCoordinateInputV2DescriptorId = "channel-inferred"}] defaultCoordinateV2Options
+  inferredMeta <- unwrap "inferred coordinate metadata" =<< coordinateMetaV2 inferredFile defaultCoordinateV2Options
+  assertEqual "inferred coordinate descriptor" [Just "channel-inferred"] (map axisCoordinateMetaV2DescriptorId inferredMeta)
+  close inferredFile
+
+  let policyPath = ".test-output" </> "coordinate-v2-policy-create.tio"
+  cleanup policyPath
+  policyFile <- unwrap "createWithPolicyWithCoordinatesV2" =<< createWithPolicyWithCoordinatesV2 native policyPath F32 dims2 0 emptyCreateMetadata defaultCreatePolicyOptions [coord{axisCoordinateInputV2DescriptorId = "channel-policy"}] defaultCoordinateV2Options
+  policyMeta <- unwrap "policy coordinate metadata" =<< coordinateMetaV2 policyFile defaultCoordinateV2Options
+  assertEqual "policy coordinate descriptor" [Just "channel-policy"] (map axisCoordinateMetaV2DescriptorId policyMeta)
+  close policyFile
+
+  let v1Path = ".test-output" </> "coordinate-v1-random-create.tio"
+  cleanup v1Path
+  v1File <- unwrap "createRandomAccessWithCoordinates" =<< createRandomAccessWithCoordinates native v1Path F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Name = "channel-v1"}]
+  v1Meta <- unwrap "v1 random coordinate metadata" =<< coordinateMeta v1File
+  assertEqual "v1 random coordinate name" [Just "channel-v1"] (map axisCoordinateMetaName v1Meta)
+  close v1File
+
+  let invalidPath tag = ".test-output" </> ("coordinate-invalid-" <> tag <> ".tio")
+  assertErrorCode "coordinate rank validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "rank") F32 [] 0 emptyCreateMetadata [coord] defaultCoordinateV2Options
+  assertErrorCode "coordinate axis bounds validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "axis") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Axis = 2}] defaultCoordinateV2Options
+  assertErrorCode "coordinate unique axes validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "duplicate") F32 dims2 0 emptyCreateMetadata [coord, coord{axisCoordinateInputV2DescriptorId = "dup"}] defaultCoordinateV2Options
+  assertErrorCode "coordinate append-axis exclusion" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "append") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Axis = 0, axisCoordinateInputV2DescriptorId = "time", axisCoordinateInputV2Name = "time", axisCoordinateInputV2Values = CoordinateV2I64 [1]}] defaultCoordinateV2Options
+  assertErrorCode "coordinate inline length validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "len") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Values = CoordinateV2I32 [10]}] defaultCoordinateV2Options
+  assertErrorCode "coordinate descriptor required" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "descriptor") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2DescriptorId = ""}] defaultCoordinateV2Options
+  assertErrorCode "coordinate name required" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "name") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Name = ""}] defaultCoordinateV2Options
+  assertErrorCode "coordinate interior nul validation" ErrorInvalidArgument =<< createStreamingWithCoordinatesV2 native (invalidPath "nul") F32 dims2 0 emptyCreateMetadata [coord{axisCoordinateInputV2Name = "bad\0name"}] defaultCoordinateV2Options
+ where
+  channelCoordinateStep2 descriptor name values =
+    AxisCoordinateInputV2
+      { axisCoordinateInputV2Axis = 1
+      , axisCoordinateInputV2DescriptorId = descriptor
+      , axisCoordinateInputV2Name = name
+      , axisCoordinateInputV2Kind = CoordinateLabelId
+      , axisCoordinateInputV2Values = CoordinateV2I32 values
+      , axisCoordinateInputV2Encoding = CoordinateEncodingPlain
+      , axisCoordinateInputV2Sorted = CoordinateSortedAscending
+      , axisCoordinateInputV2Monotonicity = CoordinateStrictlyIncreasing
+      , axisCoordinateInputV2Uniqueness = CoordinateUnique
+      , axisCoordinateInputV2Required = True
+      }
+
+testAppendAxisCoordinateBatches :: NativeLibrary -> IO ()
+testAppendAxisCoordinateBatches native = do
+  let path = ".test-output" </> "coordinate-v2-append-axis.tio"
+  cleanup path
+  file <- unwrap "createStreaming append coordinates" =<< createStreamingWithCoordinatesV2 native path F32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata [appendTimeDescriptor] defaultCoordinateV2Options
+  appended <- unwrap "appendDenseF32WithCoordinatesV2" =<< appendDenseF32WithCoordinatesV2 file [2, 2] (VS.fromList [1.0, 2.0, 3.0, 4.0]) [appendTimeCoordinate [1000, 2000]]
+  assertEqual "append coordinate assigned range" (AppendRange 0 2) appended
+  values <- unwrap "read appended axis coordinates" =<< readAxisCoordinatesV2 file 0 defaultCoordinateV2Options
+  assertEqual "append coordinate value domain" CoordinateV2AppendSequence (coordinateValueSliceDomain values)
+  assertEqual "append coordinate values deferred" 0 (coordinateValueSliceLen values)
+  assertEqual "append coordinate read status" CoordinateStatusUnsupportedDomainV2 (coordinateValueSliceStatusCategory values)
+  exact <- unwrap "lookup appended coordinate" =<< coordinateLookupV2 file 0 (CoordinateLookupKeyI64 2000) defaultCoordinateV2Options{coordinateAllowAuthoritativeScan = True}
+  assertEqual "lookup appended numeric coordinate status" CoordinateLookupErrorV2 (coordinateLookupStatus exact)
+  close file
+
+  smokeAppend "f64" F64 appendDenseF64WithCoordinatesV2 (VS.fromList [1.0, 2.0, 3.0, 4.0] :: VS.Vector Double)
+  smokeAppend "i32" I32 appendDenseI32WithCoordinatesV2 (VS.fromList ([1, 2, 3, 4] :: [Int32]))
+  smokeAppend "i64" I64 appendDenseI64WithCoordinatesV2 (VS.fromList ([10, 20, 30, 40] :: [Int64]))
+ where
+  appendTimeDescriptor =
+    AxisCoordinateInputV2
+      { axisCoordinateInputV2Axis = 0
+      , axisCoordinateInputV2DescriptorId = "time-append"
+      , axisCoordinateInputV2Name = "time"
+      , axisCoordinateInputV2Kind = CoordinateTimestamp
+      , axisCoordinateInputV2Values = CoordinateV2AppendSequenceValues CoordinateI64
+      , axisCoordinateInputV2Encoding = CoordinateEncodingEpochNanoseconds
+      , axisCoordinateInputV2Sorted = CoordinateSortedAscending
+      , axisCoordinateInputV2Monotonicity = CoordinateStrictlyIncreasing
+      , axisCoordinateInputV2Uniqueness = CoordinateUnique
+      , axisCoordinateInputV2Required = True
+      }
+  appendTimeCoordinate values =
+    AppendCoordinateEntryV2
+      { appendCoordinateEntryAxis = 0
+      , appendCoordinateEntryDescriptorId = "time-append"
+      , appendCoordinateEntryName = "time"
+      , appendCoordinateEntryValues = CoordinateV2I64 values
+      , appendCoordinateEntryEncoding = CoordinateEncodingEpochNanoseconds
+      }
+  smokeAppend label payloadDType appendFn payload = do
+    let smokePath = ".test-output" </> ("coordinate-v2-append-axis-" <> label <> ".tio")
+    cleanup smokePath
+    smokeFile <- unwrap ("createStreaming append coordinates " <> label) =<< createStreamingWithCoordinatesV2 native smokePath payloadDType [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata [appendTimeDescriptor] defaultCoordinateV2Options
+    smokeRange <- unwrap ("append with coordinates " <> label) =<< appendFn smokeFile [2, 2] payload [appendTimeCoordinate [11, 22]]
+    assertEqual ("append coordinate range " <> label) (AppendRange 0 2) smokeRange
+    smokeLookup <- unwrap ("lookup appended coordinate " <> label) =<< coordinateLookupV2 smokeFile 0 (CoordinateLookupKeyI64 22) defaultCoordinateV2Options{coordinateAllowAuthoritativeScan = True}
+    assertEqual ("lookup appended numeric coordinate status " <> label) CoordinateLookupErrorV2 (coordinateLookupStatus smokeLookup)
+    close smokeFile
+
+testUniverseAuthoringAndReads :: NativeLibrary -> IO ()
+testUniverseAuthoringAndReads native = do
+  let family = TioUuid [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      version = TioUuid [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      createOptions = CreateWithUniverseOptions [AxisIdentityInput 1 AxisIdentityUniverseAware]
+      slot = SlotUniverseBindingInput [UniverseBindingInput 1 family version 2]
+      appendOptions = AppendWithUniverseOptions [slot, slot] []
+      explicitPolicy = ReadShapeExplicitUniverse [ExplicitUniverseAxisTarget 1 family version 2]
+
+  let streamPath = ".test-output" </> "universe-streaming.tio"
+  cleanup streamPath
+  streamFile <- unwrap "createStreamingWithUniverse" =<< createStreamingWithUniverse native streamPath F32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata createOptions
+  streamRange <- unwrap "appendDenseF32WithUniverse" =<< appendDenseF32WithUniverse streamFile [2, 2] (VS.fromList [1.0, 2.0, 3.0, 4.0]) appendOptions
+  assertEqual "universe append range" (AppendRange 0 2) streamRange
+  universeRead <- unwrapSomeF32 "readWithShapePolicy explicit universe" =<< fmap fst <$> readWithShapePolicy streamFile [] defaultReadOptions explicitPolicy
+  assertEqual "explicit universe read shape" [2, 2] (tensorShape universeRead)
+  assertEqual "explicit universe read values" (VS.fromList [1.0, 2.0, 3.0, 4.0]) (tensorValues universeRead)
+  assertErrorCode "explicit universe malformed uuid validation" ErrorInvalidArgument =<< readWithShapePolicy streamFile [] defaultReadOptions (ReadShapeExplicitUniverse [ExplicitUniverseAxisTarget 1 (TioUuid [1, 2, 3]) version 2])
+  close streamFile
+
+  let randomPath = ".test-output" </> "universe-random.tio"
+  cleanup randomPath
+  randomFile <- unwrap "createRandomAccessWithUniverse" =<< createRandomAccessWithUniverse native randomPath F64 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata createOptions
+  randomRange <- unwrap "appendDenseF64WithUniverse" =<< appendDenseF64WithUniverse randomFile [1, 2] (VS.fromList [5.0, 6.0]) (AppendWithUniverseOptions [slot] [])
+  assertEqual "random universe append range" (AppendRange 0 1) randomRange
+  close randomFile
+
+  let policyPath = ".test-output" </> "universe-policy.tio"
+  cleanup policyPath
+  policyFile <- unwrap "createWithPolicyWithUniverse" =<< createWithPolicyWithUniverse native policyPath I32 [dim AxisTime 0, dim AxisChannel 2] 0 emptyCreateMetadata defaultCreatePolicyOptions createOptions
+  policyRange <- unwrap "appendDenseI32WithUniverse" =<< appendDenseI32WithUniverse policyFile [1, 2] (VS.fromList ([7, 8] :: [Int32])) (AppendWithUniverseOptions [slot] [])
+  assertEqual "policy universe append range" (AppendRange 0 1) policyRange
+  close policyFile
+
+  assertErrorCode "universe uuid validation" ErrorInvalidArgument =<< createStreamingWithUniverse native (".test-output" </> "universe-invalid.tio") F32 [dim AxisTime 0] 0 emptyCreateMetadata (CreateWithUniverseOptions [AxisIdentityInput 1 AxisIdentityUniverseAware])
+
+decodeI32LE :: [Word8] -> [Int32]
+decodeI32LE [] = []
+decodeI32LE (a:b:c:d:rest) = fromIntegral (fromIntegral a .|. shiftL (fromIntegral b) 8 .|. shiftL (fromIntegral c) 16 .|. shiftL (fromIntegral d) 24 :: Word64) : decodeI32LE rest
+decodeI32LE _ = []
+
+decodeI64LE :: [Word8] -> [Int64]
+decodeI64LE [] = []
+decodeI64LE (a:b:c:d:e:f:g:h:rest) = fromIntegral word : decodeI64LE rest
+ where
+  word = fromIntegral a .|. shiftL (fromIntegral b) 8 .|. shiftL (fromIntegral c) 16 .|. shiftL (fromIntegral d) 24 .|. shiftL (fromIntegral e) 32 .|. shiftL (fromIntegral f) 40 .|. shiftL (fromIntegral g) 48 .|. shiftL (fromIntegral h) 56 :: Word64
+decodeI64LE _ = []
+
+unwrapSomeF32 :: String -> Result SomeTensor -> IO (Tensor Float)
+unwrapSomeF32 label result = unwrap label result >>= expectSomeF32 label
+
+expectSomeF32 :: String -> SomeTensor -> IO (Tensor Float)
+expectSomeF32 label tensor = case tensor of
+  SomeTensorF32 value -> pure value
+  other -> failTest (label <> ": expected f32 tensor, got " <> show (someTensorDType other))
+
 unwrapSomeF64 :: String -> Result SomeTensor -> IO (Tensor Double)
 unwrapSomeF64 label result = unwrap label result >>= expectSomeF64 label
 
@@ -386,6 +642,15 @@ expectSomeF64 :: String -> SomeTensor -> IO (Tensor Double)
 expectSomeF64 label tensor = case tensor of
   SomeTensorF64 value -> pure value
   other -> failTest (label <> ": expected f64 tensor, got " <> show (someTensorDType other))
+
+
+unwrapSomeI32 :: String -> Result SomeTensor -> IO (Tensor Int32)
+unwrapSomeI32 label result = unwrap label result >>= expectSomeI32 label
+
+expectSomeI32 :: String -> SomeTensor -> IO (Tensor Int32)
+expectSomeI32 label tensor = case tensor of
+  SomeTensorI32 value -> pure value
+  other -> failTest (label <> ": expected i32 tensor, got " <> show (someTensorDType other))
 
 unwrapSomeDenseF64 :: String -> Result SomeDenseRead -> IO (DenseRead Double)
 unwrapSomeDenseF64 label result = unwrap label result >>= expectSomeDenseF64 label
