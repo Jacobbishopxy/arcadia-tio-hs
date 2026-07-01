@@ -8,11 +8,11 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 392 |
+| wrapped | 400 |
 | not-applicable | 24 |
 | deferred-blocker | 0 |
 | unknown-unmapped | 0 |
-| total | 416 |
+| total | 424 |
 
 A default inventory run fails when `unknown-unmapped` is non-zero. Deferred blockers remain visible and can be promoted to a hard failure with `--fail-on-deferred`. Named family gaps can be promoted to a hard failure with `--fail-on-family-gaps`.
 
@@ -21,6 +21,7 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 | Family | Expected | Present in headers | Wrapped | Gaps |
 | --- | ---: | ---: | ---: | ---: |
 | tensor-structural-core | 12 | 12 | 12 | 0 |
+| tensor-elementwise-float-core | 8 | 8 | 8 | 0 |
 
 ## wrapped items
 
@@ -219,16 +220,24 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_sparse_append_analysis_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_string_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_take_entries` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_add` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_add_scalar` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_div` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_div_scalar` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_expand_dims` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_flatten` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_index_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_mul` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_mul_scalar` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_permute_axes` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_reshape` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_slice_axis` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_slice_axis_step` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_squeeze` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_squeeze_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_sub` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_sub_scalar` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_take_axis` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_to_contiguous` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_transpose` — resolved by Haskell dynamic-loader surface

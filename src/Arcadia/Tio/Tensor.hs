@@ -6,6 +6,7 @@ module Arcadia.Tio.Tensor
   , DenseRead(..)
   , SomeDenseRead(..)
   , TioElement(..)
+  , TioFloatElement(..)
   , tensorFromVector
   , tensorFromList
   , tensorElementCount
@@ -21,6 +22,14 @@ module Arcadia.Tio.Tensor
   , tensorSliceAxisStep
   , tensorTakeAxis
   , tensorIndexAxis
+  , tensorAdd
+  , tensorSub
+  , tensorMul
+  , tensorDiv
+  , tensorAddScalar
+  , tensorSubScalar
+  , tensorMulScalar
+  , tensorDivScalar
   , someTensorDType
   , someTensorShape
   , someDenseReadDType
@@ -43,16 +52,24 @@ import Arcadia.Tio.Error (Result, invalidArgument)
 import Arcadia.Tio.Internal.CApi
   ( CArcadiaTioTensor(..)
   , NativeLibrary
+  , capiTensorAdd
+  , capiTensorAddScalar
+  , capiTensorDiv
+  , capiTensorDivScalar
   , capiTensorExpandDims
   , capiTensorFlatten
   , capiTensorFree
   , capiTensorIndexAxis
+  , capiTensorMul
+  , capiTensorMulScalar
   , capiTensorPermuteAxes
   , capiTensorReshape
   , capiTensorSliceAxis
   , capiTensorSliceAxisStep
   , capiTensorSqueeze
   , capiTensorSqueezeAxis
+  , capiTensorSub
+  , capiTensorSubScalar
   , capiTensorTakeAxis
   , capiTensorToContiguous
   , capiTensorTranspose
@@ -99,6 +116,10 @@ class Storable a => TioElement a where
   fromSomeTensor :: SomeTensor -> Result (Tensor a)
   fromSomeDenseRead :: SomeDenseRead -> Result (DenseRead a)
 
+-- | Element types supported by the native tensor elementwise float core.
+class TioElement a => TioFloatElement a where
+  tensorScalarToDouble :: a -> Double
+
 instance TioElement Float where
   elementDType _ = F32
   fromSomeTensor tensor = case tensor of
@@ -108,6 +129,9 @@ instance TioElement Float where
     SomeDenseReadF32 value -> Right value
     other -> denseDTypeMismatch F32 other
 
+instance TioFloatElement Float where
+  tensorScalarToDouble = realToFrac
+
 instance TioElement Double where
   elementDType _ = F64
   fromSomeTensor tensor = case tensor of
@@ -116,6 +140,9 @@ instance TioElement Double where
   fromSomeDenseRead dense = case dense of
     SomeDenseReadF64 value -> Right value
     other -> denseDTypeMismatch F64 other
+
+instance TioFloatElement Double where
+  tensorScalarToDouble = id
 
 instance TioElement Int32 where
   elementDType _ = I32
@@ -259,12 +286,83 @@ tensorIndexAxis native axis index tensor =
   callTensorOp native tensor $ \inputPtr outPtr ->
     capiTensorIndexAxis native inputPtr axis index outPtr
 
+-- | Add two floating-point tensors through the native C ABI tensor elementwise core.
+tensorAdd :: TioFloatElement a => NativeLibrary -> Tensor a -> Tensor a -> IO (Result (Tensor a))
+tensorAdd native lhs rhs =
+  callBinaryTensorOp native lhs rhs (capiTensorAdd native)
+
+-- | Subtract two floating-point tensors through the native C ABI tensor elementwise core.
+tensorSub :: TioFloatElement a => NativeLibrary -> Tensor a -> Tensor a -> IO (Result (Tensor a))
+tensorSub native lhs rhs =
+  callBinaryTensorOp native lhs rhs (capiTensorSub native)
+
+-- | Multiply two floating-point tensors through the native C ABI tensor elementwise core.
+tensorMul :: TioFloatElement a => NativeLibrary -> Tensor a -> Tensor a -> IO (Result (Tensor a))
+tensorMul native lhs rhs =
+  callBinaryTensorOp native lhs rhs (capiTensorMul native)
+
+-- | Divide two floating-point tensors through the native C ABI tensor elementwise core.
+tensorDiv :: TioFloatElement a => NativeLibrary -> Tensor a -> Tensor a -> IO (Result (Tensor a))
+tensorDiv native lhs rhs =
+  callBinaryTensorOp native lhs rhs (capiTensorDiv native)
+
+-- | Add a scalar to a floating-point tensor through the native C ABI tensor elementwise core.
+tensorAddScalar :: TioFloatElement a => NativeLibrary -> a -> Tensor a -> IO (Result (Tensor a))
+tensorAddScalar native rhs tensor =
+  callScalarTensorOp native tensor (tensorScalarToDouble rhs) (capiTensorAddScalar native)
+
+-- | Subtract a scalar from a floating-point tensor through the native C ABI tensor elementwise core.
+tensorSubScalar :: TioFloatElement a => NativeLibrary -> a -> Tensor a -> IO (Result (Tensor a))
+tensorSubScalar native rhs tensor =
+  callScalarTensorOp native tensor (tensorScalarToDouble rhs) (capiTensorSubScalar native)
+
+-- | Multiply a floating-point tensor by a scalar through the native C ABI tensor elementwise core.
+tensorMulScalar :: TioFloatElement a => NativeLibrary -> a -> Tensor a -> IO (Result (Tensor a))
+tensorMulScalar native rhs tensor =
+  callScalarTensorOp native tensor (tensorScalarToDouble rhs) (capiTensorMulScalar native)
+
+-- | Divide a floating-point tensor by a scalar through the native C ABI tensor elementwise core.
+tensorDivScalar :: TioFloatElement a => NativeLibrary -> a -> Tensor a -> IO (Result (Tensor a))
+tensorDivScalar native rhs tensor =
+  callScalarTensorOp native tensor (tensorScalarToDouble rhs) (capiTensorDivScalar native)
+
 callTensorOp :: forall a. TioElement a => NativeLibrary -> Tensor a -> (Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt) -> IO (Result (Tensor a))
 callTensorOp native tensor nativeCall =
   withBorrowedTensor tensor $ \inputPtr ->
     alloca $ \outPtr -> do
       poke outPtr emptyCArcadiaTioTensor
       status <- nativeCall inputPtr outPtr
+      if status == okStatus
+        then (peek outPtr >>= copyTypedTensor expectedDType) `finally` capiTensorFree native outPtr
+        else do
+          err <- lastError native
+          capiTensorFree native outPtr
+          pure (Left err)
+ where
+  expectedDType = elementDType (Proxy :: Proxy a)
+
+callBinaryTensorOp :: forall a. TioFloatElement a => NativeLibrary -> Tensor a -> Tensor a -> (Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt) -> IO (Result (Tensor a))
+callBinaryTensorOp native lhs rhs nativeCall =
+  withBorrowedTensor lhs $ \lhsPtr ->
+    withBorrowedTensor rhs $ \rhsPtr ->
+      alloca $ \outPtr -> do
+        poke outPtr emptyCArcadiaTioTensor
+        status <- nativeCall lhsPtr rhsPtr outPtr
+        if status == okStatus
+          then (peek outPtr >>= copyTypedTensor expectedDType) `finally` capiTensorFree native outPtr
+          else do
+            err <- lastError native
+            capiTensorFree native outPtr
+            pure (Left err)
+ where
+  expectedDType = elementDType (Proxy :: Proxy a)
+
+callScalarTensorOp :: forall a. TioFloatElement a => NativeLibrary -> Tensor a -> Double -> (Ptr CArcadiaTioTensor -> Double -> Ptr CArcadiaTioTensor -> IO CInt) -> IO (Result (Tensor a))
+callScalarTensorOp native tensor rhs nativeCall =
+  withBorrowedTensor tensor $ \inputPtr ->
+    alloca $ \outPtr -> do
+      poke outPtr emptyCArcadiaTioTensor
+      status <- nativeCall inputPtr rhs outPtr
       if status == okStatus
         then (peek outPtr >>= copyTypedTensor expectedDType) `finally` capiTensorFree native outPtr
         else do

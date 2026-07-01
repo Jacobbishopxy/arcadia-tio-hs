@@ -46,9 +46,10 @@ The inventory fails on unknown/unmapped C ABI items by default and can enforce
 zero deferred blockers with `--fail-on-deferred`. It also reports named family
 audits; `--fail-on-family-gaps` turns missing or unwrapped named-family items
 into hard failures. The current checked header snapshot passes those stricter
-gates with 392 wrapped items, 24 intentionally not-applicable C ABI
+gates with 400 wrapped items, 24 intentionally not-applicable C ABI
 conveniences, 0 deferred blockers, 0 unknown/unmapped items, and 0 gaps in the
-12-function `tensor-structural-core` family. This is a narrow 100% parity claim
+12-function `tensor-structural-core` family or the 8-function
+`tensor-elementwise-float-core` family. This is a narrow 100% parity claim
 for the current Haskell wrapper boundary over the audited C ABI/public wrapper
 surface only. It is not a packaging, support, deployment, release, performance,
 direct Rust-internal implementation, or production-readiness claim.
@@ -88,6 +89,9 @@ Implemented:
   `tensorSqueezeAxis`, `tensorPermuteAxes`, `tensorTranspose`,
   `tensorSliceAxis`, `tensorSliceAxisStep`, `tensorTakeAxis`, and
   `tensorIndexAxis`) over Haskell-owned dense tensors;
+- call the float-only tensor elementwise core (`tensorAdd`, `tensorSub`,
+  `tensorMul`, `tensorDiv`, and the `*Scalar` variants) over Haskell-owned
+  `Float` and `Double` tensors;
 - read axis ranges/takes/one-index slices, append-entry ranges/takes, and scalar values;
 - read full and selector-bearing retained commit snapshots, including dense
   materialization with mask;

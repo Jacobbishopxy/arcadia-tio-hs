@@ -203,8 +203,22 @@ TENSOR_STRUCTURAL_CORE_FUNCTIONS = frozenset(
     }
 )
 
+TENSOR_ELEMENTWISE_FLOAT_CORE_FUNCTIONS = frozenset(
+    {
+        "arcadia_tio_tensor_add",
+        "arcadia_tio_tensor_sub",
+        "arcadia_tio_tensor_mul",
+        "arcadia_tio_tensor_div",
+        "arcadia_tio_tensor_add_scalar",
+        "arcadia_tio_tensor_sub_scalar",
+        "arcadia_tio_tensor_mul_scalar",
+        "arcadia_tio_tensor_div_scalar",
+    }
+)
+
 NAMED_FUNCTION_FAMILIES = {
     "tensor-structural-core": TENSOR_STRUCTURAL_CORE_FUNCTIONS,
+    "tensor-elementwise-float-core": TENSOR_ELEMENTWISE_FLOAT_CORE_FUNCTIONS,
 }
 
 WRAPPED_OCB_TYPES = {
@@ -512,6 +526,7 @@ def run_self_test() -> None:
             int32_t arcadia_tio_coordinate_lookup_v2(void);
             int32_t arcadia_tio_append_sparse_i64_v2(void);
             int32_t arcadia_tio_tensor_reshape(void);
+            int32_t arcadia_tio_tensor_add(void);
             int32_t arcadia_tio_new_gap(void);
             """,
             encoding="utf-8",
@@ -527,6 +542,7 @@ def run_self_test() -> None:
         (src / "CApi.hs").write_text(
             'x = dlsym dl "arcadia_tio_abi_version"\n'
             'y = dlsym dl "arcadia_tio_tensor_reshape"\n'
+            'z = dlsym dl "arcadia_tio_tensor_add"\n'
             'data CArcadiaTioDType = CArcadiaTioDType\n',
             encoding="utf-8",
         )
@@ -538,6 +554,7 @@ def run_self_test() -> None:
             "arcadia_tio_coordinate_lookup_v2": CATEGORY_DEFERRED,
             "arcadia_tio_append_sparse_i64_v2": CATEGORY_NOT_APPLICABLE,
             "arcadia_tio_tensor_reshape": CATEGORY_WRAPPED,
+            "arcadia_tio_tensor_add": CATEGORY_WRAPPED,
             "arcadia_tio_new_gap": CATEGORY_UNKNOWN,
             "ArcadiaTioDType": CATEGORY_WRAPPED,
             "ArcadiaTioCoordinateDictionaryV2": CATEGORY_DEFERRED,
@@ -545,9 +562,13 @@ def run_self_test() -> None:
         }
         if by_name != expected:
             raise SystemExit(f"self-test failed: expected {expected}, got {by_name}")
-        family = function_family_reports(items)[0]
-        if family.name != "tensor-structural-core" or family.expected != 12 or family.present != 1 or family.wrapped != 1 or family.gaps != 11:
-            raise SystemExit(f"self-test failed family report: got {family}")
+        families = {family.name: family for family in function_family_reports(items)}
+        structural = families["tensor-structural-core"]
+        if structural.expected != 12 or structural.present != 1 or structural.wrapped != 1 or structural.gaps != 11:
+            raise SystemExit(f"self-test failed structural family report: got {structural}")
+        elementwise = families["tensor-elementwise-float-core"]
+        if elementwise.expected != 8 or elementwise.present != 1 or elementwise.wrapped != 1 or elementwise.gaps != 7:
+            raise SystemExit(f"self-test failed elementwise family report: got {elementwise}")
     print("parity_inventory.py self-test: PASS")
 
 

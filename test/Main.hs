@@ -175,6 +175,12 @@ testTensorStructuralOps native = do
   indexed <- unwrap "tensorIndexAxis" =<< tensorIndexAxis native 1 2 base
   assertTensor "tensorIndexAxis" [2, 1] [3.0, 6.0] indexed
 
+  added <- unwrap "tensorAdd" =<< tensorAdd native base (Tensor [1, 3] (VS.fromList [10.0, 20.0, 30.0]))
+  assertTensor "tensorAdd" [2, 3] [11.0, 22.0, 33.0, 14.0, 25.0, 36.0] added
+
+  multiplied <- unwrap "tensorMulScalar" =<< tensorMulScalar native 2.0 base
+  assertTensor "tensorMulScalar" [2, 3] [2.0, 4.0, 6.0, 8.0, 10.0, 12.0] multiplied
+
 testOcbWriteValidationPure :: IO ()
 testOcbWriteValidationPure = do
   assertInvalid "OCB write empty schema" (Ocb.validateWriteSpec validWriteSpec{Ocb.ocbWriteColumns = []})

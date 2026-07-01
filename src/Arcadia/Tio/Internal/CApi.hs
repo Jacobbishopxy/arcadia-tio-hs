@@ -285,6 +285,14 @@ module Arcadia.Tio.Internal.CApi
   , capiTensorSliceAxisStep
   , capiTensorTakeAxis
   , capiTensorIndexAxis
+  , capiTensorAdd
+  , capiTensorSub
+  , capiTensorMul
+  , capiTensorDiv
+  , capiTensorAddScalar
+  , capiTensorSubScalar
+  , capiTensorMulScalar
+  , capiTensorDivScalar
   , capiRank
   , capiDType
   , capiAppendAxis
@@ -3920,6 +3928,8 @@ type TensorSliceAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Word64 -> Word64 -> P
 type TensorSliceAxisStepFn = Ptr CArcadiaTioTensor -> Int64 -> Int64 -> Int64 -> Int64 -> Ptr CArcadiaTioTensor -> IO CInt
 type TensorTakeAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Ptr Word64 -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
 type TensorIndexAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Word64 -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorBinaryOpFn = Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorScalarOpFn = Ptr CArcadiaTioTensor -> Double -> Ptr CArcadiaTioTensor -> IO CInt
 type RankFn = Ptr CHandle -> Ptr CSize -> IO CInt
 type DTypeFn = Ptr CHandle -> Ptr CInt -> IO CInt
 type AppendAxisFn = Ptr CHandle -> Ptr CSize -> IO CInt
@@ -4129,6 +4139,8 @@ foreign import ccall safe "dynamic" mkTensorSliceAxis :: FunPtr TensorSliceAxisF
 foreign import ccall safe "dynamic" mkTensorSliceAxisStep :: FunPtr TensorSliceAxisStepFn -> TensorSliceAxisStepFn
 foreign import ccall safe "dynamic" mkTensorTakeAxis :: FunPtr TensorTakeAxisFn -> TensorTakeAxisFn
 foreign import ccall safe "dynamic" mkTensorIndexAxis :: FunPtr TensorIndexAxisFn -> TensorIndexAxisFn
+foreign import ccall safe "dynamic" mkTensorBinaryOp :: FunPtr TensorBinaryOpFn -> TensorBinaryOpFn
+foreign import ccall safe "dynamic" mkTensorScalarOp :: FunPtr TensorScalarOpFn -> TensorScalarOpFn
 foreign import ccall safe "dynamic" mkRank :: FunPtr RankFn -> RankFn
 foreign import ccall safe "dynamic" mkDType :: FunPtr DTypeFn -> DTypeFn
 foreign import ccall safe "dynamic" mkAppendAxis :: FunPtr AppendAxisFn -> AppendAxisFn
@@ -4352,6 +4364,14 @@ data NativeLibrary = NativeLibrary
   , nativeTensorSliceAxisStep :: TensorSliceAxisStepFn
   , nativeTensorTakeAxis :: TensorTakeAxisFn
   , nativeTensorIndexAxis :: TensorIndexAxisFn
+  , nativeTensorAdd :: TensorBinaryOpFn
+  , nativeTensorSub :: TensorBinaryOpFn
+  , nativeTensorMul :: TensorBinaryOpFn
+  , nativeTensorDiv :: TensorBinaryOpFn
+  , nativeTensorAddScalar :: TensorScalarOpFn
+  , nativeTensorSubScalar :: TensorScalarOpFn
+  , nativeTensorMulScalar :: TensorScalarOpFn
+  , nativeTensorDivScalar :: TensorScalarOpFn
   , nativeRank :: RankFn
   , nativeDType :: DTypeFn
   , nativeAppendAxis :: AppendAxisFn
@@ -4628,6 +4648,14 @@ loadUnchecked path = do
   nativeTensorSliceAxisStep <- mkTensorSliceAxisStep <$> dlsym dl "arcadia_tio_tensor_slice_axis_step"
   nativeTensorTakeAxis <- mkTensorTakeAxis <$> dlsym dl "arcadia_tio_tensor_take_axis"
   nativeTensorIndexAxis <- mkTensorIndexAxis <$> dlsym dl "arcadia_tio_tensor_index_axis"
+  nativeTensorAdd <- mkTensorBinaryOp <$> dlsym dl "arcadia_tio_tensor_add"
+  nativeTensorSub <- mkTensorBinaryOp <$> dlsym dl "arcadia_tio_tensor_sub"
+  nativeTensorMul <- mkTensorBinaryOp <$> dlsym dl "arcadia_tio_tensor_mul"
+  nativeTensorDiv <- mkTensorBinaryOp <$> dlsym dl "arcadia_tio_tensor_div"
+  nativeTensorAddScalar <- mkTensorScalarOp <$> dlsym dl "arcadia_tio_tensor_add_scalar"
+  nativeTensorSubScalar <- mkTensorScalarOp <$> dlsym dl "arcadia_tio_tensor_sub_scalar"
+  nativeTensorMulScalar <- mkTensorScalarOp <$> dlsym dl "arcadia_tio_tensor_mul_scalar"
+  nativeTensorDivScalar <- mkTensorScalarOp <$> dlsym dl "arcadia_tio_tensor_div_scalar"
   nativeRank <- mkRank <$> dlsym dl "arcadia_tio_rank"
   nativeDType <- mkDType <$> dlsym dl "arcadia_tio_dtype"
   nativeAppendAxis <- mkAppendAxis <$> dlsym dl "arcadia_tio_append_axis"
@@ -4848,6 +4876,14 @@ loadUnchecked path = do
       , nativeTensorSliceAxisStep
       , nativeTensorTakeAxis
       , nativeTensorIndexAxis
+      , nativeTensorAdd
+      , nativeTensorSub
+      , nativeTensorMul
+      , nativeTensorDiv
+      , nativeTensorAddScalar
+      , nativeTensorSubScalar
+      , nativeTensorMulScalar
+      , nativeTensorDivScalar
       , nativeRank
       , nativeDType
       , nativeAppendAxis
@@ -5220,6 +5256,30 @@ capiTensorTakeAxis NativeLibrary{nativeTensorTakeAxis} = nativeTensorTakeAxis
 
 capiTensorIndexAxis :: NativeLibrary -> TensorIndexAxisFn
 capiTensorIndexAxis NativeLibrary{nativeTensorIndexAxis} = nativeTensorIndexAxis
+
+capiTensorAdd :: NativeLibrary -> TensorBinaryOpFn
+capiTensorAdd NativeLibrary{nativeTensorAdd} = nativeTensorAdd
+
+capiTensorSub :: NativeLibrary -> TensorBinaryOpFn
+capiTensorSub NativeLibrary{nativeTensorSub} = nativeTensorSub
+
+capiTensorMul :: NativeLibrary -> TensorBinaryOpFn
+capiTensorMul NativeLibrary{nativeTensorMul} = nativeTensorMul
+
+capiTensorDiv :: NativeLibrary -> TensorBinaryOpFn
+capiTensorDiv NativeLibrary{nativeTensorDiv} = nativeTensorDiv
+
+capiTensorAddScalar :: NativeLibrary -> TensorScalarOpFn
+capiTensorAddScalar NativeLibrary{nativeTensorAddScalar} = nativeTensorAddScalar
+
+capiTensorSubScalar :: NativeLibrary -> TensorScalarOpFn
+capiTensorSubScalar NativeLibrary{nativeTensorSubScalar} = nativeTensorSubScalar
+
+capiTensorMulScalar :: NativeLibrary -> TensorScalarOpFn
+capiTensorMulScalar NativeLibrary{nativeTensorMulScalar} = nativeTensorMulScalar
+
+capiTensorDivScalar :: NativeLibrary -> TensorScalarOpFn
+capiTensorDivScalar NativeLibrary{nativeTensorDivScalar} = nativeTensorDivScalar
 
 capiRank :: NativeLibrary -> RankFn
 capiRank NativeLibrary{nativeRank} = nativeRank
