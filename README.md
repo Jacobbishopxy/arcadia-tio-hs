@@ -47,9 +47,10 @@ zero deferred blockers with `--fail-on-deferred`. It also reports named family
 audits; `--fail-on-family-gaps` turns missing or unwrapped named-family items
 into hard failures. The current checked header snapshot passes those stricter
 gates with 400 wrapped items, 24 intentionally not-applicable C ABI
-conveniences, 0 deferred blockers, 0 unknown/unmapped items, and 0 gaps in the
-12-function `tensor-structural-core` family or the 8-function
-`tensor-elementwise-float-core` family. This is a narrow 100% parity claim
+conveniences, 0 deferred blockers, 0 unknown/unmapped items, and 0 gaps across
+the 12-function `tensor-structural-core`, 8-function
+`tensor-elementwise-float-core`, 10-function `coordinate-v2-lookup-core`, and
+2-function `read-index-basic-core` families. This is a narrow 100% parity claim
 for the current Haskell wrapper boundary over the audited C ABI/public wrapper
 surface only. It is not a packaging, support, deployment, release, performance,
 direct Rust-internal implementation, or production-readiness claim.

@@ -22,6 +22,8 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 | --- | ---: | ---: | ---: | ---: |
 | tensor-structural-core | 12 | 12 | 12 | 0 |
 | tensor-elementwise-float-core | 8 | 8 | 8 | 0 |
+| coordinate-v2-lookup-core | 10 | 10 | 10 | 0 |
+| read-index-basic-core | 2 | 2 | 2 | 0 |
 
 ## wrapped items
 

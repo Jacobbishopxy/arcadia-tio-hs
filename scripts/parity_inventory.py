@@ -216,9 +216,33 @@ TENSOR_ELEMENTWISE_FLOAT_CORE_FUNCTIONS = frozenset(
     }
 )
 
+COORDINATE_V2_LOOKUP_CORE_FUNCTIONS = frozenset(
+    {
+        "arcadia_tio_coordinate_meta_v2",
+        "arcadia_tio_load_coordinate_meta_v2",
+        "arcadia_tio_axis_coordinate_meta_v2_free",
+        "arcadia_tio_read_axis_coordinates_v2",
+        "arcadia_tio_coordinate_value_slice_v2_free",
+        "arcadia_tio_coordinate_dictionary_v2",
+        "arcadia_tio_coordinate_dictionary_v2_free",
+        "arcadia_tio_coordinate_lookup_v2",
+        "arcadia_tio_coordinate_lookup_range_v2",
+        "arcadia_tio_coordinate_lookup_result_v2_free",
+    }
+)
+
+READ_INDEX_BASIC_CORE_FUNCTIONS = frozenset(
+    {
+        "arcadia_tio_read_index",
+        "arcadia_tio_read_index_report_free",
+    }
+)
+
 NAMED_FUNCTION_FAMILIES = {
     "tensor-structural-core": TENSOR_STRUCTURAL_CORE_FUNCTIONS,
     "tensor-elementwise-float-core": TENSOR_ELEMENTWISE_FLOAT_CORE_FUNCTIONS,
+    "coordinate-v2-lookup-core": COORDINATE_V2_LOOKUP_CORE_FUNCTIONS,
+    "read-index-basic-core": READ_INDEX_BASIC_CORE_FUNCTIONS,
 }
 
 WRAPPED_OCB_TYPES = {
@@ -524,6 +548,8 @@ def run_self_test() -> None:
             uint32_t arcadia_tio_abi_version(void);
             int32_t arcadia_tio_append_f32(void);
             int32_t arcadia_tio_coordinate_lookup_v2(void);
+            int32_t arcadia_tio_read_index(void);
+            void arcadia_tio_read_index_report_free(void);
             int32_t arcadia_tio_append_sparse_i64_v2(void);
             int32_t arcadia_tio_tensor_reshape(void);
             int32_t arcadia_tio_tensor_add(void);
@@ -552,6 +578,8 @@ def run_self_test() -> None:
             "arcadia_tio_abi_version": CATEGORY_WRAPPED,
             "arcadia_tio_append_f32": CATEGORY_NOT_APPLICABLE,
             "arcadia_tio_coordinate_lookup_v2": CATEGORY_DEFERRED,
+            "arcadia_tio_read_index": CATEGORY_DEFERRED,
+            "arcadia_tio_read_index_report_free": CATEGORY_DEFERRED,
             "arcadia_tio_append_sparse_i64_v2": CATEGORY_NOT_APPLICABLE,
             "arcadia_tio_tensor_reshape": CATEGORY_WRAPPED,
             "arcadia_tio_tensor_add": CATEGORY_WRAPPED,
@@ -569,6 +597,12 @@ def run_self_test() -> None:
         elementwise = families["tensor-elementwise-float-core"]
         if elementwise.expected != 8 or elementwise.present != 1 or elementwise.wrapped != 1 or elementwise.gaps != 7:
             raise SystemExit(f"self-test failed elementwise family report: got {elementwise}")
+        coordinate = families["coordinate-v2-lookup-core"]
+        if coordinate.expected != 10 or coordinate.present != 1 or coordinate.wrapped != 0 or coordinate.gaps != 10:
+            raise SystemExit(f"self-test failed coordinate family report: got {coordinate}")
+        read_index = families["read-index-basic-core"]
+        if read_index.expected != 2 or read_index.present != 2 or read_index.wrapped != 0 or read_index.gaps != 2:
+            raise SystemExit(f"self-test failed read-index family report: got {read_index}")
     print("parity_inventory.py self-test: PASS")
 
 

@@ -47,10 +47,13 @@ Current audited C ABI/public-wrapper parity gate:
 - unknown/unmapped: 0
 - `tensor-structural-core` named family gaps: 0 / 12 expected functions
 - `tensor-elementwise-float-core` named family gaps: 0 / 8 expected functions
+- `coordinate-v2-lookup-core` named family gaps: 0 / 10 expected functions
+- `read-index-basic-core` named family gaps: 0 / 2 expected functions
 
 These counts support a narrow 100% parity claim for the current Haskell wrapper
 boundary over the audited C ABI/public wrapper surface, including the tensor
-structural-core C ABI slice: every in-scope C ABI item is either wrapped or
+structural-core, tensor elementwise float, coordinate v2 lookup, and basic
+read-index C ABI slices: every in-scope C ABI item is either wrapped or
 intentionally not applicable to this source-visible wrapper. They are not a
 packaging, support, deployment, release, performance, direct Rust-internal
 format implementation, or production-readiness statement, and they do not claim
