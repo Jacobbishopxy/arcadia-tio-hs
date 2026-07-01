@@ -34,7 +34,9 @@ The current machine inventory reports wrapped items, intentionally
 not-applicable ABI conveniences, deferred blockers, and unknown/unmapped items.
 A passing default run means there are no unknown/unmapped C ABI items; the
 stricter `--fail-on-deferred` gate passes for the current checked header
-snapshot. The checked-in generated item list is
+snapshot. The gate also reports named family audits, and
+`--fail-on-family-gaps` fails when a named family is missing from the supplied
+headers or not fully wrapped. The checked-in generated item list is
 [parity-inventory.generated.md](parity-inventory.generated.md).
 
 Current audited C ABI/public-wrapper parity gate:
@@ -43,6 +45,7 @@ Current audited C ABI/public-wrapper parity gate:
 - intentionally not applicable: 24
 - deferred blockers: 0
 - unknown/unmapped: 0
+- `tensor-structural-core` named family gaps: 0 / 12 expected functions
 
 These counts support a narrow 100% parity claim for the current Haskell wrapper
 boundary over the audited C ABI/public wrapper surface, including the tensor

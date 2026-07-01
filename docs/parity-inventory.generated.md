@@ -14,7 +14,13 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 | unknown-unmapped | 0 |
 | total | 416 |
 
-A default inventory run fails when `unknown-unmapped` is non-zero. Deferred blockers remain visible and can be promoted to a hard failure with `--fail-on-deferred`.
+A default inventory run fails when `unknown-unmapped` is non-zero. Deferred blockers remain visible and can be promoted to a hard failure with `--fail-on-deferred`. Named family gaps can be promoted to a hard failure with `--fail-on-family-gaps`.
+
+## Named family audits
+
+| Family | Expected | Present in headers | Wrapped | Gaps |
+| --- | ---: | ---: | ---: | ---: |
+| tensor-structural-core | 12 | 12 | 12 | 0 |
 
 ## wrapped items
 

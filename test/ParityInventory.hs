@@ -21,7 +21,7 @@ main = do
         putStrLn ("missing parity inventory script: " <> script)
         exitFailure
       (code, out, err) <- readCreateProcessWithExitCode
-        (proc "python3" [script, "--include-root", root, "--hs-root", repoRoot])
+        (proc "python3" [script, "--include-root", root, "--hs-root", repoRoot, "--fail-on-family-gaps"])
         ""
       putStr out
       putStr err

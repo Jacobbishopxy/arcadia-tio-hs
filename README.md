@@ -43,13 +43,15 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and can enforce
-zero deferred blockers with `--fail-on-deferred`. The current checked header
-snapshot passes that stricter gate with 392 wrapped items, 24 intentionally
-not-applicable C ABI conveniences, 0 deferred blockers, and 0 unknown/unmapped
-items. This is a narrow 100% parity claim for the current Haskell wrapper
-boundary over the audited C ABI/public wrapper surface only. It is not a
-packaging, support, deployment, release, performance, direct Rust-internal
-implementation, or production-readiness claim.
+zero deferred blockers with `--fail-on-deferred`. It also reports named family
+audits; `--fail-on-family-gaps` turns missing or unwrapped named-family items
+into hard failures. The current checked header snapshot passes those stricter
+gates with 392 wrapped items, 24 intentionally not-applicable C ABI
+conveniences, 0 deferred blockers, 0 unknown/unmapped items, and 0 gaps in the
+12-function `tensor-structural-core` family. This is a narrow 100% parity claim
+for the current Haskell wrapper boundary over the audited C ABI/public wrapper
+surface only. It is not a packaging, support, deployment, release, performance,
+direct Rust-internal implementation, or production-readiness claim.
 
 ## Current scope
 
