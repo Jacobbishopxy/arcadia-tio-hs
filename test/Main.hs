@@ -35,6 +35,7 @@ main = do
   native <- unwrap "loadNativeLibrary" =<< loadNativeLibrary
   createDirectoryIfMissing True ".test-output"
 
+  testTensorStructuralOps native
   testStreamingF64MetadataSelectorsDense native
   testReadOptionsReportsIndex native
   testMutationAndArrow native
@@ -133,6 +134,46 @@ testNonOcbEnumPolicyConversionsPure = do
   assertEqual "v4 compaction policy unknown preserved" 5 (v4CompactionAnalysisPolicyToRaw (v4CompactionAnalysisPolicyFromRaw 5))
   assertEqual "v4 retained history policy raw" 0 (v4RetainedHistoryPolicyToRaw V4RetainLast)
 
+
+testTensorStructuralOps :: NativeLibrary -> IO ()
+testTensorStructuralOps native = do
+  let base = Tensor [2, 3] (VS.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: VS.Vector Double)
+
+  contiguous <- unwrap "tensorToContiguous" =<< tensorToContiguous native base
+  assertTensor "tensorToContiguous" [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] contiguous
+
+  reshaped <- unwrap "tensorReshape" =<< tensorReshape native [3, 2] base
+  assertTensor "tensorReshape" [3, 2] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] reshaped
+
+  flattened <- unwrap "tensorFlatten" =<< tensorFlatten native base
+  assertTensor "tensorFlatten" [6] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] flattened
+
+  expanded <- unwrap "tensorExpandDims" =<< tensorExpandDims native 1 base
+  assertTensor "tensorExpandDims" [2, 1, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] expanded
+
+  squeezed <- unwrap "tensorSqueeze" =<< tensorSqueeze native (Tensor [1, 2, 1, 3] (tensorValues base))
+  assertTensor "tensorSqueeze" [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] squeezed
+
+  squeezedAxis <- unwrap "tensorSqueezeAxis" =<< tensorSqueezeAxis native 1 expanded
+  assertTensor "tensorSqueezeAxis" [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] squeezedAxis
+
+  permuted <- unwrap "tensorPermuteAxes" =<< tensorPermuteAxes native [1, 0] base
+  assertTensor "tensorPermuteAxes" [3, 2] [1.0, 4.0, 2.0, 5.0, 3.0, 6.0] permuted
+
+  transposed <- unwrap "tensorTranspose" =<< tensorTranspose native base
+  assertTensor "tensorTranspose" [3, 2] [1.0, 4.0, 2.0, 5.0, 3.0, 6.0] transposed
+
+  sliced <- unwrap "tensorSliceAxis" =<< tensorSliceAxis native 1 1 3 base
+  assertTensor "tensorSliceAxis" [2, 2] [2.0, 3.0, 5.0, 6.0] sliced
+
+  stepped <- unwrap "tensorSliceAxisStep" =<< tensorSliceAxisStep native 1 0 3 2 base
+  assertTensor "tensorSliceAxisStep" [2, 2] [1.0, 3.0, 4.0, 6.0] stepped
+
+  taken <- unwrap "tensorTakeAxis" =<< tensorTakeAxis native 1 [2, 0] base
+  assertTensor "tensorTakeAxis" [2, 2] [3.0, 1.0, 6.0, 4.0] taken
+
+  indexed <- unwrap "tensorIndexAxis" =<< tensorIndexAxis native 1 2 base
+  assertTensor "tensorIndexAxis" [2, 1] [3.0, 6.0] indexed
 
 testOcbWriteValidationPure :: IO ()
 testOcbWriteValidationPure = do

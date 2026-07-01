@@ -33,23 +33,24 @@ ARCADIA_TIO_CAPI_INCLUDE_ROOT=/path/to/arcadia-tio/crates/arcadia-tio-capi/inclu
 The current machine inventory reports wrapped items, intentionally
 not-applicable ABI conveniences, deferred blockers, and unknown/unmapped items.
 A passing default run means there are no unknown/unmapped C ABI items; the
-stricter TP-478 final gate also passed with `--fail-on-deferred`. The checked-in
-generated item list is [parity-inventory.generated.md](parity-inventory.generated.md).
+stricter `--fail-on-deferred` gate passes for the current checked header
+snapshot. The checked-in generated item list is
+[parity-inventory.generated.md](parity-inventory.generated.md).
 
-TP-478 final audited C ABI/public-wrapper parity gate:
+Current audited C ABI/public-wrapper parity gate:
 
-- wrapped: 380
+- wrapped: 392
 - intentionally not applicable: 24
 - deferred blockers: 0
 - unknown/unmapped: 0
 
 These counts support a narrow 100% parity claim for the current Haskell wrapper
-boundary over the audited frozen C ABI/public wrapper surface: every in-scope C
-ABI item is either wrapped or intentionally not applicable to this
-source-visible wrapper. They are not a packaging, support, deployment, release,
-performance, direct Rust-internal format implementation, or production-readiness
-statement, and they do not claim broader parity with private Rust internals or
-future header snapshots.
+boundary over the audited C ABI/public wrapper surface, including the tensor
+structural-core C ABI slice: every in-scope C ABI item is either wrapped or
+intentionally not applicable to this source-visible wrapper. They are not a
+packaging, support, deployment, release, performance, direct Rust-internal
+format implementation, or production-readiness statement, and they do not claim
+broader parity with private Rust internals or future header snapshots.
 
 Legend:
 
@@ -81,7 +82,7 @@ Legend:
 | Selector reads / axis ranges / entry ranges | ✅ | ✅ | Axis range/take/one, entry range/take, selector-bearing option reads, and read-index wrappers are exposed with copied reports. |
 | Scalar reads | ✅ | ✅ | `readScalar` returns dtype plus native double-valued scalar carrier. |
 | File metadata load/query | ✅ `load_meta`, metadata accessors | ⚠️ partial | `rank`, `dtype`, `appendAxis`, `dimLens`, `chunkPlan`, `filePath`, and basic `loadMeta` are exposed; richer coordinate/universe metadata remains missing. |
-| Tensor helper operations | ✅ Rust tensor ops | ❌ | Could add Haskell-owned tensor helpers independent of native ABI. |
+| Tensor helper operations | ✅ Rust tensor ops | ✅ structural core | Haskell exposes the copy-only C ABI structural core as typed `tensorToContiguous`, `tensorReshape`, `tensorFlatten`, `tensorExpandDims`, `tensorSqueeze`, `tensorSqueezeAxis`, `tensorPermuteAxes`, `tensorTranspose`, `tensorSliceAxis`, `tensorSliceAxisStep`, `tensorTakeAxis`, and `tensorIndexAxis` wrappers over Haskell-owned `Tensor` values. Broader math/reduction/view/assembly tensor ops remain deferred. |
 | Sparse-intent append/analyze | ✅ | ✅ | `SparseRule` ADTs plus `analyzeSparseAppend*` / `appendSparse*` wrappers use the C ABI V2 sparse rule and copy native analysis reasons. Direct no-range sparse V2 append C helpers are intentionally not separate Haskell APIs because the range-returning wrappers call the same native inputs and return the assigned `AppendRange`. |
 | Signed integer sparse exact predicates | ✅ | ✅ | `SparsePredicateEqualI32` / `SparsePredicateEqualI64` are exposed and tested through V2 sparse rule calls. |
 | Coordinate metadata/create/read/lookup | ✅ | ⚠️ partial | Coordinate v1/v2 metadata/read/dictionary, v2 lookup/range lookup, legacy coordinate index/range helpers, coordinate-aware create variants, and append-axis v2 dense append bindings are exposed. Native append-sequence numeric value reads currently report unsupported-domain status; richer fixed-text/dictionary authoring remains outside the current safe high-level surface. |

@@ -273,6 +273,18 @@ module Arcadia.Tio.Internal.CApi
   , capiReadAxisOne
   , capiReadEntryRange
   , capiTakeEntries
+  , capiTensorToContiguous
+  , capiTensorReshape
+  , capiTensorFlatten
+  , capiTensorExpandDims
+  , capiTensorSqueeze
+  , capiTensorSqueezeAxis
+  , capiTensorPermuteAxes
+  , capiTensorTranspose
+  , capiTensorSliceAxis
+  , capiTensorSliceAxisStep
+  , capiTensorTakeAxis
+  , capiTensorIndexAxis
   , capiRank
   , capiDType
   , capiAppendAxis
@@ -3896,6 +3908,18 @@ type ReadAxisTakeFn = Ptr CHandle -> CSize -> Ptr Word32 -> CSize -> Ptr CArcadi
 type ReadAxisOneFn = Ptr CHandle -> CSize -> Word32 -> Ptr CArcadiaTioTensor -> IO CInt
 type ReadEntryRangeFn = Ptr CHandle -> Word32 -> Word32 -> Ptr CArcadiaTioTensor -> IO CInt
 type TakeEntriesFn = Ptr CHandle -> Ptr Word32 -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorToContiguousFn = Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorReshapeFn = Ptr CArcadiaTioTensor -> Ptr Word64 -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorFlattenFn = Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorExpandDimsFn = Ptr CArcadiaTioTensor -> Int64 -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorSqueezeFn = Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorSqueezeAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorPermuteAxesFn = Ptr CArcadiaTioTensor -> Ptr Int64 -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorTransposeFn = Ptr CArcadiaTioTensor -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorSliceAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Word64 -> Word64 -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorSliceAxisStepFn = Ptr CArcadiaTioTensor -> Int64 -> Int64 -> Int64 -> Int64 -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorTakeAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Ptr Word64 -> CSize -> Ptr CArcadiaTioTensor -> IO CInt
+type TensorIndexAxisFn = Ptr CArcadiaTioTensor -> Int64 -> Word64 -> Ptr CArcadiaTioTensor -> IO CInt
 type RankFn = Ptr CHandle -> Ptr CSize -> IO CInt
 type DTypeFn = Ptr CHandle -> Ptr CInt -> IO CInt
 type AppendAxisFn = Ptr CHandle -> Ptr CSize -> IO CInt
@@ -4093,6 +4117,18 @@ foreign import ccall safe "dynamic" mkReadAxisTake :: FunPtr ReadAxisTakeFn -> R
 foreign import ccall safe "dynamic" mkReadAxisOne :: FunPtr ReadAxisOneFn -> ReadAxisOneFn
 foreign import ccall safe "dynamic" mkReadEntryRange :: FunPtr ReadEntryRangeFn -> ReadEntryRangeFn
 foreign import ccall safe "dynamic" mkTakeEntries :: FunPtr TakeEntriesFn -> TakeEntriesFn
+foreign import ccall safe "dynamic" mkTensorToContiguous :: FunPtr TensorToContiguousFn -> TensorToContiguousFn
+foreign import ccall safe "dynamic" mkTensorReshape :: FunPtr TensorReshapeFn -> TensorReshapeFn
+foreign import ccall safe "dynamic" mkTensorFlatten :: FunPtr TensorFlattenFn -> TensorFlattenFn
+foreign import ccall safe "dynamic" mkTensorExpandDims :: FunPtr TensorExpandDimsFn -> TensorExpandDimsFn
+foreign import ccall safe "dynamic" mkTensorSqueeze :: FunPtr TensorSqueezeFn -> TensorSqueezeFn
+foreign import ccall safe "dynamic" mkTensorSqueezeAxis :: FunPtr TensorSqueezeAxisFn -> TensorSqueezeAxisFn
+foreign import ccall safe "dynamic" mkTensorPermuteAxes :: FunPtr TensorPermuteAxesFn -> TensorPermuteAxesFn
+foreign import ccall safe "dynamic" mkTensorTranspose :: FunPtr TensorTransposeFn -> TensorTransposeFn
+foreign import ccall safe "dynamic" mkTensorSliceAxis :: FunPtr TensorSliceAxisFn -> TensorSliceAxisFn
+foreign import ccall safe "dynamic" mkTensorSliceAxisStep :: FunPtr TensorSliceAxisStepFn -> TensorSliceAxisStepFn
+foreign import ccall safe "dynamic" mkTensorTakeAxis :: FunPtr TensorTakeAxisFn -> TensorTakeAxisFn
+foreign import ccall safe "dynamic" mkTensorIndexAxis :: FunPtr TensorIndexAxisFn -> TensorIndexAxisFn
 foreign import ccall safe "dynamic" mkRank :: FunPtr RankFn -> RankFn
 foreign import ccall safe "dynamic" mkDType :: FunPtr DTypeFn -> DTypeFn
 foreign import ccall safe "dynamic" mkAppendAxis :: FunPtr AppendAxisFn -> AppendAxisFn
@@ -4304,6 +4340,18 @@ data NativeLibrary = NativeLibrary
   , nativeReadAxisOne :: ReadAxisOneFn
   , nativeReadEntryRange :: ReadEntryRangeFn
   , nativeTakeEntries :: TakeEntriesFn
+  , nativeTensorToContiguous :: TensorToContiguousFn
+  , nativeTensorReshape :: TensorReshapeFn
+  , nativeTensorFlatten :: TensorFlattenFn
+  , nativeTensorExpandDims :: TensorExpandDimsFn
+  , nativeTensorSqueeze :: TensorSqueezeFn
+  , nativeTensorSqueezeAxis :: TensorSqueezeAxisFn
+  , nativeTensorPermuteAxes :: TensorPermuteAxesFn
+  , nativeTensorTranspose :: TensorTransposeFn
+  , nativeTensorSliceAxis :: TensorSliceAxisFn
+  , nativeTensorSliceAxisStep :: TensorSliceAxisStepFn
+  , nativeTensorTakeAxis :: TensorTakeAxisFn
+  , nativeTensorIndexAxis :: TensorIndexAxisFn
   , nativeRank :: RankFn
   , nativeDType :: DTypeFn
   , nativeAppendAxis :: AppendAxisFn
@@ -4568,6 +4616,18 @@ loadUnchecked path = do
   nativeReadAxisOne <- mkReadAxisOne <$> dlsym dl "arcadia_tio_read_axis_one"
   nativeReadEntryRange <- mkReadEntryRange <$> dlsym dl "arcadia_tio_read_entry_range"
   nativeTakeEntries <- mkTakeEntries <$> dlsym dl "arcadia_tio_take_entries"
+  nativeTensorToContiguous <- mkTensorToContiguous <$> dlsym dl "arcadia_tio_tensor_to_contiguous"
+  nativeTensorReshape <- mkTensorReshape <$> dlsym dl "arcadia_tio_tensor_reshape"
+  nativeTensorFlatten <- mkTensorFlatten <$> dlsym dl "arcadia_tio_tensor_flatten"
+  nativeTensorExpandDims <- mkTensorExpandDims <$> dlsym dl "arcadia_tio_tensor_expand_dims"
+  nativeTensorSqueeze <- mkTensorSqueeze <$> dlsym dl "arcadia_tio_tensor_squeeze"
+  nativeTensorSqueezeAxis <- mkTensorSqueezeAxis <$> dlsym dl "arcadia_tio_tensor_squeeze_axis"
+  nativeTensorPermuteAxes <- mkTensorPermuteAxes <$> dlsym dl "arcadia_tio_tensor_permute_axes"
+  nativeTensorTranspose <- mkTensorTranspose <$> dlsym dl "arcadia_tio_tensor_transpose"
+  nativeTensorSliceAxis <- mkTensorSliceAxis <$> dlsym dl "arcadia_tio_tensor_slice_axis"
+  nativeTensorSliceAxisStep <- mkTensorSliceAxisStep <$> dlsym dl "arcadia_tio_tensor_slice_axis_step"
+  nativeTensorTakeAxis <- mkTensorTakeAxis <$> dlsym dl "arcadia_tio_tensor_take_axis"
+  nativeTensorIndexAxis <- mkTensorIndexAxis <$> dlsym dl "arcadia_tio_tensor_index_axis"
   nativeRank <- mkRank <$> dlsym dl "arcadia_tio_rank"
   nativeDType <- mkDType <$> dlsym dl "arcadia_tio_dtype"
   nativeAppendAxis <- mkAppendAxis <$> dlsym dl "arcadia_tio_append_axis"
@@ -4776,6 +4836,18 @@ loadUnchecked path = do
       , nativeReadAxisOne
       , nativeReadEntryRange
       , nativeTakeEntries
+      , nativeTensorToContiguous
+      , nativeTensorReshape
+      , nativeTensorFlatten
+      , nativeTensorExpandDims
+      , nativeTensorSqueeze
+      , nativeTensorSqueezeAxis
+      , nativeTensorPermuteAxes
+      , nativeTensorTranspose
+      , nativeTensorSliceAxis
+      , nativeTensorSliceAxisStep
+      , nativeTensorTakeAxis
+      , nativeTensorIndexAxis
       , nativeRank
       , nativeDType
       , nativeAppendAxis
@@ -5112,6 +5184,42 @@ capiReadEntryRange NativeLibrary{nativeReadEntryRange} = nativeReadEntryRange
 
 capiTakeEntries :: NativeLibrary -> TakeEntriesFn
 capiTakeEntries NativeLibrary{nativeTakeEntries} = nativeTakeEntries
+
+capiTensorToContiguous :: NativeLibrary -> TensorToContiguousFn
+capiTensorToContiguous NativeLibrary{nativeTensorToContiguous} = nativeTensorToContiguous
+
+capiTensorReshape :: NativeLibrary -> TensorReshapeFn
+capiTensorReshape NativeLibrary{nativeTensorReshape} = nativeTensorReshape
+
+capiTensorFlatten :: NativeLibrary -> TensorFlattenFn
+capiTensorFlatten NativeLibrary{nativeTensorFlatten} = nativeTensorFlatten
+
+capiTensorExpandDims :: NativeLibrary -> TensorExpandDimsFn
+capiTensorExpandDims NativeLibrary{nativeTensorExpandDims} = nativeTensorExpandDims
+
+capiTensorSqueeze :: NativeLibrary -> TensorSqueezeFn
+capiTensorSqueeze NativeLibrary{nativeTensorSqueeze} = nativeTensorSqueeze
+
+capiTensorSqueezeAxis :: NativeLibrary -> TensorSqueezeAxisFn
+capiTensorSqueezeAxis NativeLibrary{nativeTensorSqueezeAxis} = nativeTensorSqueezeAxis
+
+capiTensorPermuteAxes :: NativeLibrary -> TensorPermuteAxesFn
+capiTensorPermuteAxes NativeLibrary{nativeTensorPermuteAxes} = nativeTensorPermuteAxes
+
+capiTensorTranspose :: NativeLibrary -> TensorTransposeFn
+capiTensorTranspose NativeLibrary{nativeTensorTranspose} = nativeTensorTranspose
+
+capiTensorSliceAxis :: NativeLibrary -> TensorSliceAxisFn
+capiTensorSliceAxis NativeLibrary{nativeTensorSliceAxis} = nativeTensorSliceAxis
+
+capiTensorSliceAxisStep :: NativeLibrary -> TensorSliceAxisStepFn
+capiTensorSliceAxisStep NativeLibrary{nativeTensorSliceAxisStep} = nativeTensorSliceAxisStep
+
+capiTensorTakeAxis :: NativeLibrary -> TensorTakeAxisFn
+capiTensorTakeAxis NativeLibrary{nativeTensorTakeAxis} = nativeTensorTakeAxis
+
+capiTensorIndexAxis :: NativeLibrary -> TensorIndexAxisFn
+capiTensorIndexAxis NativeLibrary{nativeTensorIndexAxis} = nativeTensorIndexAxis
 
 capiRank :: NativeLibrary -> RankFn
 capiRank NativeLibrary{nativeRank} = nativeRank

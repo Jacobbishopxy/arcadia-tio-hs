@@ -43,13 +43,13 @@ python3 scripts/parity_inventory.py \
 ```
 
 The inventory fails on unknown/unmapped C ABI items by default and can enforce
-zero deferred blockers with `--fail-on-deferred`. The TP-478 final gate passed
-that stricter check against the frozen Arcadia TIO 0.2.0 C ABI header snapshot:
-380 wrapped items, 24 intentionally not-applicable C ABI conveniences, 0
-deferred blockers, and 0 unknown/unmapped items. This is a narrow 100% parity
-claim for the current Haskell wrapper boundary over the audited C ABI/public
-wrapper surface only. It is not a packaging, support, deployment, release,
-performance, direct Rust-internal implementation, or production-readiness claim.
+zero deferred blockers with `--fail-on-deferred`. The current checked header
+snapshot passes that stricter gate with 392 wrapped items, 24 intentionally
+not-applicable C ABI conveniences, 0 deferred blockers, and 0 unknown/unmapped
+items. This is a narrow 100% parity claim for the current Haskell wrapper
+boundary over the audited C ABI/public wrapper surface only. It is not a
+packaging, support, deployment, release, performance, direct Rust-internal
+implementation, or production-readiness claim.
 
 ## Current scope
 
@@ -81,6 +81,11 @@ Implemented:
   the Haskell range-returning wrappers;
 - read all values into Haskell-owned `Vector.Storable` buffers;
 - read all values with a copied validity mask;
+- call the copy-only tensor structural core (`tensorToContiguous`,
+  `tensorReshape`, `tensorFlatten`, `tensorExpandDims`, `tensorSqueeze`,
+  `tensorSqueezeAxis`, `tensorPermuteAxes`, `tensorTranspose`,
+  `tensorSliceAxis`, `tensorSliceAxisStep`, `tensorTakeAxis`, and
+  `tensorIndexAxis`) over Haskell-owned dense tensors;
 - read axis ranges/takes/one-index slices, append-entry ranges/takes, and scalar values;
 - read full and selector-bearing retained commit snapshots, including dense
   materialization with mask;

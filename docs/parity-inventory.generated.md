@@ -8,11 +8,11 @@ This inventory compares the current Haskell wrapper surface with the Arcadia TIO
 
 | Category | Count |
 | --- | ---: |
-| wrapped | 380 |
+| wrapped | 392 |
 | not-applicable | 24 |
 | deferred-blocker | 0 |
 | unknown-unmapped | 0 |
-| total | 404 |
+| total | 416 |
 
 A default inventory run fails when `unknown-unmapped` is non-zero. Deferred blockers remain visible and can be promoted to a hard failure with `--fail-on-deferred`.
 
@@ -213,7 +213,19 @@ A default inventory run fails when `unknown-unmapped` is non-zero. Deferred bloc
 - `function` `arcadia_tio_sparse_append_analysis_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_string_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_take_entries` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_expand_dims` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_flatten` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_tensor_free` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_index_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_permute_axes` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_reshape` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_slice_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_slice_axis_step` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_squeeze` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_squeeze_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_take_axis` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_to_contiguous` — resolved by Haskell dynamic-loader surface
+- `function` `arcadia_tio_tensor_transpose` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_v4_compaction_analysis_precise_report_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_v4_compaction_analysis_report_free` — resolved by Haskell dynamic-loader surface
 - `function` `arcadia_tio_v4_diagnostics` — resolved by Haskell dynamic-loader surface
